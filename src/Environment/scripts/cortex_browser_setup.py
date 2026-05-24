@@ -10,8 +10,8 @@ ADMIN_PASS = os.getenv("CORTEX_ADMIN_PASSWORD", "secret")
 def update_env_files(api_key: str):
     """Updates CORTEX_API_KEY in the environment files."""
     env_paths = [
-        "/Users/firatkurt/Documents/Repos/AiBa/src/Environment/.env",
-        "/Users/firatkurt/Documents/Repos/AiBa/src/Agentix/.env"
+        "/Users/firatkurt/Documents/Repos/blueTeam/src/Environment/.env",
+        "/Users/firatkurt/Documents/Repos/blueTeam/src/Agentix/.env"
     ]
     
     for env_path in env_paths:

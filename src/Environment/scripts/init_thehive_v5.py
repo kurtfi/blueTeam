@@ -161,8 +161,8 @@ def renew_analyst_key(client: httpx.Client, admin_headers: dict, user_id: str) -
 def update_env_files(api_key: str):
     """Updates THEHIVE_API_KEY in the environment files."""
     env_paths = [
-        "/Users/firatkurt/Documents/Repos/AiBa/src/Environment/.env",
-        "/Users/firatkurt/Documents/Repos/AiBa/src/Agentix/.env"
+        "/Users/firatkurt/Documents/Repos/blueTeam/src/Environment/.env",
+        "/Users/firatkurt/Documents/Repos/blueTeam/src/Agentix/.env"
     ]
     for env_path in env_paths:
         if not os.path.exists(env_path):

@@ -79,7 +79,7 @@ The orchestrator drives a loop (up to a configurable `max_iterations`) where the
 - **Final Answer**: Once the goal is met, the LLM provides a prefixed response.
 
 ### 3.2 Dynamic Tool Selection
-To maintain focus and reduce "distraction" from irrelevant tools, the Orchestrator uses the [ToolCatalog.select](file:///Users/firatkurt/Documents/Repos/AiBa/src/Agentix/agentix/registry/catalog.py:106) method. It computes the semantic similarity between the user's message and tool descriptions using embeddings.
+To maintain focus and reduce "distraction" from irrelevant tools, the Orchestrator uses the [ToolCatalog.select](file:///Users/firatkurt/Documents/Repos/blueTeam/src/Agentix/agentix/registry/catalog.py:106) method. It computes the semantic similarity between the user's message and tool descriptions using embeddings.
 
 ### 3.3 Native RAG Integration
 Agentix implements a "Native RAG" pattern. Before the ReAct loop starts, the system:
@@ -96,7 +96,7 @@ This ensures the LLM has the necessary facts without needing to explicitly call 
 Agentix supports multiple agent personas defined via YAML configurations.
 
 ### 4.1 Intent-Based Routing
-The [AgentRouter](file:///Users/firatkurt/Documents/Repos/AiBa/src/Agentix/agentix/agents/router.py:19) automatically selects the best agent for a task.
+The [AgentRouter](file:///Users/firatkurt/Documents/Repos/blueTeam/src/Agentix/agentix/agents/router.py:19) automatically selects the best agent for a task.
 - It compares the user message embedding against the embeddings of agent role descriptions.
 - If the similarity score exceeds a threshold (default 0.3), the specific persona is loaded.
 - Fallback: If no specific agent matches, the "Generic Orchestrator" is used.
@@ -113,7 +113,7 @@ The [AgentRouter](file:///Users/firatkurt/Documents/Repos/AiBa/src/Agentix/agent
 Tools are the primary way Agentix interacts with the world.
 
 ### 5.1 BaseTool Contract
-All tools must implement the [BaseTool](file:///Users/firatkurt/Documents/Repos/AiBa/src/Agentix/agentix/tools/base.py) interface, defining:
+All tools must implement the [BaseTool](file:///Users/firatkurt/Documents/Repos/blueTeam/src/Agentix/agentix/tools/base.py) interface, defining:
 - `name` and `description`.
 - `parameters` (JSON Schema).
 - `execute()` (Async logic).
@@ -133,7 +133,7 @@ This architecture ensures that vulnerabilities in parsing libraries (e.g., Docli
 Security is a first-class citizen in Agentix, focused on tenant isolation and safe execution.
 
 ### 6.1 Session Workspaces
-Every session is allocated a dedicated [SessionWorkspace](file:///Users/firatkurt/Documents/Repos/AiBa/src/Agentix/agentix/core/workspace.py).
+Every session is allocated a dedicated [SessionWorkspace](file:///Users/firatkurt/Documents/Repos/blueTeam/src/Agentix/agentix/core/workspace.py).
 - **Structure**: `sessions/{session_id}/[downloads, outputs, temp, uploads]`.
 - **Path Sandboxing**: All file operations are resolved against the session root. Attempts to access paths outside this root (e.g., via `../../`) trigger a `PermissionError`.
 - **Quotas**: Disk usage is tracked per session. Writes are blocked if the quota (e.g., 50MB) is exceeded.
@@ -179,5 +179,5 @@ Comprehensive structured logging is provided via `structlog`, enabling easy inte
 - **MCP**: Model Context Protocol; standard for tool/knowledge exchange.
 
 ### References
-- [Project Repository](https://github.com/kurtfi/AiBa)
+- [Project Repository](https://github.com/kurtfi/blueTeam)
 - [OpenAI Function Calling Guide](https://platform.openai.com/docs/guides/function-calling)
