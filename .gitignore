@@ -63,6 +63,8 @@ MANIFEST
 # Virtual Environments
 **/venv/
 **/.venv/
+**/.venv_new/
+**/.venv/
 **/env/
 **/ENV/
 **/*.bak/
