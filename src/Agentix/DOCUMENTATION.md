@@ -139,16 +139,18 @@ Every session is allocated a dedicated [SessionWorkspace](./agentix/core/workspa
 - **Quotas**: Disk usage is tracked per session. Writes are blocked if the quota (e.g., 50MB) is exceeded.
 
 ### 6.2 Authentication
-The Gateway integrates **Firebase Authentication**.
-- Every request to protected routers (e.g., `/web/chat`) requires a valid Bearer Token.
-- The `owner_id` is extracted from the token and used to enforce session ownership, preventing IDOR (Insecure Direct Object Reference) attacks on session data.
+The Gateway integrates a **PostgreSQL-backed Local JWT Authentication**.
+- Clients authenticate via the `/web/login` endpoint using credentials stored in the `agentix_users` database table (created and seeded automatically on startup).
+- A signed JSON Web Token (JWT) is returned upon successful authentication.
+- Every subsequent request to protected routers (e.g., `/web/chat`) requires this JWT as a Bearer Token in the `Authorization` header.
+- The `owner_id` (extracted from the token's `uid` claim) is used to enforce session ownership, preventing IDOR (Insecure Direct Object Reference) attacks on session data.
 
 ---
 
 ## 7. Data Flow & Lifecycle
 
 1.  **Request**: User sends a message to `/web/chat` with a `session_id`.
-2.  **Auth**: Gateway validates Firebase Token and session ownership.
+2.  **Auth**: Gateway validates the local JWT Bearer Token and verifies session ownership.
 3.  **Routing**: AgentRouter determines if a specialized persona is needed.
 4.  **Retrieval**: Native RAG fetches context from the vector store.
 5.  **ReAct Loop**: Orchestrator drives the LLM through multiple reasoning/action steps.

@@ -20,7 +20,6 @@ resolution-markers = [
 members = [
     "agentic-common",
     "agentix",
-    "general-mcp",
     "integration-tests",
     "soc-mcp",
 ]
@@ -1632,51 +1631,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d5/8d/1c51c094345df128ca4a990d633fe1a0ff28726c9e6b3c41ba65087bba1d/fsspec-2026.4.0.tar.gz", hash = "sha256:301d8ac70ae90ef3ad05dcf94d6c3754a097f9b5fe4667d2787aa359ec7df7e4", size = 312760, upload-time = "2026-04-29T20:42:38.635Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d5/0c/043d5e551459da400957a1395e0febbf771446ff34291afcbe3d8be2a279/fsspec-2026.4.0-py3-none-any.whl", hash = "sha256:11ef7bb35dab8a394fde6e608221d5cf3e8499401c249bebaeaad760a1a8dec2", size = 203402, upload-time = "2026-04-29T20:42:36.842Z" },
-]
-
-[[package]]
-name = "general-mcp"
-version = "0.1.0"
-source = { editable = "src/GeneralMCP" }
-dependencies = [
-    { name = "agentic-common" },
-    { name = "aiomysql" },
-    { name = "arxiv" },
-    { name = "asyncpg" },
-    { name = "crawl4ai" },
-    { name = "docling" },
-    { name = "elasticsearch" },
-    { name = "fastmcp" },
-    { name = "motor" },
-    { name = "neo4j" },
-    { name = "playwright" },
-    { name = "pydantic" },
-    { name = "redis" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "structlog" },
-    { name = "tavily-python" },
-    { name = "yfinance" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "agentic-common", editable = "src/AgenticCommon" },
-    { name = "aiomysql", specifier = ">=0.2.0" },
-    { name = "arxiv", specifier = ">=2.1.0" },
-    { name = "asyncpg", specifier = ">=0.29.0" },
-    { name = "crawl4ai", specifier = ">=0.8.6" },
-    { name = "docling", specifier = ">=2.84.0" },
-    { name = "elasticsearch", specifier = ">=8.15.0" },
-    { name = "fastmcp", specifier = ">=3.2.0" },
-    { name = "motor", specifier = ">=3.6.0" },
-    { name = "neo4j", specifier = ">=5.25.0" },
-    { name = "playwright", specifier = ">=1.58.0" },
-    { name = "pydantic", specifier = ">=2.7.0" },
-    { name = "redis", specifier = ">=7.4.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
-    { name = "structlog", specifier = ">=24.1.0" },
-    { name = "tavily-python", specifier = ">=0.3.5" },
-    { name = "yfinance", specifier = ">=0.2.40" },
 ]
 
 [[package]]

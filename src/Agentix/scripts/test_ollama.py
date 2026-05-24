@@ -1,6 +1,14 @@
 import asyncio
 import os
+import sys
+from pathlib import Path
 from contextlib import AsyncExitStack
+
+# Add src/Agentix and src/AgenticCommon to sys.path
+root_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(root_dir))
+sys.path.insert(0, str(root_dir.parent / "AgenticCommon"))
+
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from agentix.agents.factory import AgentFactory
@@ -19,8 +27,8 @@ async def main():
     
     catalog = ToolCatalog()
     
-    # Establish MCP (Tool Server) connection
-    mcp_url = os.getenv("AGENTIX_MCP_URL", "http://localhost:8080/sse")
+    # Establish MCP (Tool Server) connection - use SOCMCP port 8081 by default
+    mcp_url = os.getenv("AGENTIX_SOC_MCP_URL", "http://localhost:8081/sse")
     print(f"🔌 Connecting to: MCP Tools Server ({mcp_url})...")
     try:
         stack = AsyncExitStack()
@@ -33,7 +41,7 @@ async def main():
         print(f"✅ Tools successfully loaded! (Total {len(catalog.all_tools())} tools)")
     except Exception as e:
         print(f"❌ Failed to connect to MCP Server: {e}")
-        print("Please make sure 'docker compose up agentix-tools' is running.")
+        print("Please make sure 'docker compose up soc-mcp' is running.")
         return
 
     # Load the agent

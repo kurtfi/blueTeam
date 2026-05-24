@@ -1,14 +1,24 @@
 import asyncio
 import os
-import structlog
+import sys
 from pathlib import Path
+
+# Add src/Agentix and src/AgenticCommon to sys.path
+root_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(root_dir))
+sys.path.insert(0, str(root_dir.parent / "AgenticCommon"))
 
 from agentix.agents.factory import AgentFactory
 from agentix.registry.catalog import ToolCatalog
 from agentic_common.base_tool import BaseTool, ToolResult
 
 # Configure logging to see the ReAct loop
-structlog.configure()
+structlog = None
+try:
+    import structlog
+    structlog.configure()
+except ImportError:
+    pass
 
 class MockTool(BaseTool):
     """A tool for testing filters."""
@@ -29,41 +39,25 @@ async def test_agent_loading():
     
     # 1. Setup Catalog
     catalog = ToolCatalog()
-    catalog.register(MockTool(name="research_tools", category="Data"))
-    catalog.register(MockTool(name="file_manager", category="System"))
+    catalog.register(MockTool(name="query_siem_logs", category="Security"))
+    catalog.register(MockTool(name="some_general_tool", category="General"))
     
     print(f"Catalog has tools: {[t.name for t in catalog.all_tools()]}")
 
-    # 2. Create Researcher Agent
-    print("\n[Researcher Agent Test]")
-    researcher = AgentFactory.create("researcher", catalog=catalog)
-    researcher._config.tool_filters.names.append("research_tools")
+    # 2. Create SOC Analyst Agent
+    print("\n[SOC Analyst Agent Test]")
+    soc_analyst = AgentFactory.create("soc_analyst", catalog=catalog)
     
-    tools = await researcher._catalog.select(
-        "Data operations", 
-        category_filter=researcher._config.tool_filters.categories,
-        name_filter=researcher._config.tool_filters.names
+    tools = await soc_analyst._catalog.select(
+        "SIEM query", 
+        category_filter=soc_analyst._config.tool_filters.categories,
+        name_filter=soc_analyst._config.tool_filters.names
     )
     
-    print(f"Researcher sees tools: {[t.name for t in tools]}")
-    assert "research_tools" in [t.name for t in tools]
-    assert "file_manager" not in [t.name for t in tools]
+    print(f"SOC Analyst sees tools: {[t.name for t in tools]}")
+    assert "query_siem_logs" in [t.name for t in tools]
+    assert "some_general_tool" not in [t.name for t in tools]
     
-    # 3. Create SysAdmin Agent
-    print("\n[SysAdmin Agent Test]")
-    sysadmin = AgentFactory.create("sysadmin", catalog=catalog)
-    sysadmin._config.tool_filters.names.append("file_manager")
-    
-    tools = await sysadmin._catalog.select(
-        "System operations",
-        category_filter=sysadmin._config.tool_filters.categories,
-        name_filter=sysadmin._config.tool_filters.names
-    )
-    
-    print(f"SysAdmin sees tools: {[t.name for t in tools]}")
-    assert "file_manager" in [t.name for t in tools]
-    assert "research_tools" not in [t.name for t in tools]
-
     print("\n--- All Loading Tests Passed! ---")
 
 if __name__ == "__main__":

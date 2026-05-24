@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from gateway.routers import web, telegram
-import gateway.security.firebase_auth  # Ensure firebase init runs
+from gateway.security.auth import auth_store
 
 import os
 
@@ -37,10 +37,20 @@ app.include_router(telegram.router)
 @app.on_event("startup")
 async def startup_event():
     logger.info("gateway.startup", message="Starting Agentix API Gateway...")
+    try:
+        await auth_store.setup_db()
+        logger.info("gateway.startup", message="Authentication database table initialized/verified.")
+    except Exception as e:
+        logger.error("gateway.startup.db_init_failed", error=str(e))
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("gateway.shutdown", message="Shutting down Agentix API Gateway...")
+    try:
+        await auth_store.close()
+        logger.info("gateway.shutdown", message="Authentication database connection closed.")
+    except Exception as e:
+        logger.error("gateway.shutdown.db_close_failed", error=str(e))
 
 @app.get("/health", tags=["System"])
 async def health_check():

@@ -53,35 +53,6 @@ services:
     ports:
       - "26379:6379"
 
-  general-mcp:
-    build:
-      context: ../..
-      dockerfile: src/GeneralMCP/Dockerfile
-    container_name: agentix-general-mcp
-    networks:
-      - agentix_net
-    restart: always
-    ports:
-      - "8080:8080"
-    environment:
-      - FASTMCP_TRANSPORT=sse
-      - FASTMCP_PORT=8080
-      - AGENTIX_LOG_LEVEL=DEBUG
-      - AGENTIX_WORKSPACE_ROOT=/app
-      - REDIS_URL=redis://redis:6379
-      - AGENTIX_POSTGRES_URL=postgresql+asyncpg://agentix:password@postgres:5432/agentix_db
-      - WAZUH_API_URL=https://wazuh-manager:55000
-      - WAZUH_API_VERIFY_SSL=false
-      - CORTEX_URL=http://cortex:9001
-      - THEHIVE_URL=http://thehive:9000
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - LANGFUSE_HOST=http://langfuse:3000
-    env_file:
-      - .env
-    volumes:
-      - ../..:/app
-      - /app/.venv
-
   soc-mcp:
     build:
       context: ../..
@@ -120,7 +91,6 @@ services:
     restart: always
     environment:
       - AGENTIX_LOG_LEVEL=DEBUG
-      - AGENTIX_GENERAL_MCP_URL=http://general-mcp:8080/sse
       - AGENTIX_SOC_MCP_URL=http://soc-mcp:8081/sse
       - REDIS_URL=redis://redis:6379
       - AGENTIX_POSTGRES_URL=postgresql+asyncpg://agentix:password@postgres:5432/agentix_db
@@ -137,7 +107,6 @@ services:
       - /app/.venv
     command: [ "uv", "run", "uvicorn", "agentix.api.server:app", "--host", "0.0.0.0", "--port", "8000" ]
     depends_on:
-      - general-mcp
       - soc-mcp
       - redis
       - postgres

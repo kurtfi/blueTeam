@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Add src/Agentix and src/AgenticCommon to sys.path
+root_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(root_dir))
+sys.path.insert(0, str(root_dir.parent / "AgenticCommon"))
+
 import asyncio
 import pytest
 from agentix.core.observability import obs

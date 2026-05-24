@@ -1,14 +1,23 @@
+import json
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from gateway.security.firebase_auth import get_current_user
+from gateway.security.auth import get_current_user, create_access_token, verify_password, auth_store
 from gateway.services.agentix_client import create_session, stream_chat, verify_session_owner
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/web", tags=["Web API"])
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 class ChatRequest(BaseModel):
     message: str
@@ -17,6 +26,37 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     session_id: str
+
+@router.post("/login", response_model=TokenResponse, summary="Log in to receive an access token")
+async def login(req: LoginRequest):
+    """
+    Authenticate against the Postgres user store and generate a JWT.
+    """
+    user = await auth_store.get_user_by_username(req.username)
+    if not user or not verify_password(user["password_hash"], req.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Parse permissions safely
+    permissions = user.get("permissions") or []
+    if isinstance(permissions, str):
+        try:
+            permissions = json.loads(permissions)
+        except Exception:
+            permissions = []
+
+    # Generate JWT
+    token = create_access_token(data={
+        "uid": user["username"],
+        "email": user["email"],
+        "role": user["role"],
+        "permissions": permissions
+    })
+    
+    return TokenResponse(access_token=token)
 
 @router.post("/chat", summary="Start or continue a chat session")
 async def web_chat(req: ChatRequest, current_user: dict = Depends(get_current_user)):

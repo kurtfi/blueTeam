@@ -44,7 +44,6 @@ class Settings(BaseSettings):
     # RAG — native context injection into the system prompt (no tool call required).
     agentix_rag_enabled: bool = True
     agentix_rag_top_k: int = 5
-    agentix_general_mcp_url: str = "http://localhost:8080/sse"
     agentix_soc_mcp_url: str = "http://localhost:8081/sse"
 
     # Session Workspace — per-session isolated file storage

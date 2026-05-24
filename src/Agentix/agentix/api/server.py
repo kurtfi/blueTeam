@@ -61,20 +61,6 @@ async def startup_event():
     app.state.pref_store = RedisPreferenceStore(redis_url=settings.redis_url)
     app.state.mcp_stack = AsyncExitStack()
     
-    # 1. Initialize General MCP Server Connection
-    try:
-        gen_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_general_mcp_url))
-        gen_read, gen_write = gen_transport
-        app.state.gen_mcp_session = await app.state.mcp_stack.enter_async_context(ClientSession(gen_read, gen_write))
-        await app.state.gen_mcp_session.initialize()
-        
-        # Sync GeneralMCP Tools into our Catalog
-        await app.state.catalog.register_mcp_client(app.state.gen_mcp_session)
-        logger.info("Successfully connected to General MCP Server and synced tools.")
-    except Exception as e:
-        logger.error("Failed to connect to General MCP server", error=str(e))
-        app.state.gen_mcp_session = None
-
     # 2. Initialize SOC MCP Server Connection
     try:
         soc_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_soc_mcp_url))
