@@ -1,0 +1,33 @@
+<!-- Local rules -->
+
+<!-- Modify it at your will. -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!-- Example -->
+<group name="local,syslog,sshd,">
+
+  <!--
+  Dec 10 01:02:02 host sshd[1234]: Failed none for root from 1.1.1.1 port 1066 ssh2
+  -->
+  <rule id="100001" level="5">
+    <if_sid>5716</if_sid>
+    <srcip>1.1.1.1</srcip>
+    <description>sshd: authentication failed from IP 1.1.1.1.</description>
+    <group>authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5,</group>
+  </rule>
+
+  <rule id="100002" level="10">
+    <if_sid>1002</if_sid>
+    <match>MITRE-ATTACK-SIM: T1003.008</match>
+    <description>MITRE ATT&amp;CK T1003.008 - OS Credential Dumping (/etc/shadow access)</description>
+    <group>mitre_t1003,syslog,errors,</group>
+  </rule>
+
+  <rule id="100003" level="10">
+    <if_sid>1002</if_sid>
+    <match>MITRE-ATTACK-SIM: T1059.004</match>
+    <description>MITRE ATT&amp;CK T1059.004 - Command and Scripting Interpreter (Unix Shell / Reverse Shell)</description>
+    <group>mitre_t1059,syslog,errors,</group>
+  </rule>
+
+</group>

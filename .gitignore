@@ -1,0 +1,98 @@
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.fleet
+.project
+.settings/
+.classpath
+
+# Node.js
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+.eslintcache
+
+# Nuxt.js / Frontend
+**/.nuxt/
+**/.output/
+**/.nitro/
+**/.cache/
+**/dist/
+**/.data/
+
+# Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environments
+.env
+.env.*
+!.env.example
+
+# Virtual Environments
+**/venv/
+**/.venv/
+**/env/
+**/ENV/
+**/*.bak/
+**/venv.bak/
+
+# Logs
+*.log
+**/logs/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/sessions/
+src/Agentix/sessions/
+
+# Testing
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+**/.tox/
+**/.nosepy
+**/nosetests.xml
+**/coverage.xml
+**/*.cover
+**/.hypothesis/
+
+# Docker
+.docker/
+# If you have local postgres data folders
+postgres_data/
+
+# Project specific
+.gemini/
+.agent/
+! .agent/workflows/

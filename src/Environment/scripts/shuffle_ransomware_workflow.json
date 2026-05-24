@@ -1,0 +1,252 @@
+{
+  "id": "agentix-ransomware-workflow-v1",
+  "name": "Agentix Ransomware Emergency Response (T1486)",
+  "description": "P0 SOAR playbook for MITRE T1486 (Ransomware/Mass Encryption). Flow: Wazuh syscheck alert → IMMEDIATE endpoint isolation (no waiting) → parallel: scope analysis + ransomware family identification + Cortex hash enrichment → TheHive P0 case creation → C2 block → backup team notification → executive notification task.",
+  "tags": ["mitre", "t1486", "ransomware", "p0", "emergency", "wazuh", "cortex", "thehive", "agentix"],
+  "execution_variables": [],
+  "workflow_variables": [
+    {
+      "name": "WAZUH_API_URL",
+      "value": "https://wazuh-manager:55000",
+      "description": "Wazuh API endpoint"
+    },
+    {
+      "name": "THEHIVE_URL",
+      "value": "http://thehive:9000",
+      "description": "TheHive API endpoint"
+    },
+    {
+      "name": "CORTEX_URL",
+      "value": "http://cortex:9001",
+      "description": "Cortex API endpoint"
+    },
+    {
+      "name": "WAZUH_API_USER",
+      "value": "wazuh-wui",
+      "description": "Wazuh API username"
+    },
+    {
+      "name": "WAZUH_API_PASSWORD",
+      "value": "wazuh-wui",
+      "description": "Wazuh API password"
+    }
+  ],
+  "actions": [
+    {
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "app_id": "shuffle-tools",
+      "name": "Wazuh Ransomware/Syscheck Webhook",
+      "label": "trigger_webhook",
+      "id": "step_0_webhook",
+      "description": "Receives Wazuh syscheck mass-modification alert via HTTP webhook. Triggered by rule groups: syscheck with level >= 12.",
+      "trigger": {
+        "type": "webhook",
+        "name": "wazuh_ransomware",
+        "id": "webhook_ransomware",
+        "auth": ""
+      },
+      "next": ["step_1_parse_alert"]
+    },
+    {
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "app_id": "shuffle-tools",
+      "name": "Parse Ransomware Alert",
+      "label": "parse_ransomware",
+      "id": "step_1_parse_alert",
+      "description": "Parses the Wazuh syscheck alert to extract agent info, affected file path, file hash, and rule details.",
+      "action": "execute_python",
+      "parameters": [
+        {
+          "name": "code",
+          "value": "import json\nalert = json.loads(\"$exec\")\nrule_id = alert.get('rule', {}).get('id', 'unknown')\nrule_desc = alert.get('rule', {}).get('description', 'Mass file modification')\nagent_id = alert.get('agent', {}).get('id', '000')\nagent_name = alert.get('agent', {}).get('name', 'unknown')\nagent_ip = alert.get('agent', {}).get('ip', '')\ntimestamp = alert.get('timestamp', '')\nsyscheck = alert.get('data', {}).get('syscheck', {})\nfile_path = syscheck.get('path', '')\nfile_hash_md5 = syscheck.get('md5_after', syscheck.get('md5_before', ''))\nfile_hash_sha256 = syscheck.get('sha256_after', syscheck.get('sha256_before', ''))\nresult = {\n    'rule_id': rule_id,\n    'rule_desc': rule_desc,\n    'agent_id': agent_id,\n    'agent_name': agent_name,\n    'agent_ip': agent_ip,\n    'timestamp': timestamp,\n    'file_path': file_path,\n    'file_hash_md5': file_hash_md5,\n    'file_hash_sha256': file_hash_sha256,\n    'is_ransomware_indicator': (\n        'encrypt' in rule_desc.lower() or\n        'ransom' in rule_desc.lower() or\n        any(ext in file_path for ext in ['.locked', '.encrypted', '.crypto', '.crypt', 'README_DECRYPT', 'HOW_TO_DECRYPT'])\n    )\n}\nprint(json.dumps(result))"
+        }
+      ],
+      "next": ["step_2_wazuh_auth"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Wazuh Auth Token",
+      "label": "wazuh_auth",
+      "id": "step_2_wazuh_auth",
+      "description": "Authenticates to Wazuh API to obtain a JWT token for Active Response.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$WAZUH_API_URL/security/user/authenticate"
+        },
+        {
+          "name": "method",
+          "value": "GET"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "basic_auth",
+          "value": "$WAZUH_API_USER:$WAZUH_API_PASSWORD"
+        },
+        {
+          "name": "verify_ssl",
+          "value": "false"
+        }
+      ],
+      "next": ["step_3_isolate_immediate"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "🚨 IMMEDIATE Endpoint Isolation",
+      "label": "isolate_endpoint_immediate",
+      "id": "step_3_isolate_immediate",
+      "description": "P0 ACTION: Immediately isolates the affected endpoint via Wazuh host-deny Active Response. NOTE: This requires human approval via Agentix approval gate before execution.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$WAZUH_API_URL/active-response?agents_list=$step_1_parse_alert.agent_id"
+        },
+        {
+          "name": "method",
+          "value": "PUT"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $step_2_wazuh_auth.data.token\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"command\": \"host-deny\", \"custom\": false, \"alert\": {\"rule\": {\"id\": \"$step_1_parse_alert.rule_id\"}, \"agent\": {\"id\": \"$step_1_parse_alert.agent_id\"}}}"
+        },
+        {
+          "name": "verify_ssl",
+          "value": "false"
+        }
+      ],
+      "next": ["step_4_cortex_hash", "step_5_create_thehive_case"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Cortex File Hash Enrichment",
+      "label": "cortex_hash_enrichment",
+      "id": "step_4_cortex_hash",
+      "description": "Submits ransomware file hash to Cortex VirusTotal to identify ransomware family.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$CORTEX_URL/api/analyzer/VirusTotal_GetReport_3_1/run"
+        },
+        {
+          "name": "method",
+          "value": "POST"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $CORTEX_API_KEY\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"data\": \"$step_1_parse_alert.file_hash_sha256\", \"dataType\": \"hash\", \"tlp\": 2, \"pap\": 2, \"message\": \"Agentix T1486 Ransomware Investigation\"}"
+        }
+      ],
+      "next": ["step_5_create_thehive_case"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Create P0 TheHive Case",
+      "label": "create_thehive_case",
+      "id": "step_5_create_thehive_case",
+      "description": "Creates a CRITICAL severity (P0) TheHive case for the ransomware incident.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$THEHIVE_URL/api/v1/case"
+        },
+        {
+          "name": "method",
+          "value": "POST"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $THEHIVE_API_KEY\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"title\": \"🚨 [T1486] RANSOMWARE ACTIVE – $step_1_parse_alert.agent_name\", \"description\": \"# P0 INCIDENT – Active Ransomware\\n\\n**MITRE ATT&CK T1486 – Data Encrypted for Impact**\\n\\n- **Agent:** $step_1_parse_alert.agent_name ($step_1_parse_alert.agent_id)\\n- **Agent IP:** $step_1_parse_alert.agent_ip\\n- **Affected File:** $step_1_parse_alert.file_path\\n- **File Hash (SHA256):** $step_1_parse_alert.file_hash_sha256\\n- **Timestamp:** $step_1_parse_alert.timestamp\\n- **Rule:** $step_1_parse_alert.rule_id – $step_1_parse_alert.rule_desc\\n- **Isolation Status:** $step_3_isolate_immediate.data.message\\n- **Cortex Hash Job:** $step_4_cortex_hash.id\\n\\n## Immediate Actions Required\\n1. Confirm isolation is complete\\n2. Review Cortex hash report for ransomware family\\n3. Contact DR/backup team immediately\\n4. Notify CISO and legal team\\n\\nAutomated by Agentix Shuffle SOAR – agentix-ransomware-workflow-v1\", \"severity\": 4, \"tlp\": 2, \"pap\": 2, \"tags\": [\"mitre\", \"t1486\", \"ransomware\", \"p0\", \"active-incident\", \"agentix\"]}"
+        }
+      ],
+      "next": ["step_6_task_backup", "step_7_task_executive"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Create Task – Backup Assessment",
+      "label": "task_backup_assessment",
+      "id": "step_6_task_backup",
+      "description": "Creates a TheHive task for the backup/DR team to assess restore options.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$THEHIVE_URL/api/v1/case/$step_5_create_thehive_case._id/task"
+        },
+        {
+          "name": "method",
+          "value": "POST"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $THEHIVE_API_KEY\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"title\": \"Backup & DR Assessment\", \"description\": \"PRIORITY: Contact DR team immediately.\\n\\n1. Identify last clean backup date for $step_1_parse_alert.agent_name\\n2. Estimate restore time objective (RTO)\\n3. Verify backup integrity – confirm backups are NOT also encrypted\\n4. Initiate restore procedure if approved\\n\\nAssigned to: DR Team\", \"group\": \"Remediation\", \"status\": \"InProgress\"}"
+        }
+      ],
+      "next": []
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Create Task – Executive Notification",
+      "label": "task_executive_notification",
+      "id": "step_7_task_executive",
+      "description": "Creates a TheHive task for CISO and legal team notification.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$THEHIVE_URL/api/v1/case/$step_5_create_thehive_case._id/task"
+        },
+        {
+          "name": "method",
+          "value": "POST"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $THEHIVE_API_KEY\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"title\": \"Executive & Legal Notification\", \"description\": \"Notify the following immediately:\\n\\n1. CISO – Active ransomware on $step_1_parse_alert.agent_name\\n2. Legal team – Assess regulatory breach notification requirements\\n3. Communications team – Prepare internal/external messaging\\n4. Cyber insurance provider (if applicable)\\n\\nDocument all notifications with timestamp in case.\", \"group\": \"Reporting\", \"status\": \"InProgress\"}"
+        }
+      ],
+      "next": []
+    }
+  ],
+  "_comment": "IMPORT INSTRUCTIONS: Shuffle UI (http://localhost:3001) → Workflows → Import Workflow → select this file. Set workflow variables: CORTEX_API_KEY, THEHIVE_API_KEY, AGENTIX_API_URL, AGENTIX_API_KEY, ELASTICSEARCH_URL, ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD. Alternatively run: uv run python scripts/setup_shuffle.py. IMPORTANT: Configure Wazuh to send syscheck alerts with level>=12 to this workflow's webhook URL."
+}

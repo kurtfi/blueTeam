@@ -1,0 +1,423 @@
+"""
+Orchestrator — central decision engine of the Agentix platform.
+
+Design principles encoded here:
+  1. Dynamic Tool Selection  — only intent-matched tools are loaded into
+                               each request context, not the whole registry.
+  2. Chain of Thought (CoT)  — Think → Act → Observe → Answer loop via
+                               the ReAct module.
+  3. Stateless Logic /       — business logic is pure; session state is
+     Stateful Experience       delegated to MemoryStore.
+  4. Safety First            — sandbox & permission checks before every
+                               tool execution.
+  5. Native RAG              — relevant knowledge is automatically injected
+                               into the system prompt before the ReAct loop
+                               starts. The LLM never needs to call a RAG tool.
+  6. Parallel Tool Calls     — independent tool calls in a single LLM turn
+                               are fanned out concurrently via asyncio.gather.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+from typing import Any, AsyncGenerator, TYPE_CHECKING
+
+import structlog
+
+from agentix.core.context.manager import ContextManager
+from agentix.core.llm import LLMClient
+from agentix.core.observability import obs
+from agentix.core.react import ReActStep, ReActTrace, StepType
+from agentic_common.settings import settings
+from agentic_common.workspace import SessionWorkspace
+from agentic_common.memory.session import SessionStore
+from agentix.registry.catalog import ToolCatalog
+from agentic_common.base_tool import BaseTool, ToolResult
+from agentic_common.telemetry import track_tool_call
+
+if TYPE_CHECKING:
+    from agentix.agents.schema import AgentConfig
+
+logger = structlog.get_logger(__name__)
+
+from agentix.core.rag import ContextEnrichmentService
+from agentix.core.tool_executor import ToolExecutionEngine
+
+
+
+class Orchestrator:
+    """
+    The central decision-making engine.
+
+    Responsibilities
+    ----------------
+    - Inject RAG context into the system prompt before the ReAct loop.
+    - Parse the user intent from the incoming request.
+    - Ask the ToolCatalog for the relevant tools (dynamic selection).
+    - Drive the ReAct loop, fanning out parallel tool calls via asyncio.gather.
+    - Store/retrieve session context via SessionStore.
+
+    Usage
+    -----
+    .. code-block:: python
+
+        orchestrator = Orchestrator()
+        result = await orchestrator.run(
+            session_id="user-42",
+            user_message="List the files in /tmp and summarise them",
+        )
+        print(result.final_answer)
+    """
+
+    def __init__(
+        self,
+        llm: LLMClient | None = None,
+        catalog: ToolCatalog | None = None,
+        memory: SessionStore | None = None,
+        preference_store: Any | None = None,
+        max_iterations: int | None = None,
+        rag_top_k: int = 5,
+        rag_enabled: bool = True,
+        config: AgentConfig | None = None,
+        vector_store: Any | None = None,
+    ) -> None:
+        self._llm = llm or LLMClient()
+        self._catalog = catalog or ToolCatalog()
+        self._memory = memory or SessionStore()
+        self._preference_store = preference_store
+        self._config = config
+        
+        # Log agent identity
+        identity = config.name if config else "Generic Orchestrator"
+        logger.info("orchestrator.initialized", agent=identity)
+
+        # Priority: Config > Argument > Settings
+        self._max_iterations = (
+            config.max_iterations if config else 
+            (max_iterations or settings.agentix_max_iterations)
+        )
+        self._rag_top_k = rag_top_k
+        self._rag_enabled = (
+            config.rag_enabled if config else rag_enabled
+        )
+
+        # Context Management
+        self._context_manager = ContextManager(model=self._llm.model)
+
+        # Lazily initialise the vector store singleton (avoids connection at import time).
+        self._vector_store: Any | None = vector_store
+
+        # Session workspace — lazily initialised per session.
+        self._workspace: SessionWorkspace | None = None
+
+        # Delegate Services
+        self._rag = ContextEnrichmentService(
+            config=config, 
+            vector_store=self._vector_store,
+            rag_top_k=self._rag_top_k, 
+            rag_enabled=self._rag_enabled
+        )
+        self._tool_executor = ToolExecutionEngine(
+            memory=self._memory,
+            preference_store=self._preference_store,
+            workspace=self._workspace
+        )
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    async def run(self, session_id: str, user_message: str) -> ReActTrace:
+        """
+        Process a single user message and return the full ReAct trace.
+
+        Args:
+            session_id:   Identifier for the ongoing conversation / user.
+            user_message: The raw user request.
+
+        Returns:
+            A :class:`ReActTrace` containing every step and the final answer.
+        """
+        trace = ReActTrace(request=user_message)
+
+        async for step in self.run_stream(session_id, user_message):
+            trace.add_step(step)
+            if step.step_type == StepType.ANSWER:
+                trace.final_answer = step.content
+
+        return trace
+
+    async def run_stream(
+        self, session_id: str, user_message: str
+    ) -> AsyncGenerator[ReActStep, None]:
+        """
+        Process a single user message and yield the full ReAct trace as a stream.
+
+        Args:
+            session_id:   Identifier for the ongoing conversation / user.
+            user_message: The raw user request.
+
+        Yields:
+            Each :class:`ReActStep` in real-time as the agent thinks and acts.
+        """
+        log = logger.bind(session_id=session_id)
+        log.info("orchestrator.run_stream.start", message=user_message[:120])
+
+        # 0. Initialise per-session workspace (if enabled).
+        if settings.agentix_session_workspace_enabled:
+            self._workspace = SessionWorkspace.from_session_id(session_id)
+            if self._workspace is None:
+                # First interaction for this session — create workspace.
+                self._workspace = SessionWorkspace(session_id=session_id)
+                await self._workspace.initialize()
+
+        # 1. Load conversation history and metadata from memory.
+        history = await self._memory.get_history(session_id)
+        metadata = await self._memory.get_metadata(session_id)
+        user_id = metadata.get("owner_id", "anonymous")
+
+        # Check if we are resuming from a pending approval/confirmation state
+        draft_history = metadata.get("draft_history")
+        is_resume = False
+        tool_calls = []
+
+        if draft_history:
+            is_positive = user_message.lower().strip() in (
+                "yes", "confirm", "evet", "onay", "y", "approve", "ok", "tamam", "go", "proceed"
+            )
+            if is_positive:
+                is_resume = True
+                log.info("orchestrator.resume.approved", user_message=user_message)
+                messages = draft_history
+                # Clear draft_history
+                await self._memory.set_metadata(session_id, "draft_history", None)
+                
+                # Load all tools when resuming to make sure we can resolve the tool call
+                all_tools = self._catalog.all_tools()
+                tool_map = {t.name: t for t in all_tools}
+                tool_schemas = [t.to_openai_schema() for t in all_tools]
+                
+                last_msg = messages[-1] if messages else {}
+                tool_calls = last_msg.get("tool_calls") or []
+            else:
+                log.info("orchestrator.resume.rejected", user_message=user_message)
+                await self._memory.set_metadata(session_id, "draft_history", None)
+                await self._memory.append(
+                    session_id,
+                    user_message,
+                    "Action cancelled by user."
+                )
+                yield ReActStep(StepType.ANSWER, "Action cancelled by user.")
+                return
+        else:
+            # 2. Native RAG — inject relevant context into the system prompt.
+            system_prompt = await self._rag.build_system_prompt(user_message, user_id, log)
+
+            # 3. Dynamically select tools that match the user's intent.
+            category_filter = self._config.tool_filters.categories if self._config else None
+            name_filter = self._config.tool_filters.names if self._config else None
+
+            matched_tools: list[BaseTool] = await self._catalog.select(
+                user_message,
+                category_filter=category_filter,
+                name_filter=name_filter,
+            )
+            tool_schemas = [t.to_openai_schema() for t in matched_tools]
+            tool_map = {t.name: t for t in matched_tools}
+            log.debug("tools.selected", count=len(matched_tools), names=list(tool_map.keys()))
+
+            if not matched_tools:
+                log.error(
+                    "orchestrator.no_tools_available",
+                    hint="MCP tools server may be down or catalog is empty. "
+                         "Ensure the MCP server is running before starting the API.",
+                )
+                yield ReActStep(
+                    StepType.ANSWER,
+                    "⚠️ No tools are currently available. The MCP tools server "
+                    "may not be running. Please ensure all infrastructure services "
+                    "(MCP server, Redis, Postgres) are started and try again.",
+                )
+                return
+
+            # 4. Context Management — ensure total prompt fits within limits.
+            messages = [
+                {"role": "system", "content": system_prompt},
+                *history,
+                {"role": "user", "content": user_message},
+            ]
+            messages = self._context_manager.manage(messages)
+
+        # 5. Observability — Start Langfuse trace
+        trace = obs.trace(
+            name="orchestrator.run",
+            session_id=session_id,
+            user_message=user_message[:120],
+            tool_count=len(tool_map)
+        )
+
+        final_answer = ""
+        iterations = 0
+
+        # 6. ReAct loop.
+        for _ in range(self._max_iterations):
+            iterations += 1
+            
+            # Resume flow: run pending tool calls directly in first iteration
+            if is_resume and tool_calls:
+                is_resume = False
+                confirmation_hit = False
+                async for step in self._process_tool_calls_stream(
+                    tool_calls=tool_calls,
+                    tool_map=tool_map,
+                    session_id=session_id,
+                    messages=messages,
+                    trace=trace,
+                    log=log,
+                    force_approved=True,
+                ):
+                    yield step
+                    if step.step_type == StepType.CONFIRM:
+                        confirmation_hit = True
+                
+                if confirmation_hit:
+                    return
+                continue
+            
+            gen_name = f"generation_{iterations}"
+            generation = trace.generation(name=gen_name, model=self._llm.model, input=messages) if trace else None
+            
+            response = await self._llm.chat(messages, tools=tool_schemas or None)
+
+            if generation:
+                generation.end(output=response)
+
+            # --- Final Answer ---
+            if response.get("content") and not response.get("tool_calls"):
+                content: str = response["content"]
+                if "Final Answer:" in content:
+                    answer = content.split("Final Answer:")[-1].strip()
+                    final_answer = answer
+                    yield ReActStep(StepType.ANSWER, answer)
+                    break
+                # Model responded without a tool but also without the prefix
+                final_answer = content
+                yield ReActStep(StepType.ANSWER, content)
+                break
+
+            # --- Tool calls ---
+            tool_calls = response.get("tool_calls") or []
+            if not tool_calls:
+                break
+
+            messages.append({"role": "assistant", **response})
+
+            confirmation_hit = False
+            async for step in self._process_tool_calls_stream(
+                tool_calls=tool_calls,
+                tool_map=tool_map,
+                session_id=session_id,
+                messages=messages,
+                trace=trace,
+                log=log,
+            ):
+                yield step
+                if step.step_type == StepType.CONFIRM:
+                    confirmation_hit = True
+            
+            if confirmation_hit:
+                return
+
+        if not final_answer:
+            final_answer = "Max iterations reached without a final answer."
+            yield ReActStep(StepType.ANSWER, final_answer)
+            log.warning("orchestrator.max_iterations_reached")
+
+        # 6. Persist updated history.
+        await self._memory.append(session_id, user_message, final_answer)
+        log.info("orchestrator.run_stream.done", iterations=iterations)
+
+        # 7. Flush Langfuse traces to ensure they are sent before the request ends.
+        obs.flush()
+
+    async def _process_tool_calls_stream(
+        self,
+        tool_calls: list[dict],
+        tool_map: dict[str, BaseTool],
+        session_id: str,
+        messages: list[dict],
+        trace: Any,
+        log: Any,
+        force_approved: bool = False,
+    ) -> AsyncGenerator[ReActStep, None]:
+        # Yield THINK steps for all tool calls.
+        think_steps: list[tuple[dict, ReActStep]] = []
+        for tc in tool_calls:
+            tool_name: str = tc["function"]["name"]
+            try:
+                tool_args = json.loads(tc["function"]["arguments"])
+            except json.JSONDecodeError:
+                tool_args = {}
+
+            think_step = ReActStep(
+                StepType.THINK,
+                f"Calling tool '{tool_name}' with {tool_args}",
+                tool_name=tool_name,
+                tool_input=tool_args,
+            )
+            yield think_step
+            think_steps.append((tc, think_step))
+
+        # HITL check — any tool requiring confirmation stops the whole batch.
+        if not force_approved:
+            for tc, _ in think_steps:
+                t_name = tc["function"]["name"]
+                try:
+                    t_args = json.loads(tc["function"]["arguments"])
+                except json.JSONDecodeError:
+                    t_args = {}
+                if tool := tool_map.get(t_name):
+                    if tool.requires_confirmation(**t_args) and not t_args.get("approved"):
+                        # Save the current messages history as draft state for resumption
+                        await self._memory.set_metadata(session_id, "draft_history", messages)
+                        yield ReActStep(
+                            StepType.CONFIRM,
+                            content=f"Tool '{t_name}' requires manual confirmation.",
+                            tool_name=t_name,
+                            tool_input=t_args,
+                        )
+                        log.info("orchestrator.confirmation_required", tool=t_name)
+                        return  # Caller must re-submit with approved=True.
+
+        # Fan-out: execute all tool calls in parallel.
+        # Make sure tool_executor has latest workspace
+        self._tool_executor._workspace = self._workspace
+        observation_results = await self._tool_executor.execute_tools_parallel(
+            tool_calls=tool_calls,
+            tool_map=tool_map,
+            session_id=session_id,
+            parent=trace,
+        )
+
+        # Yield OBSERVE steps and feed results back to the model.
+        for tc, result in zip(tool_calls, observation_results):
+            t_name = tc["function"]["name"]
+            observe_step = ReActStep(
+                StepType.OBSERVE,
+                content=str(result.output) if result.success else f"ERROR: {result.error}",
+                tool_name=t_name,
+                tool_output=result.output,
+            )
+            yield observe_step
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": (
+                        json.dumps(result.output) if result.success
+                        else f"ERROR: {result.error}"
+                    ),
+                }
+            )
+
+

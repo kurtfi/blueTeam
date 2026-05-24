@@ -1,0 +1,2 @@
+[tool.uv]
+workspace = { members = ["src/Agentix", "src/GeneralMCP", "src/SOCMCP", "src/IntegrationTests", "src/AgenticCommon"] }

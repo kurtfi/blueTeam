@@ -1,0 +1,223 @@
+{
+  "id": "agentix-mitre-workflow-v1",
+  "name": "Agentix MITRE ATT&CK Response",
+  "description": "Automated SOAR playbook: Wazuh alert → Cortex enrichment → TheHive case creation → Wazuh active response. Covers T1003.008 (Credential Dumping) and T1059.004 (Reverse Shell).",
+  "tags": ["mitre", "wazuh", "cortex", "thehive", "agentix"],
+  "execution_variables": [],
+  "workflow_variables": [
+    {
+      "name": "WAZUH_API_URL",
+      "value": "https://wazuh-manager:55000",
+      "description": "Wazuh API endpoint (internal Docker hostname)"
+    },
+    {
+      "name": "WAZUH_API_USER",
+      "value": "wazuh-wui",
+      "description": "Wazuh API username"
+    },
+    {
+      "name": "WAZUH_API_PASSWORD",
+      "value": "wazuh-wui",
+      "description": "Wazuh API password"
+    },
+    {
+      "name": "THEHIVE_URL",
+      "value": "http://thehive:9000",
+      "description": "TheHive API endpoint (internal Docker hostname)"
+    },
+    {
+      "name": "CORTEX_URL",
+      "value": "http://cortex:9001",
+      "description": "Cortex API endpoint (internal Docker hostname)"
+    }
+  ],
+  "actions": [
+    {
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "app_id": "shuffle-tools",
+      "name": "Wazuh Webhook Receiver",
+      "label": "trigger_webhook",
+      "id": "step_0_webhook_trigger",
+      "description": "Receives Wazuh alert JSON via HTTP webhook. Wazuh integration block in ossec.conf posts here.",
+      "trigger": {
+        "type": "webhook",
+        "name": "wazuh_alerts",
+        "id": "webhook_wazuh_alerts",
+        "auth": ""
+      },
+      "next": ["step_1_parse_alert"]
+    },
+    {
+      "app_name": "Shuffle Tools",
+      "app_version": "1.2.0",
+      "app_id": "shuffle-tools",
+      "name": "Parse Wazuh Alert",
+      "label": "parse_alert",
+      "id": "step_1_parse_alert",
+      "description": "Extracts rule_id, description, agent_id, agent_ip, and MITRE technique from the incoming Wazuh alert.",
+      "action": "execute_python",
+      "parameters": [
+        {
+          "name": "code",
+          "value": "import json\nalert = json.loads(\"$exec\")\nrule_id = alert.get('rule', {}).get('id', 'unknown')\nrule_desc = alert.get('rule', {}).get('description', 'No description')\nmitre_ids = alert.get('rule', {}).get('mitre', {}).get('id', [])\nmitre_tactic = alert.get('rule', {}).get('mitre', {}).get('tactic', [])\nagent_id = alert.get('agent', {}).get('id', '000')\nagent_ip = alert.get('agent', {}).get('ip', alert.get('data', {}).get('srcip', ''))\nagent_name = alert.get('agent', {}).get('name', 'unknown')\ntimestamp = alert.get('timestamp', '')\nresult = {\n    'rule_id': rule_id,\n    'rule_desc': rule_desc,\n    'mitre_ids': mitre_ids,\n    'mitre_tactic': mitre_tactic,\n    'agent_id': agent_id,\n    'agent_ip': agent_ip,\n    'agent_name': agent_name,\n    'timestamp': timestamp,\n    'is_credential_dump': '100002' in str(rule_id) or 'T1003' in str(mitre_ids),\n    'is_reverse_shell': '100003' in str(rule_id) or 'T1059' in str(mitre_ids)\n}\nprint(json.dumps(result))"
+        }
+      ],
+      "next": ["step_2_cortex_enrichment"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Cortex IP Reputation Check",
+      "label": "cortex_ip_enrichment",
+      "id": "step_2_cortex_enrichment",
+      "description": "Calls Cortex API to analyze the agent's source IP using VirusTotal_GetReport_3_1 analyzer.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$CORTEX_URL/api/analyzer/VirusTotal_GetReport_3_1/run"
+        },
+        {
+          "name": "method",
+          "value": "POST"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $CORTEX_API_KEY\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"data\": \"$step_1_parse_alert.agent_ip\", \"dataType\": \"ip\", \"tlp\": 2, \"pap\": 2, \"message\": \"Agentix MITRE ATT&CK Simulation\"}"
+        }
+      ],
+      "next": ["step_3_create_thehive_case"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Create TheHive Case",
+      "label": "create_thehive_case",
+      "id": "step_3_create_thehive_case",
+      "description": "Creates an incident case in TheHive with MITRE ATT&CK tags and Cortex job reference.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$THEHIVE_URL/api/v1/case"
+        },
+        {
+          "name": "method",
+          "value": "POST"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $THEHIVE_API_KEY\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"title\": \"[AGENTIX-SIM] $step_1_parse_alert.rule_desc\", \"description\": \"**MITRE ATT&CK Simulation Alert**\\n\\n- **Rule ID:** $step_1_parse_alert.rule_id\\n- **Description:** $step_1_parse_alert.rule_desc\\n- **Agent:** $step_1_parse_alert.agent_name ($step_1_parse_alert.agent_id)\\n- **Agent IP:** $step_1_parse_alert.agent_ip\\n- **Timestamp:** $step_1_parse_alert.timestamp\\n- **Cortex Job:** $step_2_cortex_enrichment.id\\n\\nThis case was created automatically by Agentix Shuffle SOAR playbook.\", \"severity\": 3, \"tlp\": 2, \"pap\": 2, \"tags\": [\"mitre\", \"agentix-sim\", \"wazuh\", \"automated\", \"$step_1_parse_alert.mitre_ids\"]}"
+        }
+      ],
+      "next": ["step_4_wazuh_active_response"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Wazuh Auth Token",
+      "label": "wazuh_get_token",
+      "id": "step_4_wazuh_active_response",
+      "description": "Authenticates to Wazuh API to obtain a JWT token for active response commands.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$WAZUH_API_URL/security/user/authenticate"
+        },
+        {
+          "name": "method",
+          "value": "GET"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "basic_auth",
+          "value": "$WAZUH_API_USER:$WAZUH_API_PASSWORD"
+        },
+        {
+          "name": "verify_ssl",
+          "value": "false"
+        }
+      ],
+      "next": ["step_5_isolate_endpoint"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Isolate Endpoint via Active Response",
+      "label": "isolate_endpoint",
+      "id": "step_5_isolate_endpoint",
+      "description": "Sends host-deny active response command to Wazuh to isolate the compromised endpoint.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$WAZUH_API_URL/active-response?agents_list=$step_1_parse_alert.agent_id"
+        },
+        {
+          "name": "method",
+          "value": "PUT"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $step_4_wazuh_active_response.data.token\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"command\": \"host-deny\", \"custom\": false, \"alert\": {\"rule\": {\"id\": \"$step_1_parse_alert.rule_id\"}, \"agent\": {\"id\": \"$step_1_parse_alert.agent_id\"}}}"
+        },
+        {
+          "name": "verify_ssl",
+          "value": "false"
+        }
+      ],
+      "next": ["step_6_update_case_with_results"]
+    },
+    {
+      "app_name": "HTTP",
+      "app_version": "1.4.0",
+      "app_id": "http",
+      "name": "Update TheHive Case with Response",
+      "label": "update_thehive_case",
+      "id": "step_6_update_case_with_results",
+      "description": "Adds a task log to TheHive case documenting the active response action taken.",
+      "action": "send_request",
+      "parameters": [
+        {
+          "name": "url",
+          "value": "$THEHIVE_URL/api/v1/case/$step_3_create_thehive_case._id/task"
+        },
+        {
+          "name": "method",
+          "value": "POST"
+        },
+        {
+          "name": "headers",
+          "value": "{\"Authorization\": \"Bearer $THEHIVE_API_KEY\", \"Content-Type\": \"application/json\"}"
+        },
+        {
+          "name": "body",
+          "value": "{\"title\": \"Active Response Executed\", \"description\": \"Wazuh host-deny active response sent to agent $step_1_parse_alert.agent_id ($step_1_parse_alert.agent_name). Response: $step_5_isolate_endpoint.data.affected_items\", \"status\": \"Completed\", \"group\": \"Containment\"}"
+        }
+      ],
+      "next": []
+    }
+  ],
+  "_comment": "IMPORT INSTRUCTIONS: Go to Shuffle UI (http://localhost:3001) → Workflows → Import Workflow → select this file. Then set workflow variables CORTEX_API_KEY and THEHIVE_API_KEY. The webhook URL will be shown after import — update Wazuh ossec.conf integration hook_url if it changes."
+}

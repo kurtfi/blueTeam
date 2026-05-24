@@ -1,0 +1,209 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------
+  # Wazuh Stack
+  # ----------------------------------------------------
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.9.0
+    container_name: wazuh-indexer
+    networks:
+      - agentix_net
+    ports:
+      - "9200:9200"
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "discovery.type=single-node"
+    entrypoint: >
+      bash -c "
+      if [ ! -f /usr/share/wazuh-indexer/opensearch.yml.bak ]; then
+        cp /usr/share/wazuh-indexer/opensearch.yml /usr/share/wazuh-indexer/opensearch.yml.bak
+      fi &&
+      cp /usr/share/wazuh-indexer/opensearch.yml.bak /usr/share/wazuh-indexer/opensearch.yml &&
+      rm -rf /usr/share/wazuh-indexer/plugins/opensearch-security &&
+      sed -i '/plugins.security/,$$d' /usr/share/wazuh-indexer/opensearch.yml &&
+      echo 'bootstrap.system_call_filter: false' >> /usr/share/wazuh-indexer/opensearch.yml &&
+      echo 'compatibility.override_main_response_version: true' >> /usr/share/wazuh-indexer/opensearch.yml &&
+      exec /entrypoint.sh opensearchwrapper
+      "
+    volumes:
+      - wazuh_indexer_data:/usr/share/wazuh-indexer/data
+
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.9.0
+    container_name: wazuh-manager
+    networks:
+      - agentix_net
+    ports:
+      - "1514:1514"
+      - "1515:1515"
+      - "514:514/udp"
+      - "55000:55000"
+    environment:
+      - INDEXER_URL=http://wazuh-indexer:9200
+    depends_on:
+      - wazuh-indexer
+
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.9.0
+    container_name: wazuh-dashboard
+    networks:
+      - agentix_net
+    ports:
+      - "5601:5601"
+    environment:
+      - INDEXER_URL=http://wazuh-indexer:9200
+      - WAZUH_API_URL=https://wazuh-manager
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    volumes:
+      - ./wazuh_dashboard.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
+    depends_on:
+      - wazuh-manager
+
+  # ----------------------------------------------------
+  # Shuffle Stack (SOAR)
+  # ----------------------------------------------------
+  shuffle-opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: shuffle-opensearch
+    networks:
+      - agentix_net
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=false
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+      - plugins.security.disabled=true
+    volumes:
+      - shuffle-opensearch-data:/usr/share/opensearch/data
+
+  shuffle-backend:
+    image: frikky/shuffle:backend
+    container_name: shuffle-backend
+    networks:
+      - agentix_net
+    ports:
+      - "5001:5001"
+    environment:
+      - DATA_DIR=/app/data
+      - SHUFFLE_APP_NAME=agentix_shuffle
+      - SHUFFLE_OPENSEARCH_URL=http://shuffle-opensearch:9200
+    volumes:
+      - shuffle-database:/app/data
+    depends_on:
+      - shuffle-opensearch
+
+  shuffle-frontend:
+    image: frikky/shuffle:frontend
+    container_name: shuffle-frontend
+    networks:
+      - agentix_net
+    ports:
+      - "3001:80"
+    environment:
+      - BACKEND_HOSTNAME=shuffle-backend
+    depends_on:
+      - shuffle-backend
+
+  shuffle-orborus:
+    image: frikky/shuffle:orborus
+    container_name: shuffle-orborus
+    networks:
+      - agentix_net
+    environment:
+      - SHUFFLE_APP_SDK_TIMEOUT=300
+      - SHUFFLE_ORBORUS_EXECUTION_TIMEOUT=600
+      - ENVIRONMENT_NAME=Shuffle
+      - BASE_URL=http://shuffle-backend:5001
+      - ORBORUS_EXECUTION_CONCURRENCY=5
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - shuffle-backend
+
+  # ----------------------------------------------------
+  # TheHive & Cortex
+  # ----------------------------------------------------
+  cassandra:
+    image: cassandra:4
+    container_name: cassandra
+    restart: always
+    networks:
+      - agentix_net
+    environment:
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=250M
+      - CASSANDRA_CLUSTER_NAME=TheHive
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+
+  thehive-elasticsearch:
+    image: elasticsearch:7.17.20
+    container_name: thehive-elasticsearch
+    restart: always
+    networks:
+      - agentix_net
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - thehive-elasticsearch-data:/usr/share/elasticsearch/data
+
+  thehive:
+    image: strangebee/thehive:5
+    container_name: thehive
+    restart: always
+    networks:
+      - agentix_net
+    ports:
+      - "9000:9000"
+    environment:
+      - "JAVA_OPTS=-Xms1g -Xmx1g"
+    command:
+      - --cql-hostnames
+      - cassandra
+      - --es-hostnames
+      - thehive-elasticsearch
+    depends_on:
+      - cassandra
+      - thehive-elasticsearch
+    volumes:
+      - thehive-data:/opt/thp/thehive/data
+      - thehive-index:/opt/thp/thehive/index
+
+  cortex:
+    image: thehiveproject/cortex:3
+    container_name: cortex
+    restart: always
+    networks:
+      - agentix_net
+    ports:
+      - "9001:9001"
+    environment:
+      - "JAVA_OPTS=-Xms512m -Xmx512m"
+    command:
+      - --es-uri
+      - http://thehive-elasticsearch:9200
+      - --job-directory
+      - /tmp/cortex-jobs
+      - --docker-job-directory
+      - /Users/firatkurt/Documents/Repos/AiBa/src/Environment/cortex-jobs
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./cortex-jobs:/tmp/cortex-jobs
+    depends_on:
+      - thehive-elasticsearch
+
+networks:
+  agentix_net:
+    name: agentix_net
+    driver: bridge
+
+volumes:
+  wazuh_indexer_data:
+  shuffle-opensearch-data:
+  shuffle-database:
+  cassandra-data:
+  thehive-elasticsearch-data:
+  thehive-data:
+  thehive-index:

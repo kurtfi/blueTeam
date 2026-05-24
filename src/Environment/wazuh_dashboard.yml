@@ -1,0 +1,6 @@
+server.host: 0.0.0.0
+server.port: 5601
+opensearch.hosts: ["http://wazuh-indexer:9200"]
+server.ssl.enabled: false
+opensearch_security.enabled: false
+uiSettings.overrides.defaultRoute: /app/wz-home

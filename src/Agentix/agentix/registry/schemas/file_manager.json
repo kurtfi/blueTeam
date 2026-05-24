@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "file_manager",
+  "version": "1.0.0",
+  "category": "system",
+  "description": "Read, write, list, or delete local files. Use when the user asks to inspect, create, or modify files.",
+  "requires_sandbox": false,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "operation": {
+        "type": "string",
+        "enum": ["read", "write", "list", "delete"],
+        "description": "The file operation to perform."
+      },
+      "path": {
+        "type": "string",
+        "description": "Absolute or relative file / directory path."
+      },
+      "content": {
+        "type": "string",
+        "description": "Content to write (required only for 'write' operation)."
+      }
+    },
+    "required": ["operation", "path"],
+    "additionalProperties": false
+  },
+  "examples": [
+    {
+      "description": "Read a file",
+      "input": { "operation": "read", "path": "/tmp/notes.txt" }
+    },
+    {
+      "description": "Write a file",
+      "input": { "operation": "write", "path": "/tmp/out.txt", "content": "Hello, world!" }
+    },
+    {
+      "description": "List a directory",
+      "input": { "operation": "list", "path": "/tmp" }
+    }
+  ]
+}
