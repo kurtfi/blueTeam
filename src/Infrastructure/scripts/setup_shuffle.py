@@ -320,7 +320,7 @@ Examples:
 Next Steps:
   1. Open Shuffle UI: http://localhost:3001
   2. Go to each workflow and verify the graph structure looks correct
-  3. Set workflow variables (CORTEX_API_KEY, THEHIVE_API_KEY) in each workflow
+  3. Set workflow variables (AGENTIX_WEBHOOK_URL, AGENTIX_WEBHOOK_SECRET, etc.) in workflows
   4. Copy the webhook URLs above into Wazuh ossec.conf
   5. Restart Wazuh manager:
        docker exec wazuh-manager /var/ossec/bin/wazuh-control restart

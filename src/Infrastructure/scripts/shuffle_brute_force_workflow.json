@@ -1,219 +1,64 @@
 {
-  "id": "agentix-brute-force-workflow-v1",
-  "name": "Agentix Brute Force Response (T1110)",
-  "description": "Automated SOAR playbook for MITRE T1110 (Brute Force). Flow: Wazuh alert → parse auth failures → check successful login → Cortex IP enrichment → TheHive case creation → conditional: block IP + disable account if compromise confirmed.",
-  "tags": ["mitre", "t1110", "brute-force", "wazuh", "cortex", "thehive", "agentix"],
+  "id": "agentix-brute-force-workflow-v3",
+  "name": "Agentix Brute Force Response (T1110) v3",
+  "description": "Automated SOAR playbook for MITRE T1110 (Brute Force). Flow: Wazuh alert → Forward to Agentix Webhook.",
+  "tags": ["mitre", "t1110", "brute-force", "wazuh", "agentix"],
   "execution_variables": [],
   "workflow_variables": [
     {
-      "name": "WAZUH_API_URL",
-      "value": "https://wazuh-manager:55000",
-      "description": "Wazuh API endpoint"
+      "name": "AGENTIX_WEBHOOK_URL",
+      "value": "http://agentix-gateway:8001/v1/webhooks/shuffle/wazuh",
+      "description": "Agentix core API webhook endpoint URL"
     },
     {
-      "name": "THEHIVE_URL",
-      "value": "http://thehive:9000",
-      "description": "TheHive API endpoint"
+      "name": "AGENTIX_WEBHOOK_SECRET",
+      "value": "dev-webhook-secret-key-change-me",
+      "description": "HMAC secret key to sign outgoing webhook alerts"
     },
     {
-      "name": "CORTEX_URL",
-      "value": "http://cortex:9001",
-      "description": "Cortex API endpoint"
-    },
+      "name": "AGENTIX_INTERNAL_API_KEY",
+      "value": "dev-internal-key-change-me-in-production",
+      "description": "Agentix internal API key for authentication bypass"
+    }
+  ],
+  "triggers": [
     {
-      "name": "WAZUH_API_USER",
-      "value": "wazuh-wui",
-      "description": "Wazuh API username"
-    },
-    {
-      "name": "WAZUH_API_PASSWORD",
-      "value": "wazuh-wui",
-      "description": "Wazuh API password"
+      "id": "webhook_wazuh_brute_force",
+      "name": "wazuh_brute_force",
+      "type": "webhook",
+      "status": "running",
+      "workflows": ["agentix-brute-force-workflow-v3"],
+      "start": "step_1_forward_to_agentix"
     }
   ],
   "actions": [
     {
-      "app_name": "Shuffle Tools",
-      "app_version": "1.2.0",
-      "app_id": "shuffle-tools",
-      "name": "Wazuh Brute Force Webhook",
-      "label": "trigger_webhook",
-      "id": "step_0_webhook",
-      "description": "Receives Wazuh brute force alert (rule 5710/5712) via HTTP webhook.",
-      "trigger": {
-        "type": "webhook",
-        "name": "wazuh_brute_force",
-        "id": "webhook_brute_force",
-        "auth": ""
-      },
-      "next": ["step_1_parse_alert"]
-    },
-    {
-      "app_name": "Shuffle Tools",
-      "app_version": "1.2.0",
-      "app_id": "shuffle-tools",
-      "name": "Parse Brute Force Alert",
-      "label": "parse_brute_force",
-      "id": "step_1_parse_alert",
-      "description": "Extracts source IP, targeted user, failure count, and rule ID from the Wazuh brute force alert.",
-      "action": "execute_python",
-      "parameters": [
-        {
-          "name": "code",
-          "value": "import json\nalert = json.loads(\"$exec\")\nrule_id = alert.get('rule', {}).get('id', 'unknown')\nrule_desc = alert.get('rule', {}).get('description', 'Brute force detected')\nagent_id = alert.get('agent', {}).get('id', '000')\nagent_name = alert.get('agent', {}).get('name', 'unknown')\nsrc_ip = alert.get('data', {}).get('srcip', alert.get('agent', {}).get('ip', ''))\ntarget_user = alert.get('data', {}).get('dstuser', alert.get('data', {}).get('user', 'unknown'))\ntimestamp = alert.get('timestamp', '')\n# Brute force rules: 5710 (SSH), 5712 (SSH repeated), 2501 (PAM), 2502 (multiple auth failures)\nresult = {\n    'rule_id': rule_id,\n    'rule_desc': rule_desc,\n    'agent_id': agent_id,\n    'agent_name': agent_name,\n    'src_ip': src_ip,\n    'target_user': target_user,\n    'timestamp': timestamp,\n    'is_brute_force': rule_id in ['5710', '5712', '5716', '2501', '2502', '100010']\n}\nprint(json.dumps(result))"
-        }
-      ],
-      "next": ["step_2_check_success", "step_3_cortex_enrichment"]
-    },
-    {
-      "app_name": "HTTP",
+      "app_name": "http",
       "app_version": "1.4.0",
       "app_id": "http",
-      "name": "Query Wazuh – Check Successful Login",
-      "label": "check_successful_login",
-      "id": "step_2_check_success",
-      "description": "Queries Wazuh Indexer (Elasticsearch) to check if any successful login occurred from the brute force source IP within the last 5 minutes.",
-      "action": "send_request",
+      "name": "POST",
+      "label": "Forward Alert to Agentix Webhook",
+      "action": "POST",
+      "environment": "Shuffle",
+      "id": "step_1_forward_to_agentix",
+      "isStartNode": true,
+      "description": "Relays the alert directly to Agentix Gateway triage endpoint.",
       "parameters": [
         {
           "name": "url",
-          "value": "$ELASTICSEARCH_URL/wazuh-alerts-*/_search"
-        },
-        {
-          "name": "method",
-          "value": "POST"
+          "value": "$AGENTIX_WEBHOOK_URL"
         },
         {
           "name": "headers",
-          "value": "{\"Content-Type\": \"application/json\"}"
-        },
-        {
-          "name": "basic_auth",
-          "value": "$ELASTICSEARCH_USER:$ELASTICSEARCH_PASSWORD"
+          "value": "Content-Type: application/json\nX-Internal-Api-Key: $AGENTIX_INTERNAL_API_KEY"
         },
         {
           "name": "body",
-          "value": "{\"query\": {\"bool\": {\"must\": [{\"term\": {\"rule.groups\": \"authentication_success\"}}, {\"term\": {\"data.srcip\": \"$step_1_parse_alert.src_ip\"}}]}}, \"size\": 5, \"sort\": [{\"@timestamp\": {\"order\": \"desc\"}}]}"
-        }
-      ],
-      "next": ["step_3_cortex_enrichment"]
-    },
-    {
-      "app_name": "HTTP",
-      "app_version": "1.4.0",
-      "app_id": "http",
-      "name": "Cortex IP Reputation",
-      "label": "cortex_ip_enrichment",
-      "id": "step_3_cortex_enrichment",
-      "description": "Submits brute force source IP to Cortex VirusTotal analyzer.",
-      "action": "send_request",
-      "parameters": [
-        {
-          "name": "url",
-          "value": "$CORTEX_URL/api/analyzer/VirusTotal_GetReport_3_1/run"
-        },
-        {
-          "name": "method",
-          "value": "POST"
-        },
-        {
-          "name": "headers",
-          "value": "{\"Authorization\": \"Bearer $CORTEX_API_KEY\", \"Content-Type\": \"application/json\"}"
-        },
-        {
-          "name": "body",
-          "value": "{\"data\": \"$step_1_parse_alert.src_ip\", \"dataType\": \"ip\", \"tlp\": 2, \"pap\": 2, \"message\": \"Agentix T1110 Brute Force Investigation\"}"
-        }
-      ],
-      "next": ["step_4_create_thehive_case"]
-    },
-    {
-      "app_name": "HTTP",
-      "app_version": "1.4.0",
-      "app_id": "http",
-      "name": "Create TheHive Case",
-      "label": "create_thehive_case",
-      "id": "step_4_create_thehive_case",
-      "description": "Creates a TheHive case using the MITRE T1110 template. Severity adjusted based on whether a successful login was found.",
-      "action": "send_request",
-      "parameters": [
-        {
-          "name": "url",
-          "value": "$THEHIVE_URL/api/v1/case"
-        },
-        {
-          "name": "method",
-          "value": "POST"
-        },
-        {
-          "name": "headers",
-          "value": "{\"Authorization\": \"Bearer $THEHIVE_API_KEY\", \"Content-Type\": \"application/json\"}"
-        },
-        {
-          "name": "body",
-          "value": "{\"title\": \"[T1110] Brute Force Attack from $step_1_parse_alert.src_ip on $step_1_parse_alert.agent_name\", \"description\": \"**MITRE ATT&CK T1110 – Brute Force**\\n\\n- **Source IP:** $step_1_parse_alert.src_ip\\n- **Target User:** $step_1_parse_alert.target_user\\n- **Agent:** $step_1_parse_alert.agent_name ($step_1_parse_alert.agent_id)\\n- **Rule:** $step_1_parse_alert.rule_id – $step_1_parse_alert.rule_desc\\n- **Timestamp:** $step_1_parse_alert.timestamp\\n- **Cortex Job:** $step_3_cortex_enrichment.id\\n- **Successful Login Check:** $step_2_check_success.hits.total.value hits\\n\\nAutomated response by Agentix Shuffle SOAR.\", \"severity\": 3, \"tlp\": 2, \"pap\": 2, \"tags\": [\"mitre\", \"t1110\", \"brute-force\", \"agentix\"]}"
-        }
-      ],
-      "next": ["step_5_block_ip"]
-    },
-    {
-      "app_name": "HTTP",
-      "app_version": "1.4.0",
-      "app_id": "http",
-      "name": "Block Brute Force Source IP",
-      "label": "block_source_ip",
-      "id": "step_5_block_ip",
-      "description": "Calls Agentix SOC Agent MCP API to block the brute force source IP via the firewall tool. NOTE: This step requires human approval gate — the Agentix API enforces operator confirmation.",
-      "action": "send_request",
-      "parameters": [
-        {
-          "name": "url",
-          "value": "$AGENTIX_API_URL/api/v1/tools/block_ip"
-        },
-        {
-          "name": "method",
-          "value": "POST"
-        },
-        {
-          "name": "headers",
-          "value": "{\"Authorization\": \"Bearer $AGENTIX_API_KEY\", \"Content-Type\": \"application/json\"}"
-        },
-        {
-          "name": "body",
-          "value": "{\"ip_address\": \"$step_1_parse_alert.src_ip\"}"
-        }
-      ],
-      "next": ["step_6_update_case"]
-    },
-    {
-      "app_name": "HTTP",
-      "app_version": "1.4.0",
-      "app_id": "http",
-      "name": "Update TheHive Case – Actions Taken",
-      "label": "update_thehive_case",
-      "id": "step_6_update_case",
-      "description": "Adds a task log to the TheHive case documenting all automated actions taken.",
-      "action": "send_request",
-      "parameters": [
-        {
-          "name": "url",
-          "value": "$THEHIVE_URL/api/v1/case/$step_4_create_thehive_case._id/task"
-        },
-        {
-          "name": "method",
-          "value": "POST"
-        },
-        {
-          "name": "headers",
-          "value": "{\"Authorization\": \"Bearer $THEHIVE_API_KEY\", \"Content-Type\": \"application/json\"}"
-        },
-        {
-          "name": "body",
-          "value": "{\"title\": \"Automated Response Completed\", \"description\": \"Shuffle workflow agentix-brute-force-workflow-v1 completed.\\n\\n- Source IP $step_1_parse_alert.src_ip blocked at firewall\\n- Cortex enrichment job: $step_3_cortex_enrichment.id\\n- Successful login count: $step_2_check_success.hits.total.value\\n\\nNext: Review Cortex report and determine if account disable is required (human approval required).\", \"status\": \"Completed\", \"group\": \"Containment\"}"
+          "value": "$exec"
         }
       ],
       "next": []
     }
   ],
-  "_comment": "IMPORT INSTRUCTIONS: Shuffle UI (http://localhost:3001) → Workflows → Import Workflow → select this file. Set workflow variables: CORTEX_API_KEY, THEHIVE_API_KEY, AGENTIX_API_URL, AGENTIX_API_KEY, ELASTICSEARCH_URL, ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD. Alternatively, run: uv run python scripts/setup_shuffle.py"
+  "_comment": "IMPORT INSTRUCTIONS: Shuffle UI (http://localhost:3001) → Workflows → Import Workflow → select this file. Set workflow variables: AGENTIX_WEBHOOK_URL, AGENTIX_WEBHOOK_SECRET. Alternatively, run: uv run python scripts/setup_shuffle.py"
 }

@@ -15,17 +15,9 @@ services:
       - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
       - "discovery.type=single-node"
     entrypoint: >
-      bash -c "
-      if [ ! -f /usr/share/wazuh-indexer/opensearch.yml.bak ]; then
+      bash -c " if [ ! -f /usr/share/wazuh-indexer/opensearch.yml.bak ]; then
         cp /usr/share/wazuh-indexer/opensearch.yml /usr/share/wazuh-indexer/opensearch.yml.bak
-      fi &&
-      cp /usr/share/wazuh-indexer/opensearch.yml.bak /usr/share/wazuh-indexer/opensearch.yml &&
-      rm -rf /usr/share/wazuh-indexer/plugins/opensearch-security &&
-      sed -i '/plugins.security/,$$d' /usr/share/wazuh-indexer/opensearch.yml &&
-      echo 'bootstrap.system_call_filter: false' >> /usr/share/wazuh-indexer/opensearch.yml &&
-      echo 'compatibility.override_main_response_version: true' >> /usr/share/wazuh-indexer/opensearch.yml &&
-      exec /entrypoint.sh opensearchwrapper
-      "
+      fi && cp /usr/share/wazuh-indexer/opensearch.yml.bak /usr/share/wazuh-indexer/opensearch.yml && rm -rf /usr/share/wazuh-indexer/plugins/opensearch-security && sed -i '/plugins.security/,$$d' /usr/share/wazuh-indexer/opensearch.yml && echo 'bootstrap.system_call_filter: false' >> /usr/share/wazuh-indexer/opensearch.yml && echo 'compatibility.override_main_response_version: true' >> /usr/share/wazuh-indexer/opensearch.yml && exec /entrypoint.sh opensearchwrapper "
     volumes:
       - wazuh_indexer_data:/usr/share/wazuh-indexer/data
 

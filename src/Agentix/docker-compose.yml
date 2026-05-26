@@ -80,6 +80,12 @@ services:
     volumes:
       - ../..:/app
       - /app/.venv
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/sse')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
 
   agentix-api:
     build:
@@ -107,9 +113,12 @@ services:
       - /app/.venv
     command: [ "uv", "run", "uvicorn", "agentix.api.server:app", "--host", "0.0.0.0", "--port", "8000" ]
     depends_on:
-      - soc-mcp
-      - redis
-      - postgres
+      soc-mcp:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
 
   agentix-gateway:
     build:
@@ -124,6 +133,7 @@ services:
     environment:
       - AGENTIX_LOG_LEVEL=DEBUG
       - AGENTIX_API_URL=http://agentix-api:8000
+      - AGENTIX_POSTGRES_URL=postgresql+asyncpg://agentix:password@postgres:5432/agentix_db
     env_file:
       - .env
     volumes:

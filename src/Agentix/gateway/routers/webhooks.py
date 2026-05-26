@@ -1,0 +1,41 @@
+import structlog
+import httpx
+import os
+from fastapi import APIRouter, Request, HTTPException, Response
+
+logger = structlog.get_logger(__name__)
+
+router = APIRouter(prefix="/v1/webhooks", tags=["Webhooks"])
+
+AGENTIX_API_URL = os.getenv("AGENTIX_API_URL", "http://localhost:8000")
+
+@router.post("/shuffle/wazuh")
+async def shuffle_wazuh_webhook(request: Request):
+    """
+    Gateway endpoint for receiving Shuffle webhooks.
+    Forwards the request body and signature header to agentix-api.
+    """
+    body = await request.body()
+    headers = dict(request.headers)
+    
+    # We should exclude Host header to let httpx determine it or pass it correctly
+    headers.pop("host", None)
+    
+    # Forward the POST request to agentix-api
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(
+                f"{AGENTIX_API_URL}/v1/webhooks/shuffle/wazuh",
+                content=body,
+                headers=headers,
+                timeout=10.0
+            )
+            # Return the exact response from agentix-api to Shuffle
+            return Response(
+                content=resp.content,
+                status_code=resp.status_code,
+                headers=dict(resp.headers)
+            )
+        except httpx.HTTPError as e:
+            logger.error("gateway.webhooks.forward_failed", error=str(e))
+            raise HTTPException(status_code=502, detail="Error forwarding request to agentix-api")

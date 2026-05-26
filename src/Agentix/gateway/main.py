@@ -2,7 +2,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from gateway.routers import web, telegram
+from gateway.routers import web, telegram, webhooks
 from gateway.security.auth import auth_store
 
 import os
@@ -33,6 +33,7 @@ app.add_middleware(
 # Register routers
 app.include_router(web.router)
 app.include_router(telegram.router)
+app.include_router(webhooks.router)
 
 @app.on_event("startup")
 async def startup_event():

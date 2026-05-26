@@ -30,4 +30,11 @@
     <group>mitre_t1059,syslog,errors,</group>
   </rule>
 
+  <rule id="100010" level="10">
+    <if_sid>1002</if_sid>
+    <match>MITRE-ATTACK-SIM: T1110</match>
+    <description>MITRE ATT&amp;CK T1110 - Brute Force Login Attack Simulation</description>
+    <group>authentication_failures,syslog,errors,</group>
+  </rule>
+
 </group>

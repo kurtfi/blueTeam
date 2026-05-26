@@ -1,7 +1,7 @@
 import os
 import httpx
 
-API_URL = "http://localhost:8000/v1/webhooks/shuffle/wazuh"
+API_URL = "http://localhost:8001/v1/webhooks/shuffle/wazuh"
 API_KEY = "dev-internal-key-change-me-in-production"
 
 def main():
