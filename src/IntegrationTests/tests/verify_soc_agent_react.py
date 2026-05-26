@@ -80,7 +80,7 @@ async def run_debug():
             memory=redis_store
         )
         
-        logger.info("Starting run_stream with Ollama (qwen3.5:9b)...")
+        logger.info("Starting run_stream with Ollama (gemma4:e4b)...")
         print("\n" + "="*80)
         print("🤖 SOC Analyst ReAct Loop Stream")
         print("="*80)

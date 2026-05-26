@@ -34,7 +34,7 @@
     <if_sid>1002</if_sid>
     <match>MITRE-ATTACK-SIM: T1110</match>
     <description>MITRE ATT&amp;CK T1110 - Brute Force Login Attack Simulation</description>
-    <group>authentication_failures,syslog,errors,</group>
+    <group>authentication_failures,authentication_failed,syslog,errors,</group>
   </rule>
 
 </group>

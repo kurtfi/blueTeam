@@ -102,7 +102,7 @@ Tüm adımlarını sırasıyla planla, uygun MCP araçlarını kullan ve nihai k
 
         print("\n=== TURN 1 REQUEST (QWEN) ===")
         kwargs = {
-            "model": "qwen3.5:9b",
+            "model": "gemma4:e4b",
             "messages": messages,
             "options": {"temperature": 0.1, "num_predict": 4096},
             "tools": tool_schemas

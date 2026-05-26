@@ -103,7 +103,7 @@ rag_enabled: false
 max_iterations: 20
 
 llm:
-  model: "qwen3.5:9b"
+  model: "gemma4:e4b"
   temperature: 0.1
 
 examples:
