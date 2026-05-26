@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-`SOCMCP` is an externalized Model Context Protocol (MCP) server dedicated to Security Operations Center (SOC) tasks. By decoupling these high-privilege, specialized tools from the main Agentix orchestrator, the platform maintains a strict boundary of concerns. `SOCMCP` specifically empowers the Agentix "SOC Triage (T1)" persona to interact autonomously with security platforms like Wazuh, Cortex, TheHive, and Shuffle.
+`SOCMCP` is an externalized Model Context Protocol (MCP) server dedicated to Security Operations Center (SOC) tasks. By decoupling these high-privilege, specialized tools from the main Agentix orchestrator, the platform maintains a strict boundary of concerns. `SOCMCP` specifically empowers the Agentix "SOC Triage (T1)" persona to interact autonomously with security platforms like Wazuh, Cortex, TheHive, and SOAR providers.
 
 ---
 

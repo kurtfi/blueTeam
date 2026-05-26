@@ -42,7 +42,7 @@ async def test_webhook_forwarding_success(mock_async_client):
     }
     
     response = client.post(
-        "/v1/webhooks/shuffle/wazuh",
+        "/v1/webhooks/wazuh",
         json=payload,
         headers=headers
     )
@@ -55,7 +55,7 @@ async def test_webhook_forwarding_success(mock_async_client):
     mock_client_instance.post.assert_called_once()
     call_args = mock_client_instance.post.call_args
     assert call_args is not None
-    assert "/v1/webhooks/shuffle/wazuh" in call_args[0][0]
+    assert "/v1/webhooks/wazuh" in call_args[0][0]
     assert call_args[1]["headers"]["x-webhook-signature"] == "mock-hmac-signature-value"
     assert b'"alert_id":"999"' in call_args[1]["content"]
 
@@ -68,7 +68,7 @@ async def test_webhook_forwarding_failure(mock_async_client):
     mock_async_client.return_value.__aenter__.return_value = mock_client_instance
     
     response = client.post(
-        "/v1/webhooks/shuffle/wazuh",
+        "/v1/webhooks/wazuh",
         json={"test": "data"},
         headers={"X-Webhook-Signature": "signature"}
     )

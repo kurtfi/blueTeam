@@ -599,9 +599,8 @@ def main():
 
     print("\n=== Setup Complete ===")
     print("Next steps:")
-    print("  1. Import scripts/shuffle_mitre_workflow.json into Shuffle (http://localhost:3001)")
-    print("  2. Run: uv run python scripts/simulate_attack.py --t1003")
-    print("  3. Run: uv run python scripts/simulate_attack.py --t1059")
+    print("  1. Run: uv run python scripts/simulate_attack.py --t1003")
+    print("  2. Run: uv run python scripts/simulate_attack.py --t1059")
 
 
 if __name__ == "__main__":

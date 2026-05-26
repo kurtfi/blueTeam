@@ -1,7 +1,7 @@
 """
 SOC Playbook System
 ============================
-Structured incident response playbooks for Wazuh + Cortex + TheHive + Shuffle.
+Structured incident response playbooks for Wazuh + Cortex + TheHive + SOAR.
 """
 from soc_mcp.playbooks.base import (
     Playbook,

@@ -223,7 +223,7 @@ class PlaybookResult:
     steps_count: int
     approval_required_steps: list[str]   # titles of steps needing human approval
     case_template: str | None = None  # Template name to use when creating the case
-    shuffle_workflow_id: str | None = None
+    soar_workflow_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -234,7 +234,7 @@ class PlaybookResult:
             "steps_count": self.steps_count,
             "approval_required_steps": self.approval_required_steps,
             "case_template": self.case_template,
-            "shuffle_workflow_id": self.shuffle_workflow_id,
+            "soar_workflow_id": self.soar_workflow_id,
             "instructions": self.instructions,
         }
 
@@ -256,7 +256,7 @@ class Playbook:
         steps: Ordered list of PlaybookStep instances
         tags: Free-form tags for search/filtering
         case_template: Matching TheHive case template name
-        shuffle_workflow_id: Shuffle workflow ID to trigger (if any)
+        soar_workflow_id: SOAR workflow ID to trigger (if any)
     """
 
     def __init__(
@@ -269,7 +269,7 @@ class Playbook:
         steps: list[PlaybookStep],
         tags: list[str] | None = None,
         case_template: str | None = None,
-        shuffle_workflow_id: str | None = None,
+        soar_workflow_id: str | None = None,
     ) -> None:
         self.id = id
         self.name = name
@@ -279,7 +279,7 @@ class Playbook:
         self.steps = sorted(steps, key=lambda s: s.order)
         self.tags = tags or []
         self.case_template = case_template
-        self.shuffle_workflow_id = shuffle_workflow_id
+        self.soar_workflow_id = soar_workflow_id
 
     def render(self, ctx: PlaybookContext) -> PlaybookResult:
         """
@@ -310,8 +310,8 @@ class Playbook:
         footer = ""
         if self.case_template:
             footer += f"\n\n---\n**📋 TheHive Template:** `{self.case_template}`"
-        if self.shuffle_workflow_id:
-            footer += f"\n**⚡ Shuffle Workflow:** `{self.shuffle_workflow_id}`"
+        if self.soar_workflow_id:
+            footer += f"\n**⚡ SOAR Workflow:** `{self.soar_workflow_id}`"
         if approval_steps:
             footer += (
                 f"\n\n> ⚠️ **{len(approval_steps)} step(s) require human approval** "
@@ -328,7 +328,7 @@ class Playbook:
             steps_count=len(self.steps),
             approval_required_steps=approval_steps,
             case_template=self.case_template,
-            shuffle_workflow_id=self.shuffle_workflow_id,
+            soar_workflow_id=self.soar_workflow_id,
         )
 
     def matches(self, rule_id: str = "", mitre_ids: list[str] | None = None) -> bool:

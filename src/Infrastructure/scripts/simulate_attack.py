@@ -240,13 +240,9 @@ def print_next_steps():
    → Security Events → Search for rule.id:100002 or rule.id:100003
    → Check that alerts appear within 30-60 seconds
 
-2. Shuffle (http://localhost:3001)
-   → Auto-import all workflows:
-       uv run python scripts/setup_shuffle.py --verify
-   → Workflows available:
-       shuffle_mitre_workflow.json          (T1003.008 + T1059.004)
-       shuffle_brute_force_workflow.json    (T1110)
-       shuffle_ransomware_workflow.json     (T1486)
+2. SOAR / Gateway Webhook (http://localhost:8001/v1/webhooks/wazuh)
+   → Wazuh integrations forward alerts directly here.
+   → Check Agentix log stream for agent triage trigger.
 
 3. TheHive (http://localhost:9000)
    → Cases → Look for "[AGENTIX-SIM]" tagged cases

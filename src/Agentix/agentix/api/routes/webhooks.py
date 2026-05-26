@@ -14,7 +14,7 @@ async def verify_hmac_signature(
     x_webhook_signature: str = Header(None),
     x_internal_api_key: str = Header(None)
 ):
-    # 1. Allow bypass if internal API key matches (e.g. from internal scripts/Shuffle)
+    # 1. Allow bypass if internal API key matches (e.g. from internal scripts)
     internal_key = os.getenv("AGENTIX_INTERNAL_API_KEY")
     if internal_key and x_internal_api_key == internal_key:
         logger.info("webhooks.auth.internal_key_authorized")
@@ -38,10 +38,10 @@ async def verify_hmac_signature(
 
 router = APIRouter(tags=["webhooks"])
 
-@router.post("/v1/webhooks/shuffle/wazuh", dependencies=[Depends(verify_hmac_signature)])
+@router.post("/v1/webhooks/wazuh", dependencies=[Depends(verify_hmac_signature)])
 async def handle_wazuh_alert(request: Request, background_tasks: BackgroundTasks):
     """
-    Receives alerts from Wazuh via Shuffle.
+    Receives alerts from Wazuh integration directly.
     """
     try:
         payload = await request.json()

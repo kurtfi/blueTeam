@@ -2,13 +2,13 @@
 """
 Wazuh Custom Integration: Agentix Gateway Direct Forward
 =========================================================
-Bypasses Shuffle SOAR and sends Wazuh alerts directly to the
-Agentix Gateway webhook endpoint with X-Internal-Api-Key auth.
+Sends Wazuh alerts directly to the Agentix Gateway webhook
+endpoint with X-Internal-Api-Key auth.
 
 ossec.conf usage:
   <integration>
     <name>custom-agentix</name>
-    <hook_url>http://agentix-gateway:8001/v1/webhooks/shuffle/wazuh</hook_url>
+    <hook_url>http://agentix-gateway:8001/v1/webhooks/wazuh</hook_url>
     <api_key>dev-internal-key-change-me-in-production</api_key>
     <group>authentication_failures</group>
     <alert_format>json</alert_format>
@@ -91,7 +91,7 @@ def process_args(args):
     json_alert = get_json_alert(alert_file_location)
     debug(f"# Alert loaded from '{alert_file_location}'")
 
-    # Build message payload (same structure as shuffle.py for compatibility)
+    # Build message payload for compatibility with agentix webhook handler
     msg = generate_msg(json_alert)
     if not msg:
         return

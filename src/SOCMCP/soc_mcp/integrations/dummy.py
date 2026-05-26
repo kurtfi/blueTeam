@@ -4,7 +4,7 @@ import httpx
 import structlog
 from typing import Optional
 
-from soc_mcp.integrations.base import IFirewallProvider, IIamProvider
+from soc_mcp.integrations.base import IFirewallProvider, IIamProvider, ISoarProvider
 
 logger = structlog.get_logger(__name__)
 
@@ -62,3 +62,8 @@ class DummyIamProvider(IIamProvider):
                 return f"User account {username} disabled successfully."
         except Exception as e:
             return f"Error disabling user account: {str(e)}"
+
+class DummySoarProvider(ISoarProvider):
+    async def trigger_workflow(self, workflow_id: str, data: Optional[dict] = None, webhook_url: str = "") -> str:
+        logger.info("provider.soar.trigger_workflow", workflow_id=workflow_id, data=data)
+        return f"SOAR workflow '{workflow_id}' triggered successfully (Dummy SOAR Provider)."

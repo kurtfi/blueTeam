@@ -1,6 +1,6 @@
 #!/bin/sh
 # Custom Agentix integration wrapper for Wazuh
-# Mirrors the standard Wazuh integration shell wrapper (e.g. shuffle)
+# Mirrors the standard Wazuh integration shell wrapper
 
 WPYTHON_BIN="framework/python/bin/python3"
 

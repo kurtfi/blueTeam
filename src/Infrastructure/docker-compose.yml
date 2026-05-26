@@ -53,66 +53,6 @@ services:
       - wazuh-manager
 
   # ----------------------------------------------------
-  # Shuffle Stack (SOAR)
-  # ----------------------------------------------------
-  shuffle-opensearch:
-    image: opensearchproject/opensearch:2.11.0
-    container_name: shuffle-opensearch
-    networks:
-      - agentix_net
-    environment:
-      - discovery.type=single-node
-      - bootstrap.memory_lock=false
-      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
-      - plugins.security.disabled=true
-    volumes:
-      - shuffle-opensearch-data:/usr/share/opensearch/data
-
-  shuffle-backend:
-    image: frikky/shuffle:backend
-    container_name: shuffle-backend
-    networks:
-      - agentix_net
-    ports:
-      - "5001:5001"
-    environment:
-      - DATA_DIR=/app/data
-      - SHUFFLE_APP_NAME=agentix_shuffle
-      - SHUFFLE_OPENSEARCH_URL=http://shuffle-opensearch:9200
-    volumes:
-      - shuffle-database:/app/data
-    depends_on:
-      - shuffle-opensearch
-
-  shuffle-frontend:
-    image: frikky/shuffle:frontend
-    container_name: shuffle-frontend
-    networks:
-      - agentix_net
-    ports:
-      - "3001:80"
-    environment:
-      - BACKEND_HOSTNAME=shuffle-backend
-    depends_on:
-      - shuffle-backend
-
-  shuffle-orborus:
-    image: frikky/shuffle:orborus
-    container_name: shuffle-orborus
-    networks:
-      - agentix_net
-    environment:
-      - SHUFFLE_APP_SDK_TIMEOUT=300
-      - SHUFFLE_ORBORUS_EXECUTION_TIMEOUT=600
-      - ENVIRONMENT_NAME=Shuffle
-      - BASE_URL=http://shuffle-backend:5001
-      - ORBORUS_EXECUTION_CONCURRENCY=5
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - shuffle-backend
-
-  # ----------------------------------------------------
   # TheHive & Cortex
   # ----------------------------------------------------
   cassandra:
@@ -193,8 +133,6 @@ networks:
 
 volumes:
   wazuh_indexer_data:
-  shuffle-opensearch-data:
-  shuffle-database:
   cassandra-data:
   thehive-elasticsearch-data:
   thehive-data:

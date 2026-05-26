@@ -67,7 +67,7 @@ class PlaybookRegistry:
                 "steps": len(pb.steps),
                 "tags": pb.tags,
                 "case_template": pb.case_template,
-                "shuffle_workflow_id": pb.shuffle_workflow_id,
+                "soar_workflow_id": pb.soar_workflow_id,
             }
             for pb in sorted(self._playbooks.values(), key=lambda p: p.id)
         ]

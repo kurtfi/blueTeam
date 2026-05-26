@@ -109,7 +109,7 @@ To maintain modularity, Agentix has exported high-resource and security-sensitiv
 | **GeneralMCP** | Data     | DoclingParser, Crawl4AI, RAGSearch | Data processing, web scraping, and PDF reading. |
 | **GeneralMCP** | System   | FileManager, Terminal | Protected file management and shell access. |
 | **GeneralMCP** | Action   | MailService, APIConnector | API and email access to external services. |
-| **SOCMCP**     | Security | Wazuh, Cortex, TheHive, Shuffle | Security platform integrations for L1 SOC analysts. |
+| **SOCMCP**     | Security | Wazuh, Cortex, TheHive, SOAR | Security platform integrations for L1 SOC analysts. |
 
 Additionally, all logging, database, memory, and workspace operations have been moved to the **`AgenticCommon`** shared library.
 ---

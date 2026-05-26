@@ -56,10 +56,12 @@ class ProviderRegistry:
 
     def get_soar_provider(self) -> ISoarProvider:
         if not self._soar_provider:
-            provider_name = os.getenv("SOAR_PROVIDER", "shuffle").lower()
-            if provider_name == "shuffle":
-                from soc_mcp.integrations.shuffle import ShuffleProvider
-                self._soar_provider = ShuffleProvider()
+            provider_name = os.getenv("SOAR_PROVIDER", "dummy").lower()
+            if provider_name in ("dummy", "shuffle"):
+                if provider_name == "shuffle":
+                    logger.warning("provider.soar.shuffle_bypassed", message="Shuffle is disabled. Falling back to Dummy SOAR Provider.")
+                from soc_mcp.integrations.dummy import DummySoarProvider
+                self._soar_provider = DummySoarProvider()
             else:
                 raise ValueError(f"Unknown SOAR_PROVIDER: {provider_name}")
         return self._soar_provider

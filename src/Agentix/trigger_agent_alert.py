@@ -5,7 +5,7 @@ import hashlib
 import json
 import sys
 
-API_URL = "http://localhost:8001/v1/webhooks/shuffle/wazuh"
+API_URL = "http://localhost:8001/v1/webhooks/wazuh"
 WEBHOOK_SECRET = os.getenv("AGENTIX_WEBHOOK_SECRET")
 
 if not WEBHOOK_SECRET:

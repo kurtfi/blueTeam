@@ -41,7 +41,7 @@ PB_001 = Playbook(
     severity=Severity.HIGH,
     tags=["credential-dumping", "wazuh-rule-100002", "linux"],
     case_template="MITRE T1003.008 - OS Credential Dumping",
-    shuffle_workflow_id="agentix-mitre-workflow-v1",
+    soar_workflow_id="agentix-mitre-workflow-v1",
     steps=[
         PlaybookStep(
             order=0,
@@ -178,7 +178,7 @@ PB_002 = Playbook(
     severity=Severity.CRITICAL,
     tags=["reverse-shell", "c2", "wazuh-rule-100003", "linux"],
     case_template="MITRE T1059.004 - Suspicious Command Execution",
-    shuffle_workflow_id="agentix-mitre-workflow-v1",
+    soar_workflow_id="agentix-mitre-workflow-v1",
     steps=[
         PlaybookStep(
             order=0,
@@ -268,10 +268,10 @@ PB_002 = Playbook(
         ),
         PlaybookStep(
             order=6,
-            title="Trigger Shuffle SOAR Workflow",
+            title="Trigger Automated SOAR Workflow",
             group="Containment",
             description=(
-                "Trigger the Agentix MITRE workflow in Shuffle for automated "
+                "Trigger the Agentix MITRE workflow in the SOAR orchestrator for automated "
                 "Cortex enrichment and case task creation."
             ),
             tool_hint="trigger_soar_workflow",
@@ -314,7 +314,7 @@ PB_003 = Playbook(
     severity=Severity.MEDIUM,
     tags=["brute-force", "authentication", "linux", "ssh"],
     case_template="MITRE T1110 - Brute Force Attack",
-    shuffle_workflow_id="agentix-brute-force-workflow-v1",
+    soar_workflow_id="agentix-brute-force-workflow-v1",
     steps=[
         PlaybookStep(
             order=0,
@@ -439,7 +439,7 @@ PB_004 = Playbook(
     severity=Severity.CRITICAL,
     tags=["pass-the-hash", "lateral-movement", "ntlm", "windows"],
     case_template="MITRE T1550.002 - Pass-the-Hash / Lateral Movement",
-    shuffle_workflow_id=None,
+    soar_workflow_id=None,
     steps=[
         PlaybookStep(
             order=0,
@@ -561,7 +561,7 @@ PB_005 = Playbook(
     severity=Severity.HIGH,
     tags=["exfiltration", "dns-tunneling", "covert-channel"],
     case_template="MITRE T1048 - Data Exfiltration via DNS",
-    shuffle_workflow_id=None,
+    soar_workflow_id=None,
     steps=[
         PlaybookStep(
             order=0,
@@ -665,7 +665,7 @@ PB_006 = Playbook(
     severity=Severity.CRITICAL,
     tags=["ransomware", "encryption", "p0-incident", "wazuh-syscheck"],
     case_template="MITRE T1486 - Ransomware / Data Encrypted for Impact",
-    shuffle_workflow_id="agentix-ransomware-workflow-v1",
+    soar_workflow_id="agentix-ransomware-workflow-v1",
     steps=[
         PlaybookStep(
             order=0,
@@ -759,10 +759,10 @@ PB_006 = Playbook(
         ),
         PlaybookStep(
             order=6,
-            title="Trigger Shuffle Ransomware Response Workflow",
+            title="Trigger Automated SOAR Ransomware Workflow",
             group="Containment",
             description=(
-                "Trigger the automated Shuffle ransomware workflow to "
+                "Trigger the automated SOAR ransomware workflow to "
                 "coordinate Wazuh isolation, Cortex family identification, "
                 "and TheHive task assignment across the team."
             ),
@@ -806,7 +806,7 @@ PB_007 = Playbook(
     severity=Severity.HIGH,
     tags=["privilege-escalation", "suid", "linux", "wazuh-syscheck"],
     case_template="MITRE T1548.001 - Privilege Escalation via SUID",
-    shuffle_workflow_id=None,
+    soar_workflow_id=None,
     steps=[
         PlaybookStep(
             order=0,

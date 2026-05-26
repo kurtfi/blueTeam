@@ -9,10 +9,10 @@ router = APIRouter(prefix="/v1/webhooks", tags=["Webhooks"])
 
 AGENTIX_API_URL = os.getenv("AGENTIX_API_URL", "http://localhost:8000")
 
-@router.post("/shuffle/wazuh")
-async def shuffle_wazuh_webhook(request: Request):
+@router.post("/wazuh")
+async def wazuh_webhook(request: Request):
     """
-    Gateway endpoint for receiving Shuffle webhooks.
+    Gateway endpoint for receiving Wazuh integrations.
     Forwards the request body and signature header to agentix-api.
     """
     body = await request.body()
@@ -25,12 +25,12 @@ async def shuffle_wazuh_webhook(request: Request):
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(
-                f"{AGENTIX_API_URL}/v1/webhooks/shuffle/wazuh",
+                f"{AGENTIX_API_URL}/v1/webhooks/wazuh",
                 content=body,
                 headers=headers,
                 timeout=10.0
             )
-            # Return the exact response from agentix-api to Shuffle
+            # Return the exact response from agentix-api
             return Response(
                 content=resp.content,
                 status_code=resp.status_code,

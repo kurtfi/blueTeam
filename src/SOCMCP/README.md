@@ -2,7 +2,7 @@
 
 **Security Operations Center MCP Server for Agentix**
 
-SOCMCP provides a FastMCP-compliant server that exposes enterprise security operations tools to the Agentix orchestrator. It acts as the bridge between the AI agents and standard SOC platforms like Wazuh, Cortex, TheHive, and Shuffle.
+SOCMCP provides a FastMCP-compliant server that exposes enterprise security operations tools to the Agentix orchestrator. It acts as the bridge between the AI agents and standard SOC platforms like Wazuh, Cortex, TheHive, and SOAR providers.
 
 ## Quickstart
 
