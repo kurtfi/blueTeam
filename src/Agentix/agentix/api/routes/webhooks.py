@@ -7,7 +7,12 @@ from fastapi import APIRouter, Request, BackgroundTasks, HTTPException, Header, 
 
 from agentix.core.triage_workflow import process_wazuh_alert
 
+from agentix.core.alert_dedup import AlertDeduplicator
+
 logger = structlog.get_logger(__name__)
+
+async def get_deduplicator(request: Request) -> AlertDeduplicator:
+    return request.app.state.deduplicator
 
 async def verify_hmac_signature(
     request: Request,
@@ -39,7 +44,11 @@ async def verify_hmac_signature(
 router = APIRouter(tags=["webhooks"])
 
 @router.post("/v1/webhooks/wazuh", dependencies=[Depends(verify_hmac_signature)])
-async def handle_wazuh_alert(request: Request, background_tasks: BackgroundTasks):
+async def handle_wazuh_alert(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    dedup: AlertDeduplicator = Depends(get_deduplicator)
+):
     """
     Receives alerts from Wazuh integration directly.
     """
@@ -52,6 +61,23 @@ async def handle_wazuh_alert(request: Request, background_tasks: BackgroundTasks
     # Generate a unique session ID for the triage process
     session_id = f"triage-{uuid.uuid4()}"
     
+    # Check for duplication in Redis
+    is_dup, existing_session = await dedup.check_and_register(payload, session_id)
+    if is_dup:
+        rule_id = (payload.get("rule_id") 
+                   or payload.get("rule", {}).get("id") 
+                   or payload.get("all_fields", {}).get("rule", {}).get("id"))
+        logger.info(
+            "webhooks.wazuh.deduplicated",
+            existing_session=existing_session,
+            rule_id=rule_id
+        )
+        return {
+            "status": "deduplicated",
+            "existing_session": existing_session,
+            "message": "Alert already being triaged"
+        }
+
     # Run the orchestrator in the background to avoid blocking the webhook response
     background_tasks.add_task(process_wazuh_alert, session_id, payload)
     

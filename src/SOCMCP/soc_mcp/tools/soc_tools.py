@@ -131,25 +131,37 @@ async def find_playbook_for_alert(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @mcp.tool()
-async def create_case(title: str, description: str, severity: int = 2, tags: list[str] = None) -> str:
-    """Creates a new case on SOAR/Case Management."""
+async def create_case(title: str = "", description: str = "", severity: int = 2, tags: list[str] = None) -> str:
+    """Creates a new case on SOAR/Case Management.
+    Returns a message containing 'Case ID: <id>' on success.
+    IMPORTANT: Save the returned Case ID (e.g. ~12345) — you will need it for add_case_note and update_case_status.
+    """
     provider = registry.get_case_management_provider()
     return await provider.create_case(title, description, severity, tags)
 
 @mcp.tool()
 async def add_case_note(case_id: str, note: str, task_title: str = "Investigation Note") -> str:
-    """Adds a note to the case."""
+    """Adds a note/task to an existing case.
+    IMPORTANT: You MUST first create a case using 'create_case' and use the exact Case ID returned (e.g. ~12345).
+    Do NOT use 'N/A', 'UNKNOWN', or any placeholder — only the real Case ID from create_case output.
+    """
     provider = registry.get_case_management_provider()
     return await provider.add_case_note(case_id, note, task_title)
 
 @mcp.tool()
 async def update_case_status(case_id: str, status: str, resolution_type: str = "TruePositive", summary: str = "") -> str:
-    """Updates the case status."""
+    """Updates the status of an existing case.
+    IMPORTANT: You MUST first create a case using 'create_case' and use the exact Case ID returned (e.g. ~12345).
+    Valid status values: FalsePositive, TruePositive, Indeterminate, InProgress, New, Duplicated, Other.
+    Common mappings: use 'FalsePositive' for benign/false alarms, 'TruePositive' for confirmed threats,
+    'InProgress' for ongoing investigation, 'Indeterminate' when uncertain.
+    The resolution_type is used as a hint when status maps to a resolution (e.g. 'FalsePositive', 'TruePositive').
+    """
     provider = registry.get_case_management_provider()
     return await provider.update_case_status(case_id, status, resolution_type, summary)
 
 @mcp.tool()
-async def create_alert(title: str, description: str, source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: list[str] = None, observables: list[dict] = None) -> str:
+async def create_alert(title: str = "", description: str = "", source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: list[str] = None, observables: list[dict] = None) -> str:
     """Creates an alert for triage in the Case Management system."""
     provider = registry.get_case_management_provider()
     return await provider.create_alert(title, description, source, source_ref, severity, tags, observables)

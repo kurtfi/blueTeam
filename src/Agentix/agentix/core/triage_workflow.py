@@ -1,5 +1,6 @@
 import json
 import structlog
+import asyncio
 from agentix.agents.factory import AgentFactory
 from agentix.core.orchestrator import Orchestrator
 from agentix.registry.catalog import ToolCatalog
@@ -21,6 +22,9 @@ async def process_siem_alert(session_id: str, payload: dict):
     Initiates a SOC Triage agent session using the SOC Analyst agent
     and the shared MCP-connected ToolCatalog.
     """
+    logger.info("triage_workflow.delay_startup", session_id=session_id, delay_seconds=15)
+    await asyncio.sleep(15)
+
     logger.info("triage_workflow.start", session_id=session_id)
 
     catalog = _shared_catalog

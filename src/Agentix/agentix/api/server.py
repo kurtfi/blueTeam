@@ -25,6 +25,7 @@ from agentix.registry.catalog import ToolCatalog
 from agentic_common.memory.redis_preferences import RedisPreferenceStore
 from agentix.api.internal_auth import InternalApiKeyMiddleware
 from agentix.api.routes import webhooks
+from agentix.core.alert_dedup import AlertDeduplicator
 
 from contextlib import AsyncExitStack
 from mcp import ClientSession
@@ -59,6 +60,7 @@ async def startup_event():
     app.state.catalog = ToolCatalog()
     app.state.redis_store = RedisSessionStore(redis_url=settings.redis_url)
     app.state.pref_store = RedisPreferenceStore(redis_url=settings.redis_url)
+    app.state.deduplicator = AlertDeduplicator(redis_url=settings.redis_url, window_seconds=120)
     app.state.mcp_stack = AsyncExitStack()
     
     # 2. Initialize SOC MCP Server Connection with retry logic
@@ -122,6 +124,8 @@ async def shutdown_event():
         await app.state.redis_store.close()
     if hasattr(app.state, "pref_store"):
         await app.state.pref_store.close()
+    if hasattr(app.state, "deduplicator"):
+        await app.state.deduplicator.aclose()
 
 # --- Request Models ---
 

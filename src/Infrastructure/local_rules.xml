@@ -30,10 +30,18 @@
     <group>mitre_t1059,syslog,errors,</group>
   </rule>
 
-  <rule id="100010" level="10">
+  <!-- Her bireysel T1110 log satırını yakalar ama webhook'a gönderilmez (group listesinden authentication_failures kaldırıldı) -->
+  <rule id="100010" level="3">
     <if_sid>1002</if_sid>
     <match>MITRE-ATTACK-SIM: T1110</match>
-    <description>MITRE ATT&amp;CK T1110 - Brute Force Login Attack Simulation</description>
+    <description>MITRE ATT&amp;CK T1110 - Brute Force (individual event)</description>
+    <group>authentication_failed,syslog,</group>
+  </rule>
+
+  <!-- 60 saniye içinde 5+ T1110 event'i → TEK bir yüksek-seviye alert (webhook'a gönderilir) -->
+  <rule id="100011" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>100010</if_matched_sid>
+    <description>MITRE ATT&amp;CK T1110 - Brute Force Attack Detected (correlated)</description>
     <group>authentication_failures,authentication_failed,syslog,errors,</group>
   </rule>
 

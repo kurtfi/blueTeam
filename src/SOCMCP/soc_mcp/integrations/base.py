@@ -9,7 +9,7 @@ class ISiemProvider(ABC):
 
 class ICaseManagementProvider(ABC):
     @abstractmethod
-    async def create_case(self, title: str, description: str, severity: int = 2, tags: Optional[List[str]] = None) -> str:
+    async def create_case(self, title: str = "", description: str = "", severity: int = 2, tags: Optional[List[str]] = None) -> str:
         """Create a new case in the case management system."""
         pass
 
@@ -24,7 +24,7 @@ class ICaseManagementProvider(ABC):
         pass
 
     @abstractmethod
-    async def create_alert(self, title: str, description: str, source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: Optional[List[str]] = None, observables: Optional[List[Dict[str, Any]]] = None) -> str:
+    async def create_alert(self, title: str = "", description: str = "", source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: Optional[List[str]] = None, observables: Optional[List[Dict[str, Any]]] = None) -> str:
         """Create an alert in the case management system for triage."""
         pass
 
