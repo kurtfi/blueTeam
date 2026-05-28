@@ -7,7 +7,7 @@ This document describes the topology of the system containers, their network con
 ## 1. Container Topology
 
 The BlueTeam/Agentix system runs in a multi-container network. We partition containers into two primary Docker Compose deployments:
-1. **Security Infrastructure** (`src/Infrastructure/docker-compose.yml`): Runs Wazuh SIEM, TheHive Case Management, and Cortex Enrichment.
+1. **Security Infrastructure** (`Infrastructure/docker-compose.yml`): Runs Wazuh SIEM, TheHive Case Management, and Cortex Enrichment.
 2. **AI Agent Core** (`src/Agentix/docker-compose.yml`): Runs the Agentix Gateway, Agentix Orchestrator core, and the TriageCore FastMCP server.
 
 ```
@@ -50,7 +50,7 @@ To ensure services initialize correctly without timeout errors, run the compose 
 ### 1. Launch Security Infrastructure
 The databases (Elasticsearch, Cassandra) and security services take longer to run initialization migrations.
 ```bash
-cd src/Infrastructure
+cd Infrastructure
 docker compose up -d
 ```
 You can monitor progress using:
@@ -63,7 +63,7 @@ curl -k -u wazuh-wui:wazuh-wui https://localhost:55000/
 ### 2. Launch Agentix & MCP Services
 Once Wazuh, TheHive, and Cortex are healthy, spin up the AI orchestration layer:
 ```bash
-cd ../Agentix
+cd ../src/Agentix
 docker compose up -d
 ```
 This launches the FastMCP server, connects it to the security tools, and starts the API gateway.

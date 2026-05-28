@@ -44,7 +44,7 @@ ollama run gemma:2b
 ### Step 3: Run the Security Stack
 Spin up the Docker services for Wazuh SIEM, TheHive, and Cortex:
 ```bash
-cd src/Infrastructure
+cd Infrastructure
 docker compose up -d
 ```
 Verify the services are running correctly:

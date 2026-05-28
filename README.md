@@ -68,11 +68,11 @@ blueTeam/
 │   ├── architecture/          # System, data flow, and deployment diagrams
 │   ├── guides/                # Getting started, adding tools, agents, and integrations
 │   └── glossary.md            # Technical terms reference
+├── Infrastructure/            # Docker Compose setups for Wazuh, TheHive, and Cortex
 ├── src/
 │   ├── Agentix/               # The core AI Agent Orchestrator & API Gateway
 │   ├── TriageCore/                # Model Context Protocol (MCP) server for SOC integrations
 │   ├── AgenticCommon/         # Shared libraries (LLM clients, sandboxing utilities)
-│   ├── Infrastructure/        # Docker Compose setups for Wazuh, TheHive, and Cortex
 │   └── IntegrationTests/      # End-to-end and connectivity testing scripts
 ├── .env.example               # Unified environment variables template
 ├── LICENSE                    # MIT License
@@ -115,7 +115,7 @@ uv sync --all-extras --dev
 ### Step 3: Launch Security Infrastructure
 Spin up Wazuh, TheHive, and Cortex via Docker Compose:
 ```bash
-cd src/Infrastructure
+cd Infrastructure
 docker compose up -d
 ```
 *Note: It may take a couple of minutes for all security containers to fully initialize.*
