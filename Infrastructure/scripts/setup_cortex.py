@@ -149,41 +149,6 @@ def check_analyzers(client: httpx.Client, headers: dict):
         print(f"  → Could not list analyzers: {resp.status_code}")
 
 
-def update_env_file(api_key: str):
-    """Appends/updates CORTEX_API_KEY in the .env file."""
-    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-    env_path = os.path.normpath(env_path)
-
-    if not api_key:
-        print("\n[.env] Skipping .env update (no API key generated).")
-        return
-
-    print(f"\n[.env] Updating CORTEX_API_KEY in {env_path}...")
-    try:
-        with open(env_path, "r") as f:
-            content = f.read()
-
-        if "CORTEX_API_KEY=" in content:
-            lines = content.splitlines()
-            new_lines = []
-            for line in lines:
-                if line.startswith("CORTEX_API_KEY="):
-                    new_lines.append(f"CORTEX_API_KEY={api_key}")
-                else:
-                    new_lines.append(line)
-            with open(env_path, "w") as f:
-                f.write("\n".join(new_lines) + "\n")
-            print(f"  ✓ CORTEX_API_KEY updated in {env_path}")
-        else:
-            with open(env_path, "a") as f:
-                f.write(f"\nCORTEX_API_KEY={api_key}\n")
-            print(f"  ✓ CORTEX_API_KEY appended to {env_path}")
-
-    except Exception as e:
-        print(f"  ✗ Could not update .env: {e}")
-        print(f"  → Set manually: CORTEX_API_KEY={api_key}")
-
-
 def main():
     print("=" * 60)
     print("Agentix Cortex Setup")
@@ -203,8 +168,9 @@ def main():
         sys.exit(1)
 
     with httpx.Client(timeout=15.0) as client:
-        get_admin_token(client)
+        token = get_admin_token(client)
         auth_headers = {
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
 
@@ -212,11 +178,10 @@ def main():
         api_key = ensure_analyst_user(client, auth_headers, org_id)
         check_analyzers(client, auth_headers)
 
-    update_env_file(api_key)
-
     print("\n" + "=" * 60)
     print("Cortex Setup Complete")
     print("=" * 60)
+    print(f"  API Key: {api_key}")
     print("""
 Next Steps:
   1. Open Cortex UI: http://localhost:9001

@@ -7,39 +7,6 @@ CORTEX_URL = os.getenv("CORTEX_URL", "http://localhost:9001")
 ADMIN_USER = "admin"
 ADMIN_PASS = os.getenv("CORTEX_ADMIN_PASSWORD", "secret")
 
-def update_env_files(api_key: str):
-    """Updates CORTEX_API_KEY in the environment files."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_paths = [
-        os.path.abspath(os.path.join(script_dir, "../.env")),
-        os.path.abspath(os.path.join(script_dir, "../../Agentix/.env"))
-    ]
-    
-    for env_path in env_paths:
-        if not os.path.exists(env_path):
-            print(f"  → Path not found: {env_path}")
-            continue
-            
-        print(f"  → Updating {env_path}...")
-        with open(env_path, "r") as f:
-            lines = f.readlines()
-            
-        new_lines = []
-        updated = False
-        for line in lines:
-            if line.startswith("CORTEX_API_KEY="):
-                new_lines.append(f"CORTEX_API_KEY={api_key}\n")
-                updated = True
-            else:
-                new_lines.append(line)
-                
-        if not updated:
-            new_lines.append(f"\nCORTEX_API_KEY={api_key}\n")
-            
-        with open(env_path, "w") as f:
-            f.writelines(new_lines)
-        print(f"  ✓ Updated {env_path}")
-
 def main():
     print("=== Cortex Browser-Based Setup ===")
     print(f"Target URL: {CORTEX_URL}")
@@ -134,7 +101,6 @@ def main():
             if result.get("success"):
                 api_key = result.get("apiKey")
                 print(f"\n✓ Successfully generated API key: {api_key}")
-                update_env_files(api_key)
             else:
                 print(f"\n✗ Setup failed: {result.get('error')}")
                 sys.exit(1)

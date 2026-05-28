@@ -87,7 +87,8 @@ def ensure_analyst_user(client: httpx.Client, admin_headers: dict) -> str:
         "login": ANALYST_LOGIN,
         "name": ANALYST_NAME,
         "profile": selected_profile,
-        "status": "Ok"
+        "status": "Ok",
+        "password": "secret"
     }
     
     # Try /api/user first, fallback to /api/v1/user
@@ -106,6 +107,12 @@ def ensure_analyst_user(client: httpx.Client, admin_headers: dict) -> str:
     if create_resp.status_code in (200, 201):
         user_data = create_resp.json()
         user_id = user_data.get("id", user_data.get("_id", ANALYST_LOGIN))
+        # 4. Set password explicitly
+        client.patch(
+            f"{THEHIVE_URL}/api/user/{ANALYST_LOGIN}",
+            json={"password": "secret"},
+            headers=admin_headers
+        )
         print(f"  ✓ User '{ANALYST_LOGIN}' created successfully (id={user_id})")
         return user_id
     else:
@@ -134,44 +141,11 @@ def renew_analyst_key(client: httpx.Client, admin_headers: dict, user_id: str) -
             api_key = key_data.get("key") or key_data.get("apiKey") or renew_resp.text.strip().strip('"')
         except Exception:
             api_key = renew_resp.text.strip().strip('"')
-        print(f"  ✓ API key generated successfully: {api_key[:6]}...{api_key[-4:]}")
+        print(f"  ✓ API key generated successfully: {api_key}")
         return api_key
     else:
         print(f"  ✗ Failed to generate API key: {renew_resp.status_code} – {renew_resp.text}")
         sys.exit(1)
-
-def update_env_files(api_key: str):
-    """Updates THEHIVE_API_KEY in the environment files."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_paths = [
-        os.path.abspath(os.path.join(script_dir, "../.env")),
-        os.path.abspath(os.path.join(script_dir, "../../Agentix/.env"))
-    ]
-    
-    for env_path in env_paths:
-        if not os.path.exists(env_path):
-            print(f"  → Path not found: {env_path}")
-            continue
-            
-        print(f"  → Updating {env_path}...")
-        with open(env_path, "r") as f:
-            lines = f.readlines()
-            
-        new_lines = []
-        updated = False
-        for line in lines:
-            if line.startswith("THEHIVE_API_KEY="):
-                new_lines.append(f"THEHIVE_API_KEY={api_key}\n")
-                updated = True
-            else:
-                new_lines.append(line)
-                
-        if not updated:
-            new_lines.append(f"\nTHEHIVE_API_KEY={api_key}\n")
-            
-        with open(env_path, "w") as f:
-            f.writelines(new_lines)
-        print(f"  ✓ Updated {env_path}")
 
 def main():
     print("=== TheHive Analyst User Initialization ===")
@@ -188,7 +162,6 @@ def main():
         admin_headers = get_admin_headers(client)
         user_id = ensure_analyst_user(client, admin_headers)
         api_key = renew_analyst_key(client, admin_headers, user_id)
-        update_env_files(api_key)
         
     print("\n=== Initialization Complete ===")
 
