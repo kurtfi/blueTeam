@@ -46,7 +46,7 @@ graph TD
     subgraph "Capability Layer (Tools)"
         Catalog["Tool Catalog"]
         GeneralMCP["GeneralMCP (Data/Sys/Action)"]
-        SOCMCP["SOCMCP (Security/Wazuh)"]
+        TriageCore["TriageCore (Security/Wazuh)"]
     end
 
     Web & TG --> ORC
@@ -55,13 +55,13 @@ graph TD
     ORC --> Router
     Router --> Researcher & Analyst
     ORC <--> Catalog
-    Catalog <--> GeneralMCP & SOCMCP
+    Catalog <--> GeneralMCP & TriageCore
 ```
 
 ### Components
 1.  **Gateway**: Provides channel-specific entry points (REST, Webhooks) and handles authentication.
 2.  **Orchestrator**: The central engine driving the ReAct loop and managing resource lifecycle.
-3.  **Capability Layer (Tool Catalog)**: A registry that manages tool metadata. It dynamically loads external tools from `GeneralMCP` (utility, file, terminal, web tools) and `SOCMCP` (security platform integration).
+3.  **Capability Layer (Tool Catalog)**: A registry that manages tool metadata. It dynamically loads external tools from `GeneralMCP` (utility, file, terminal, web tools) and `TriageCore` (security platform integration).
 4.  **AgenticCommon**: A foundational shared library providing unified Session Workspaces (sandbox), Telemetry, and Database Models.
 
 ---
@@ -122,7 +122,7 @@ All tools must implement the [BaseTool](./agentix/tools/base.py) interface, defi
 Agentix is natively compatible with the **Model Context Protocol**. It heavily utilizes this architecture by decoupling all significant tools into standalone servers, accessed via the `MCPToolAdapter`:
 
 - **GeneralMCP**: Provides data processing (Docling, Crawl4AI), terminal, file system, and API capabilities.
-- **SOCMCP**: Provides high-privilege access to enterprise security tools (Wazuh, TheHive, Cortex) within a highly protected network segment.
+- **TriageCore**: Provides high-privilege access to enterprise security tools (Wazuh, TheHive, Cortex) within a highly protected network segment.
 
 This architecture ensures that vulnerabilities in parsing libraries (e.g., Docling) or API credential leaks do not directly compromise the Agentix orchestrator core.
 

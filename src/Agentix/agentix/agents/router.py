@@ -17,7 +17,7 @@ Design decisions:
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 
@@ -119,7 +119,7 @@ class AgentRouter:
 
         system_prompt = _ROUTER_SYSTEM_PROMPT.format(agent_list=agent_list)
 
-        messages = [
+        messages: list[Any] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ]

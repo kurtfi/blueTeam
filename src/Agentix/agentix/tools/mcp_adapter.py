@@ -178,6 +178,8 @@ class MCPToolAdapter(BaseTool):
                 success=False,
                 error=f"Tool '{self.name}' failed after {self._max_retries + 1} attempts: {exc}",
             )
+        
+        return ToolResult(success=False, error=f"Tool '{self.name}' failed (unreachable)")
 
     # ------------------------------------------------------------------
     # Internal helpers

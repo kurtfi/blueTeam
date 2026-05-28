@@ -11,13 +11,12 @@ sys.path.insert(0, str(root_dir.parent / "AgenticCommon"))
 from agentix.agents.factory import AgentFactory
 from agentix.registry.catalog import ToolCatalog
 from agentic_common.base_tool import BaseTool, ToolResult
+from typing import Any
 
-# Configure logging to see the ReAct loop
-structlog = None
+import structlog
 try:
-    import structlog
-    structlog.configure()
-except ImportError:
+    structlog.configure() # type: ignore
+except Exception:
     pass
 
 class MockTool(BaseTool):
@@ -27,7 +26,7 @@ class MockTool(BaseTool):
         self.category = category
         self.description = f"A special {category} tool for {name} operations."
     
-    async def execute(self, **kwargs) -> ToolResult:
+    async def execute(self, context: dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
         return ToolResult(success=True, output="Mock result")
 
 async def test_agent_loading():

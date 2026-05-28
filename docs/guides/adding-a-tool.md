@@ -1,6 +1,6 @@
 # Adding a New Tool
 
-This guide explains how to add a new security capability (tool) to the platform. Tools can either be added directly as internal Python tools within `Agentix` or exposed via the decoupled `SOCMCP` server.
+This guide explains how to add a new security capability (tool) to the platform. Tools can either be added directly as internal Python tools within `Agentix` or exposed via the decoupled `TriageCore` server.
 
 ---
 
@@ -54,10 +54,10 @@ tool_registry.register(
 
 ## 2. Exposing an MCP Tool via FastMCP
 
-If your tool interacts with external services (like সুরিকাটা/Suricata or MISP) and requires isolated credentials, add it to the `SOCMCP` server instead.
+If your tool interacts with external services (like সুরিকাটা/Suricata or MISP) and requires isolated credentials, add it to the `TriageCore` server instead.
 
 ### Step 1: Write FastMCP Tool
-Add your function to `src/SOCMCP/soc_mcp/server.py`:
+Add your function to `src/TriageCore/triage_core/server.py`:
 
 ```python
 from fastmcp import FastMCP

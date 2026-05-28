@@ -4,13 +4,13 @@ Abstract base class for vector store providers.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TypedDict
+from typing import TypedDict, Any
 
 class VectorSearchResult(TypedDict):
     """Result of a semantic search."""
     id: str
     text: str
-    metadata: dict
+    metadata: dict[str, Any]
     score: float
 
 class BaseVectorStore(ABC):
@@ -20,7 +20,7 @@ class BaseVectorStore(ABC):
     async def upsert(
         self, 
         texts: list[str], 
-        metadata: list[dict] | None = None, 
+        metadata: list[dict[str, Any]] | None = None, 
         ids: list[str] | None = None
     ) -> list[str]:
         """Insert or update documents in the vector store."""
@@ -32,7 +32,8 @@ class BaseVectorStore(ABC):
         query: str, 
         top_k: int = 5, 
         collection: str = "default",
-        filter: dict | None = None
+        filter: dict[str, Any] | None = None,
+        **kwargs: Any
     ) -> list[VectorSearchResult]:
         """Search for similar documents given a query."""
         pass

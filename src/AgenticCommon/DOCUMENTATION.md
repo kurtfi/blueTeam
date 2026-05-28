@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-`AgenticCommon` serves as the foundational, shared logic layer for the Agentix platform. To prevent code duplication and ensure consistent behavior across the main `Agentix` orchestrator and its decoupled tools (like `SOCMCP` and `GeneralMCP`), core components have been consolidated into this single library. 
+`AgenticCommon` serves as the foundational, shared logic layer for the Agentix platform. To prevent code duplication and ensure consistent behavior across the main `Agentix` orchestrator and its decoupled tools (like `TriageCore` and `GeneralMCP`), core components have been consolidated into this single library. 
 
 This ensures that logging formats, workspace path resolutions, and configuration validations remain identical whether a process is running in the core orchestrator or in an edge MCP server.
 
@@ -36,7 +36,7 @@ Uses `pydantic-settings` for robust, type-checked environment variable parsing.
 Provides standard interfaces for vector embeddings used by native RAG operations and semantic search features, ensuring that all components produce compatible vector spaces.
 
 ### 2.5 Base Tool (`base_tool.py`)
-Defines the `BaseTool` class contract that was originally part of Agentix. All tools across `Agentix`, `SOCMCP`, and `GeneralMCP` inherit from this class to guarantee a uniform API containing:
+Defines the `BaseTool` class contract that was originally part of Agentix. All tools across `Agentix`, `TriageCore`, and `GeneralMCP` inherit from this class to guarantee a uniform API containing:
 - `name`
 - `description`
 - `parameters` schema

@@ -64,7 +64,7 @@ async def web_chat(req: ChatRequest, current_user: dict = Depends(get_current_us
     Standard Web endpoint to communicate with Agentix.
     It returns an SSE stream if requested or establishes a new session.
     """
-    user_id = current_user.get("uid")
+    user_id = str(current_user.get("uid", ""))
     
     # 1. Establish session if not provided
     session_id = req.session_id

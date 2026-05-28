@@ -13,7 +13,7 @@ Designed for DevSecOps engineers, security researchers, and educators, it bridge
 
 ## 🔍 Architecture at a Glance
 
-The platform utilizes a **Modular Monorepo** structure built with `uv` workspaces, decoupling the AI orchestration core (`Agentix`) from security integrations (`SOCMCP`) and containerized services (`Infrastructure`).
+The platform utilizes a **Modular Monorepo** structure built with `uv` workspaces, decoupling the AI orchestration core (`Agentix`) from security integrations (`TriageCore`) and containerized services (`Infrastructure`).
 
 ```mermaid
 graph TD
@@ -30,10 +30,10 @@ graph TD
     LLMClient -->|API Calls| LLMProviders[OpenAI / Gemini / Ollama]
 
     subgraph Tool Integration Layer
-        Orchestrator -->|Model Context Protocol SSE| SOCMCP[SOC FastMCP Server]
-        SOCMCP -->|API| Wazuh[Wazuh SIEM / EDR]
-        SOCMCP -->|API| TheHive[TheHive Case Mgmt]
-        SOCMCP -->|API| Cortex[Cortex Enrichment]
+        Orchestrator -->|Model Context Protocol SSE| TriageCore[SOC FastMCP Server]
+        TriageCore -->|API| Wazuh[Wazuh SIEM / EDR]
+        TriageCore -->|API| TheHive[TheHive Case Mgmt]
+        TriageCore -->|API| Cortex[Cortex Enrichment]
     end
 
     subgraph Infrastructure [Docker-Compose Services]
@@ -70,7 +70,7 @@ blueTeam/
 │   └── glossary.md            # Technical terms reference
 ├── src/
 │   ├── Agentix/               # The core AI Agent Orchestrator & API Gateway
-│   ├── SOCMCP/                # Model Context Protocol (MCP) server for SOC integrations
+│   ├── TriageCore/                # Model Context Protocol (MCP) server for SOC integrations
 │   ├── AgenticCommon/         # Shared libraries (LLM clients, sandboxing utilities)
 │   ├── Infrastructure/        # Docker Compose setups for Wazuh, TheHive, and Cortex
 │   └── IntegrationTests/      # End-to-end and connectivity testing scripts

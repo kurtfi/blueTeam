@@ -102,7 +102,7 @@ class Orchestrator:
         )
 
         # Context Management
-        self._context_manager = ContextManager(model=self._llm.model)
+        self._context_manager = ContextManager(model=str(self._llm.model))
 
         # Lazily initialise the vector store singleton (avoids connection at import time).
         self._vector_store: Any | None = vector_store
@@ -179,7 +179,7 @@ class Orchestrator:
         # Check if we are resuming from a pending approval/confirmation state
         draft_history = metadata.get("draft_history")
         is_resume = False
-        tool_calls = []
+        tool_calls: list[Any] = []
 
         if draft_history:
             is_positive = user_message.lower().strip() in (

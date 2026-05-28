@@ -59,9 +59,10 @@ class InMemoryVectorStore(BaseVectorStore):
         query: str,
         top_k: int = 5,
         collection: str = "default",
-        alpha: float = 0.5,
-        filter: dict | None = None,
+        filter: dict[str, Any] | None = None,
+        **kwargs: Any
     ) -> list[VectorSearchResult]:
+        alpha: float = kwargs.get("alpha", 0.5)
         if collection not in self._collections or not self._collections[collection]:
             return []
 
@@ -105,7 +106,7 @@ class InMemoryVectorStore(BaseVectorStore):
 
         # 3. Reciprocal Rank Fusion (RRF)
         # score = sum( 1 / (k + rank(d)) )
-        k = 60
+        rrf_k = 60
         fused_scores: dict[str, float] = {}
         all_ids = set(semantic_rank.keys()) | set(keyword_rank.keys())
         
@@ -114,7 +115,7 @@ class InMemoryVectorStore(BaseVectorStore):
             k_rank = keyword_rank.get(doc_id, 1000)
             
             # alpha=1 -> pure semantic, alpha=0 -> pure keyword
-            score = (alpha * (1.0 / (k + s_rank))) + ((1.0 - alpha) * (1.0 / (k + k_rank)))
+            score = (alpha * (1.0 / (rrf_k + s_rank))) + ((1.0 - alpha) * (1.0 / (rrf_k + k_rank)))
             fused_scores[doc_id] = score
 
         # 4. Final aggregation

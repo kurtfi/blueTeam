@@ -8,7 +8,7 @@ This document describes the topology of the system containers, their network con
 
 The BlueTeam/Agentix system runs in a multi-container network. We partition containers into two primary Docker Compose deployments:
 1. **Security Infrastructure** (`src/Infrastructure/docker-compose.yml`): Runs Wazuh SIEM, TheHive Case Management, and Cortex Enrichment.
-2. **AI Agent Core** (`src/Agentix/docker-compose.yml`): Runs the Agentix Gateway, Agentix Orchestrator core, and the SOCMCP FastMCP server.
+2. **AI Agent Core** (`src/Agentix/docker-compose.yml`): Runs the Agentix Gateway, Agentix Orchestrator core, and the TriageCore FastMCP server.
 
 ```
        [Host Network]
@@ -16,7 +16,7 @@ The BlueTeam/Agentix system runs in a multi-container network. We partition cont
              ├── Port 8000 ────────> [ Agentix Gateway ] ─── (internal API)
              │                              │
              │                              ▼
-             ├── Port 8080 ────────> [ SOCMCP Server ] ── (FastMCP Engine)
+             ├── Port 8080 ────────> [ TriageCore Server ] ── (FastMCP Engine)
              │                              │
              │                              ▼ (Integration Calls)
              ├── Port 55000 ───────> [ Wazuh Manager ]
@@ -28,7 +28,7 @@ The BlueTeam/Agentix system runs in a multi-container network. We partition cont
 
 ## 2. Port Mapping & Network Allocation
 
-All containers belong to the bridge network `agentix_net` to allow resolved DNS communication (e.g. `SOCMCP` reaching Wazuh by querying `http://wazuh-manager:55000`).
+All containers belong to the bridge network `agentix_net` to allow resolved DNS communication (e.g. `TriageCore` reaching Wazuh by querying `http://wazuh-manager:55000`).
 
 | Container Service | internal Port | External (Host) Port | Protocol | Description |
 |:---|:---|:---|:---|:---|

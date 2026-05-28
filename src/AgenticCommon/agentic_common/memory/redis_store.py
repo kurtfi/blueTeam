@@ -21,11 +21,11 @@ class RedisSessionStore:
     async def exists(self, session_id: str) -> bool:
         history_key = f"session:{session_id}:history"
         meta_key = f"session:{session_id}:metadata"
-        return await self._redis.exists(history_key, meta_key) > 0
+        return await self._redis.exists(history_key, meta_key) > 0 # type: ignore[misc]
 
     async def get_history(self, session_id: str) -> list[dict]:
         key = f"session:{session_id}:history"
-        items = await self._redis.lrange(key, 0, -1)
+        items = await self._redis.lrange(key, 0, -1) # type: ignore[misc]
         return [json.loads(item) for item in items]
 
     async def append(
@@ -53,16 +53,16 @@ class RedisSessionStore:
     async def get_metadata(self, session_id: str, k: str | None = None) -> Any:
         key = f"session:{session_id}:metadata"
         if k:
-            val = await self._redis.hget(key, k)
+            val = await self._redis.hget(key, k) # type: ignore[misc]
             return json.loads(val) if val else None
 
-        data = await self._redis.hgetall(key)
+        data = await self._redis.hgetall(key) # type: ignore[misc]
         return {k: json.loads(v) for k, v in data.items()}
 
     async def set_metadata(self, session_id: str, k: str, value: Any) -> None:
         key = f"session:{session_id}:metadata"
-        await self._redis.hset(key, k, json.dumps(value))
-        await self._redis.expire(key, self._ttl)
+        await self._redis.hset(key, k, json.dumps(value)) # type: ignore[misc]
+        await self._redis.expire(key, self._ttl) # type: ignore[misc]
 
     async def close(self) -> None:
         await self._redis.aclose()

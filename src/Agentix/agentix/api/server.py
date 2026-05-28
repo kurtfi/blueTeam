@@ -68,17 +68,17 @@ async def startup_event():
     retry_delay = 5  # seconds
     for attempt in range(1, max_retries + 1):
         try:
-            logger.info("Connecting to SOC MCP Server...", attempt=attempt, url=settings.agentix_soc_mcp_url)
+            logger.info("Connecting to SOC MCP Server...", attempt=attempt, url=settings.agentix_triage_core_url)
             # Recreate stack for this attempt to ensure clean state
             app.state.mcp_stack = AsyncExitStack()
             
-            soc_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_soc_mcp_url))
+            soc_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_triage_core_url))
             soc_read, soc_write = soc_transport
-            app.state.soc_mcp_session = await app.state.mcp_stack.enter_async_context(ClientSession(soc_read, soc_write))
-            await app.state.soc_mcp_session.initialize()
+            app.state.triage_core_session = await app.state.mcp_stack.enter_async_context(ClientSession(soc_read, soc_write))
+            await app.state.triage_core_session.initialize()
             
-            # Sync SOCMCP Tools into our Catalog
-            await app.state.catalog.register_mcp_client(app.state.soc_mcp_session)
+            # Sync TriageCore Tools into our Catalog
+            await app.state.catalog.register_mcp_client(app.state.triage_core_session)
             logger.info("Successfully connected to SOC MCP Server and synced tools.")
             break
         except Exception as e:
@@ -87,7 +87,7 @@ async def startup_event():
             logger.warning("Failed to connect to SOC MCP server, retrying...", attempt=attempt, max_retries=max_retries, error=str(e))
             if attempt == max_retries:
                 logger.error("Failed to connect to SOC MCP server after maximum retries", error=str(e))
-                app.state.soc_mcp_session = None
+                app.state.triage_core_session = None
             else:
                 await asyncio.sleep(retry_delay)
 

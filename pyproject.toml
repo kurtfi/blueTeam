@@ -1,2 +1,7 @@
 [tool.uv]
-workspace = { members = ["src/Agentix", "src/SOCMCP", "src/IntegrationTests", "src/AgenticCommon"] }
+workspace = { members = ["src/Agentix", "src/TriageCore", "src/IntegrationTests", "src/AgenticCommon"] }
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.1.0",
+]

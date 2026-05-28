@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from agentic_common.embeddings import EmbeddingFactory

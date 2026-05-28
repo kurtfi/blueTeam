@@ -38,7 +38,8 @@ class OllamaEmbeddingProvider(BaseEmbeddingProvider):
 
     async def embed_query(self, text: str) -> list[float]:
         resp = await self.client.embeddings(model=self.model, prompt=text)
-        return resp.embedding if hasattr(resp, "embedding") else resp["embedding"]
+        emb = resp.embedding if hasattr(resp, "embedding") else resp["embedding"]
+        return list(emb)
 
     async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         embeddings: list[list[float]] = []

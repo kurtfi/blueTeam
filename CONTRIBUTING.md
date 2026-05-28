@@ -47,13 +47,13 @@ uv run ruff format --check .
 ### 2. Static Type Checks (Mypy)
 We use Mypy for static type checking across the Python packages. Ensure all functions have proper type hints:
 ```bash
-uv run mypy src/Agentix src/SOCMCP src/AgenticCommon
+uv run mypy src/Agentix src/TriageCore src/AgenticCommon
 ```
 
 ### 3. Unit and Integration Tests (Pytest)
 Write tests for any new tools, agents, or client wrappers. To run all unit tests:
 ```bash
-uv run pytest src/Agentix/tests src/SOCMCP/tests
+uv run pytest src/Agentix/tests src/TriageCore/tests
 ```
 
 ---
@@ -75,7 +75,7 @@ Commit message format:
 - `chore`: Updating build tasks, package dependencies, or CI config.
 
 ### Examples:
-- `feat(tool): add Suricata alert query to SOCMCP`
+- `feat(tool): add Suricata alert query to TriageCore`
 - `fix(core): resolve path traversal edge case in SessionWorkspace`
 - `docs(readme): update quickstart command syntax`
 

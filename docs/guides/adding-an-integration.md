@@ -1,13 +1,13 @@
 # Adding a New SOC Integration
 
-This guide details how to add a new third-party security platform integration (such as Splunk, Suricata, or MISP) to the decoupled `SOCMCP` server.
+This guide details how to add a new third-party security platform integration (such as Splunk, Suricata, or MISP) to the decoupled `TriageCore` server.
 
 ---
 
 ## 1. Architecture: The Integration Provider Pattern
 
-To avoid coupling agent tools directly to specific vendor implementations, `SOCMCP` uses an abstract **Provider/Strategy Pattern**.
-- **Base Client Contract**: Defined under `src/SOCMCP/soc_mcp/integrations/base.py`.
+To avoid coupling agent tools directly to specific vendor implementations, `TriageCore` uses an abstract **Provider/Strategy Pattern**.
+- **Base Client Contract**: Defined under `src/TriageCore/triage_core/integrations/base.py`.
 - **Registry**: Resolves which client class to instantiate at runtime based on the `*_PROVIDER` environment variables (e.g. `SIEM_PROVIDER=wazuh` vs `SIEM_PROVIDER=splunk`).
 
 ```
@@ -27,12 +27,12 @@ To avoid coupling agent tools directly to specific vendor implementations, `SOCM
 Let's walk through implementing a new firewall provider integration called `pfSense`.
 
 ### Step 1: Subclass the Base Provider
-Create a new file under `src/SOCMCP/soc_mcp/integrations/pfsense.py`:
+Create a new file under `src/TriageCore/triage_core/integrations/pfsense.py`:
 
 ```python
 from typing import Dict, Any
 import httpx
-from soc_mcp.integrations.base import BaseFirewallProvider
+from triage_core.integrations.base import BaseFirewallProvider
 
 class PFSenseProvider(BaseFirewallProvider):
     def __init__(self, config: Dict[str, Any]):
@@ -63,11 +63,11 @@ class PFSenseProvider(BaseFirewallProvider):
 ```
 
 ### Step 2: Register in the Integration Registry
-Open `src/SOCMCP/soc_mcp/integrations/registry.py` and register your new provider class:
+Open `src/TriageCore/triage_core/integrations/registry.py` and register your new provider class:
 
 ```python
-from soc_mcp.integrations.registry import provider_registry
-from soc_mcp.integrations.pfsense import PFSenseProvider
+from triage_core.integrations.registry import provider_registry
+from triage_core.integrations.pfsense import PFSenseProvider
 
 # Register pfsense as a valid option for the FIREWALL provider category
 provider_registry.register("firewall", "pfsense", PFSenseProvider)
@@ -94,7 +94,7 @@ Write an integration connectivity test inside `src/IntegrationTests/tests/` to v
 
 ```python
 import pytest
-from soc_mcp.integrations.registry import provider_registry
+from triage_core.integrations.registry import provider_registry
 
 @pytest.mark.asyncio
 async def test_pfsense_connectivity():

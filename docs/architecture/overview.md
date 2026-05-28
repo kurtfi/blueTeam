@@ -48,10 +48,10 @@ graph TD
     LLM -->|HTTP| LocalOllama[Local LLM: Ollama]
 
     subgraph SOC Tool Layer
-        Orchestrator -->|Model Context Protocol SSE| SOCMCP[SOC FastMCP Server]
-        SOCMCP -->|Internal TCP| WazuhAPI[Wazuh Manager API]
-        SOCMCP -->|Internal TCP| TheHiveAPI[TheHive API]
-        SOCMCP -->|Internal TCP| CortexAPI[Cortex API]
+        Orchestrator -->|Model Context Protocol SSE| TriageCore[SOC FastMCP Server]
+        TriageCore -->|Internal TCP| WazuhAPI[Wazuh Manager API]
+        TriageCore -->|Internal TCP| TheHiveAPI[TheHive API]
+        TriageCore -->|Internal TCP| CortexAPI[Cortex API]
     end
 
     subgraph Docker Infrastructure

@@ -45,6 +45,8 @@ class PostgresVectorStore(BaseVectorStore):
 
     async def _setup_db(self) -> None:
         """Create extension and table if they don't exist."""
+        if not self._pool:
+            return
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
@@ -101,9 +103,10 @@ class PostgresVectorStore(BaseVectorStore):
         query: str,
         top_k: int = 5,
         collection: str = "default",
-        alpha: float = 0.5,
-        filter: dict | None = None,
+        filter: dict[str, Any] | None = None,
+        **kwargs: Any
     ) -> list[VectorSearchResult]:
+        alpha: float = kwargs.get("alpha", 0.5)
         pool = await self._get_pool()
         query_vector = await self._embeddings.embed_query(query)
 

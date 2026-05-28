@@ -17,16 +17,16 @@ The core agent framework (`Agentix`) runs code that interacts with the LLM. Howe
 ## Considered Options
 
 1. **Embedded Integrations**: Place Wazuh, TheHive, and Cortex client libraries directly in the core orchestrator python packages.
-2. **Model Context Protocol (MCP) Decoupling**: Run integrations in a separate microservice (`SOCMCP`) exposing its capabilities as FastMCP SSE/Stdio tools. The core orchestrator communicates with the MCP server to obtain tool listings and trigger executions.
+2. **Model Context Protocol (MCP) Decoupling**: Run integrations in a separate microservice (`TriageCore`) exposing its capabilities as FastMCP SSE/Stdio tools. The core orchestrator communicates with the MCP server to obtain tool listings and trigger executions.
 
 ## Decision Outcome
 
-Chosen option: **Option 2 (Model Context Protocol Decoupling)**. We deploy `SOCMCP` as a standalone service using the `fastmcp` Python library. It handles authentication and communication with Wazuh, Cortex, and TheHive internally, and only exposes clean functional schemas to the `Agentix` orchestrator.
+Chosen option: **Option 2 (Model Context Protocol Decoupling)**. We deploy `TriageCore` as a standalone service using the `fastmcp` Python library. It handles authentication and communication with Wazuh, Cortex, and TheHive internally, and only exposes clean functional schemas to the `Agentix` orchestrator.
 
 ### Positive Consequences
 
-* **Credential Isolation**: Security credentials (like `THEHIVE_API_KEY` or `WAZUH_API_PASSWORD`) remain exclusively inside the `SOCMCP` container. The core `Agentix` service only knows how to send JSON requests to the MCP endpoint.
-* **Independent Lifecycle**: If Wazuh or TheHive APIs change, only the `SOCMCP` component needs updating. The core orchestration code remains untouched.
+* **Credential Isolation**: Security credentials (like `THEHIVE_API_KEY` or `WAZUH_API_PASSWORD`) remain exclusively inside the `TriageCore` container. The core `Agentix` service only knows how to send JSON requests to the MCP endpoint.
+* **Independent Lifecycle**: If Wazuh or TheHive APIs change, only the `TriageCore` component needs updating. The core orchestration code remains untouched.
 * **Standardization**: Adapting to Anthropic's Model Context Protocol allows the tools to be reused with other MCP-compliant agents or developer tools.
 
 ### Negative Consequences

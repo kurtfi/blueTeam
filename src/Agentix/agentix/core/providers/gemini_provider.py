@@ -33,10 +33,11 @@ class GeminiProvider(BaseLLMProvider):
     ) -> dict[str, Any]:
         
         # 1. Map OpenAI messages to Gemini formatted contents
-        contents = []
+        contents: list[Any] = []
         system_instruction = None
         
-        for msg in messages:
+        for msg_raw in messages:
+            msg = dict(msg_raw) # type: ignore
             role = msg.get("role")
             content = msg.get("content", "")
             
@@ -50,8 +51,10 @@ class GeminiProvider(BaseLLMProvider):
                 parts = []
                 if content:
                     parts.append({"text": content})
-                if msg.get("tool_calls"):
-                    for tc in msg["tool_calls"]:
+                tool_calls = msg.get("tool_calls")
+                if tool_calls and isinstance(tool_calls, list):
+                    for tc_raw in tool_calls:
+                        tc = dict(tc_raw) # type: ignore
                         try:
                             args = tc["function"]["arguments"]
                             if isinstance(args, str):
@@ -89,7 +92,7 @@ class GeminiProvider(BaseLLMProvider):
             contents.append({"role": "user", "parts": [{"text": str(content)}]})
 
         # 2. Map OpenAI Tools to Gemini format (they support OpenAPI standard json schemas mostly)
-        gemini_tools = []
+        gemini_tools: list[Any] = []
         if tools:
             for t in tools:
                 if t.get("type") == "function":
@@ -103,7 +106,7 @@ class GeminiProvider(BaseLLMProvider):
                         }]
                     })
                     
-        config_kwargs = {
+        config_kwargs: dict[str, Any] = {
             "temperature": self.temperature,
             "max_output_tokens": self.max_tokens,
         }

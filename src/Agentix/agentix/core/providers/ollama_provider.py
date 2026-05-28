@@ -38,10 +38,11 @@ class OllamaProvider(BaseLLMProvider):
         formatted_messages = []
         for msg in messages:
             msg_copy = dict(msg) # type: ignore
-            if msg_copy.get("role") == "assistant" and msg_copy.get("tool_calls"):
+            tool_calls = msg_copy.get("tool_calls")
+            if msg_copy.get("role") == "assistant" and tool_calls and isinstance(tool_calls, list):
                 formatted_tool_calls = []
-                for tc in msg_copy["tool_calls"]:
-                    tc_copy = dict(tc) # type: ignore
+                for tc_raw in tool_calls:
+                    tc_copy = dict(tc_raw) # type: ignore
                     if "function" in tc_copy and "arguments" in tc_copy["function"]:
                         func_copy = dict(tc_copy["function"])
                         args = func_copy.get("arguments")

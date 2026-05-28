@@ -27,7 +27,7 @@ async def main():
     
     catalog = ToolCatalog()
     
-    # Establish MCP (Tool Server) connection - use SOCMCP port 8081 by default
+    # Establish MCP (Tool Server) connection - use TriageCore port 8081 by default
     mcp_url = os.getenv("AGENTIX_SOC_MCP_URL", "http://localhost:8081/sse")
     print(f"🔌 Connecting to: MCP Tools Server ({mcp_url})...")
     try:
