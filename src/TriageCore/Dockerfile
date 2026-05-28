@@ -4,13 +4,13 @@ WORKDIR /app
 
 ENV UV_COMPILE_BYTECODE=1
 
-# Copy only SOCMCP files from context
-COPY src/SOCMCP/pyproject.toml ./
-COPY src/SOCMCP/soc_mcp ./soc_mcp
+# Copy only TriageCore files from context
+COPY src/TriageCore/pyproject.toml ./
+COPY src/TriageCore/triage_core ./triage_core
 
 # Sync dependencies standalone
 RUN uv sync
 
 EXPOSE 8081
 
-CMD ["uv", "run", "python", "-m", "soc_mcp.main"]
+CMD ["uv", "run", "python", "-m", "triage_core.main"]

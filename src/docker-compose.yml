@@ -1,3 +1,4 @@
+name: "agentix"
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -53,11 +54,11 @@ services:
     ports:
       - "26379:6379"
 
-  soc-mcp:
+  triage-core:
     build:
-      context: ../..
-      dockerfile: src/SOCMCP/Dockerfile
-    container_name: agentix-soc-mcp
+      context: ..
+      dockerfile: src/TriageCore/Dockerfile
+    container_name: triage-core
     networks:
       - agentix_net
     restart: always
@@ -73,12 +74,11 @@ services:
       - WAZUH_API_VERIFY_SSL=false
       - CORTEX_URL=http://cortex:9001
       - THEHIVE_URL=http://thehive:9000
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - LANGFUSE_HOST=http://langfuse:3000
     env_file:
-      - .env
+      - TriageCore/.env
     volumes:
-      - ../..:/app
+      - ..:/app
       - /app/.venv
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/sse')"]
@@ -89,7 +89,7 @@ services:
 
   agentix-api:
     build:
-      context: ../..
+      context: ..
       dockerfile: src/Agentix/Dockerfile
     container_name: agentix-api
     networks:
@@ -97,7 +97,7 @@ services:
     restart: always
     environment:
       - AGENTIX_LOG_LEVEL=DEBUG
-      - AGENTIX_SOC_MCP_URL=http://soc-mcp:8081/sse
+      - AGENTIX_SOC_MCP_URL=http://triage-core:8081/sse
       - REDIS_URL=redis://redis:6379
       - AGENTIX_POSTGRES_URL=postgresql+asyncpg://agentix:password@postgres:5432/agentix_db
       - WAZUH_API_URL=https://wazuh-manager:55000
@@ -107,13 +107,13 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - LANGFUSE_HOST=http://langfuse:3000
     env_file:
-      - .env
+      - Agentix/.env
     volumes:
-      - ../..:/app
+      - ..:/app
       - /app/.venv
     command: [ "uv", "run", "uvicorn", "agentix.api.server:app", "--host", "0.0.0.0", "--port", "8000" ]
     depends_on:
-      soc-mcp:
+      triage-core:
         condition: service_healthy
       redis:
         condition: service_started
@@ -122,7 +122,7 @@ services:
 
   agentix-gateway:
     build:
-      context: ../..
+      context: ..
       dockerfile: src/Agentix/Dockerfile
     container_name: agentix-gateway
     networks:
@@ -135,9 +135,9 @@ services:
       - AGENTIX_API_URL=http://agentix-api:8000
       - AGENTIX_POSTGRES_URL=postgresql+asyncpg://agentix:password@postgres:5432/agentix_db
     env_file:
-      - .env
+      - Agentix/.env
     volumes:
-      - ../..:/app
+      - ..:/app
       - /app/.venv
     command: [ "uv", "run", "uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8001" ]
     depends_on:
@@ -145,7 +145,7 @@ services:
 
   agentix-scheduler:
     build:
-      context: ../..
+      context: ..
       dockerfile: src/Agentix/Dockerfile
     container_name: agentix-scheduler
     networks:
@@ -156,9 +156,9 @@ services:
       - AGENTIX_API_URL=http://agentix-api:8000
       - LANGFUSE_HOST=http://langfuse:3000
     env_file:
-      - .env
+      - Agentix/.env
     volumes:
-      - ../..:/app
+      - ..:/app
       - /app/.venv
     command: [ "uv", "run", "python", "-m", "scheduler.main" ]
     depends_on:
