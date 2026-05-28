@@ -38,7 +38,7 @@ def simulate_t1110():
     if success_count == len(log_entries):
         print(f"  \u2713 {success_count} brute force log entries written to {LOG_FILE}")
         print(f"  \u2192 10 failed attempts + 1 successful login simulated")
-        print(f"  \u2192 Expected Wazuh rules: 5710/5712 (SSH brute force)")
+        print(f"  \u2192 Expected Wazuh rules: 100011 (Brute Force correlated)")
         print(f"  \u2192 Expected MITRE tag: T1110 - Brute Force")
         return True
     else:
@@ -52,4 +52,4 @@ if __name__ == "__main__":
         if "--verify" in sys.argv:
             print("\n  Waiting 5s for Wazuh to process logs...")
             time.sleep(5)
-            verify_wazuh_alerts(["5710", "5712"])
+            verify_wazuh_alerts(["100011"])

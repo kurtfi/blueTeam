@@ -308,6 +308,10 @@ class Orchestrator:
             # --- Tool calls ---
             tool_calls = response.get("tool_calls") or []
             if not tool_calls:
+                if not final_answer:
+                    final_answer = "LLM returned an empty response and no tool calls. Aborting."
+                    yield ReActStep(StepType.ANSWER, final_answer)
+                    log.warning("orchestrator.llm_empty_response")
                 break
 
             messages.append({"role": "assistant", **response})
@@ -331,7 +335,7 @@ class Orchestrator:
         if not final_answer:
             final_answer = "Max iterations reached without a final answer."
             yield ReActStep(StepType.ANSWER, final_answer)
-            log.warning("orchestrator.max_iterations_reached")
+            log.warning("orchestrator.max_iterations_reached", iterations=iterations)
 
         # 6. Persist updated history.
         await self._memory.append(session_id, user_message, final_answer)

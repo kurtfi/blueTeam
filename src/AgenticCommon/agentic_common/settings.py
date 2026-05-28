@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     
     # Ollama Settings
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "gemma4:e4b"
+    ollama_model: str = "qwen3.5:9b"
     ollama_embedding_model: str = "nomic-embed-text"
 
     # Security — Internal API Key for Gateway ↔ Core communication.

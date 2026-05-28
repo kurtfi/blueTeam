@@ -45,4 +45,18 @@
     <group>authentication_failures,authentication_failed,syslog,errors,</group>
   </rule>
 
+  <rule id="100004" level="10">
+    <if_sid>1002</if_sid>
+    <match>MITRE-ATTACK-SIM: T1548.001</match>
+    <description>MITRE ATT&amp;CK T1548.001 - SUID Privilege Escalation</description>
+    <group>mitre_t1548,syslog,errors,</group>
+  </rule>
+
+  <rule id="100005" level="10">
+    <if_sid>1002</if_sid>
+    <match>MITRE-ATTACK-SIM: T1048</match>
+    <description>MITRE ATT&amp;CK T1048 - Exfiltration via DNS</description>
+    <group>mitre_t1048,syslog,errors,</group>
+  </rule>
+
 </group>

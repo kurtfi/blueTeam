@@ -61,7 +61,7 @@ class AgentRouter:
             model: Optional model override for the routing LLM.
                    If None, uses the platform's default LLM.
                    For cost efficiency, use a small/fast model like
-                   ``gemma4:e4b`` or ``gpt-4o-mini``.
+                   ``gemma4:e4b``, ``qwen3.5:9b`` or ``gpt-4o-mini``.
         """
         # Low temperature + small max_tokens = fast, deterministic routing.
         self._llm = LLMClient(

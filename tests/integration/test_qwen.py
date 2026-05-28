@@ -65,7 +65,7 @@ async def test_qwen_soc_analyst_flow():
         client = AsyncClient(host=settings.ollama_base_url)
 
         kwargs = {
-            "model": "gemma4:e4b",
+            "model": "qwen3.5:9b",
             "messages": messages,
             "options": {"temperature": 0.1, "num_predict": 4096},
             "tools": tool_schemas

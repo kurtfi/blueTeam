@@ -10,7 +10,7 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.mark.asyncio
 async def test_ollama_chat_completion():
-    provider = OllamaProvider(model="gemma4:e4b")
+    provider = OllamaProvider(model="qwen3.5:9b")
     
     tools = [
         {

@@ -16,7 +16,7 @@ from agentix.registry.catalog import ToolCatalog
 
 # Explicitly routing environment variables to Ollama for testing.
 os.environ["AGENTIX_LLM_PROVIDER"] = "ollama"
-os.environ["OLLAMA_MODEL"] = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
+os.environ["OLLAMA_MODEL"] = os.getenv("OLLAMA_MODEL", "qwen3.5:9b")
 os.environ["OLLAMA_BASE_URL"] = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 os.environ["AGENTIX_LOG_LEVEL"] = os.getenv("AGENTIX_LOG_LEVEL", "ERROR") # To reduce log verbosity
 

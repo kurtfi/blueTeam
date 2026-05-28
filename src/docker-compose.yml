@@ -97,7 +97,7 @@ services:
     restart: always
     environment:
       - AGENTIX_LOG_LEVEL=DEBUG
-      - AGENTIX_SOC_MCP_URL=http://triage-core:8081/sse
+      - AGENTIX_TRIAGE_CORE_URL=http://triage-core:8081/sse
       - REDIS_URL=redis://redis:6379
       - AGENTIX_POSTGRES_URL=postgresql+asyncpg://agentix:password@postgres:5432/agentix_db
       - WAZUH_API_URL=https://wazuh-manager:55000

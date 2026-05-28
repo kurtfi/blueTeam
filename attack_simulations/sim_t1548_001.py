@@ -54,4 +54,4 @@ if __name__ == "__main__":
         if "--verify" in sys.argv:
             print("\n  Waiting 5s for Wazuh to process logs...")
             time.sleep(5)
-            verify_wazuh_alerts([])
+            verify_wazuh_alerts(["100004"])

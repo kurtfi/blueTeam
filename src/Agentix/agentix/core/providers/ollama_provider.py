@@ -83,7 +83,20 @@ class OllamaProvider(BaseLLMProvider):
             function_data = tc.get("function", {})
             args = function_data.get("arguments", {})
             if isinstance(args, dict):
-                args_str = json.dumps(args)
+                cleaned_args = {}
+                for k, v in args.items():
+                    if isinstance(v, str) and (v.strip().startswith('[') or v.strip().startswith('{')):
+                        # Ollama sometimes formats lists as sets {"value"} instead of ["value"]
+                        clean_v = v.strip()
+                        if clean_v.startswith('{') and clean_v.endswith('}') and ':' not in clean_v:
+                            clean_v = '[' + clean_v[1:-1] + ']'
+                        try:
+                            cleaned_args[k] = json.loads(clean_v)
+                        except Exception:
+                            cleaned_args[k] = v
+                    else:
+                        cleaned_args[k] = v
+                args_str = json.dumps(cleaned_args)
             else:
                 args_str = str(args)
                 
