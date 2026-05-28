@@ -16,8 +16,8 @@ def main():
         
         try:
             print("Navigating to Cortex...")
-            page.goto(CORTEX_URL, timeout=30000)
-            page.wait_for_load_state("networkidle")
+            page.goto(CORTEX_URL, timeout=60000)
+            page.wait_for_load_state("domcontentloaded")
             
             # Print page title to verify
             print(f"Page title: {page.title()}")
@@ -25,12 +25,17 @@ def main():
             # Check if we need to update database
             # Typically a button with text "Update database" or class btn-primary
             print("Checking for 'Update database' button...")
-            update_btn = page.locator("text=Update database")
+            try:
+                update_btn = page.locator("text=Update database")
+                update_btn.wait_for(timeout=10000)
+            except:
+                pass
+            
             if update_btn.count() > 0:
                 print("Clicking 'Update database'...")
                 update_btn.click()
                 page.wait_for_timeout(5000)  # Wait for migration to finish
-                page.wait_for_load_state("networkidle")
+                page.wait_for_load_state("domcontentloaded")
                 print("Database updated.")
             else:
                 print("No 'Update database' button found. Maybe database is already updated.")
@@ -40,7 +45,12 @@ def main():
             print("Checking for Super Admin creation form...")
             
             # Look for password input or form
-            password_input = page.locator("input[type='password']")
+            try:
+                password_input = page.locator("input[type='password']")
+                password_input.nth(0).wait_for(timeout=10000)
+            except:
+                pass
+            
             if password_input.count() > 0:
                 print("Found admin registration form.")
                 
@@ -87,7 +97,7 @@ def main():
                         page.keyboard.press("Enter")
                 
                 page.wait_for_timeout(5000)
-                page.wait_for_load_state("networkidle")
+                page.wait_for_load_state("domcontentloaded")
                 print("Form submitted successfully.")
             else:
                 print("No admin registration form found. Admin might already be created.")

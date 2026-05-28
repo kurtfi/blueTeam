@@ -21,7 +21,7 @@ def main():
         try:
             print("Navigating to Cortex...")
             page.goto(f"{CORTEX_URL}/index.html#!/login")
-            page.wait_for_load_state("networkidle")
+            page.wait_for_load_state("domcontentloaded")
             page.wait_for_timeout(2000)
             
             print("Filling login form...")
@@ -31,7 +31,7 @@ def main():
             
             print("Submitting login...")
             page.locator("button:has-text('Sign in')").click()
-            page.wait_for_load_state("networkidle")
+            page.wait_for_load_state("domcontentloaded")
             page.wait_for_timeout(3000)
             
             print(f"Current URL after login attempt: {page.url}")

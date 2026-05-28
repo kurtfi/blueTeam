@@ -68,8 +68,8 @@ check_service_wazuh_api() {
 check_service "TheHive" "http://localhost:9000/api/status"
 check_service "Cortex" "http://localhost:9001/api/status"
 
-# Wazuh dashboard typically responds to /login
-check_service "Wazuh Dashboard" "https://localhost:5601/login"
+# Wazuh dashboard health check
+check_service "Wazuh Dashboard" "http://localhost:5601"
 check_service_wazuh_api
 
 # 5. Execute Setup Scripts
