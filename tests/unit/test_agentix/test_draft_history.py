@@ -138,3 +138,67 @@ async def test_orchestrator_resumes_from_draft_history():
     answer_steps = [s for s in steps if s.step_type == StepType.ANSWER]
     assert len(answer_steps) == 1
     assert "Isolation is complete." in answer_steps[0].content
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_yields_teams_steps_on_confirm():
+    # Setup mocks
+    mock_memory = AsyncMock(spec=RedisSessionStore)
+    mock_memory.get_history.return_value = []
+    mock_memory.get_metadata.return_value = {}
+    
+    mock_tool = MagicMock()
+    mock_tool.name = "isolate_endpoint"
+    mock_tool.description = "isolate endpoint from network"
+    mock_tool.category = "action"
+    mock_tool.requires_confirmation.return_value = True
+    mock_tool.to_openai_schema.return_value = {
+        "type": "function",
+        "function": {"name": "isolate_endpoint", "description": "isolate endpoint from network"}
+    }
+    
+    catalog = ToolCatalog()
+    catalog.register(mock_tool)
+    
+    orchestrator = Orchestrator(catalog=catalog, memory=mock_memory, max_iterations=1, rag_enabled=False)
+    
+    # Mock LLM returning a tool call requiring confirmation
+    orchestrator._llm = AsyncMock()
+    orchestrator._llm.model = "test-model"
+    orchestrator._llm.chat.return_value = {
+        "role": "assistant",
+        "content": "Need to isolate endpoint",
+        "tool_calls": [{
+            "id": "call_123",
+            "type": "function",
+            "function": {
+                "name": "isolate_endpoint",
+                "arguments": '{"agent_id": "007"}'
+            }
+        }]
+    }
+    
+    steps = []
+    async for step in orchestrator.run_stream("session_123", "Run isolation"):
+        steps.append(step)
+        
+    # Verify that the two teams steps were yielded before CONFIRM
+    # There should be 4 steps total: 1 THINK step, 2 OBSERVE steps (Teams), and 1 CONFIRM step
+    assert len(steps) == 4
+    
+    # 1. Think Step
+    assert steps[0].step_type == StepType.THINK
+    
+    # 2. Teams Dispatch Step
+    assert steps[1].step_type == StepType.OBSERVE
+    assert steps[1].tool_name == "microsoft_teams"
+    assert "Dispatching approval request card" in steps[1].content
+    
+    # 3. Teams Delivery Step
+    assert steps[2].step_type == StepType.OBSERVE
+    assert steps[2].tool_name == "microsoft_teams"
+    assert "Adaptive Card sent successfully!" in steps[2].content
+    
+    # 4. Confirm Step
+    assert steps[3].step_type == StepType.CONFIRM
+    assert steps[3].tool_name == "isolate_endpoint"

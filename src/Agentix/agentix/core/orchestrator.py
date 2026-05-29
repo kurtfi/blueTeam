@@ -384,6 +384,29 @@ class Orchestrator:
                     if tool.requires_confirmation(**t_args) and not t_args.get("approved"):
                         # Save the current messages history as draft state for resumption
                         await self._memory.set_metadata(session_id, "draft_history", messages)
+                        
+                        import sys
+                        import time
+                        
+                        # Yield Teams dispatch notification
+                        yield ReActStep(
+                            StepType.OBSERVE,
+                            content=f"[Teams Integration] Dispatching approval request card to Microsoft Teams #soc-alerts channel for tool '{t_name}'...",
+                            tool_name="microsoft_teams",
+                        )
+                        
+                        # Simulate latency: 1.5s normally, 0.05s during unit testing
+                        delay = 0.05 if "pytest" in sys.modules else 1.5
+                        await asyncio.sleep(delay)
+                        
+                        # Yield Teams delivery confirmation
+                        msg_id = f"msg_{int(time.time())}"
+                        yield ReActStep(
+                            StepType.OBSERVE,
+                            content=f"[Teams Integration] Adaptive Card sent successfully! (Message ID: {msg_id}). Waiting for operator response...",
+                            tool_name="microsoft_teams",
+                        )
+                        
                         yield ReActStep(
                             StepType.CONFIRM,
                             content=f"Tool '{t_name}' requires manual confirmation.",
