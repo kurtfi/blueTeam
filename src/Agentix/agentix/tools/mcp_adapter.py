@@ -87,15 +87,25 @@ class MCPToolAdapter(BaseTool):
     def requires_confirmation(self, **kwargs: Any) -> bool:
         """
         Check if the tool call requires manual human approval.
+
+        Priority order:
+        1. MCP tool metadata field ``x-requires-confirmation`` (dynamic, preferred)
+        2. Hardcoded fallback set for well-known destructive tools (backward-compat)
         """
-        destructive_names = {
+        # 1. Check MCP tool metadata (set in inputSchema extensions)
+        schema_extensions = self._parameters.get("x-requires-confirmation")
+        if isinstance(schema_extensions, bool):
+            return schema_extensions
+
+        # 2. Fallback: well-known destructive tool names
+        _DESTRUCTIVE_NAMES = {
             "isolate_endpoint",
             "block_ip",
             "disable_user_account",
             "delete_file",
             "execute_command",
         }
-        return self.name in destructive_names
+        return self.name in _DESTRUCTIVE_NAMES
 
     # ------------------------------------------------------------------
     # Execution

@@ -11,13 +11,16 @@ Usage:
 """
 from __future__ import annotations
 
+import threading
+
 from triage_core.playbooks.base import Playbook, PlaybookContext, PlaybookResult
 
 
 class PlaybookRegistry:
-    """Singleton that holds all registered playbooks."""
+    """Thread-safe singleton that holds all registered playbooks."""
 
     _instance: "PlaybookRegistry | None" = None
+    _lock: threading.Lock = threading.Lock()
 
     def __init__(self) -> None:
         self._playbooks: dict[str, Playbook] = {}
@@ -25,7 +28,10 @@ class PlaybookRegistry:
     @classmethod
     def instance(cls) -> "PlaybookRegistry":
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._lock:
+                # Double-checked locking
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
 
     # ──────────────────────────────────────────────────────────

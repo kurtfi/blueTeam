@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 import structlog
 from typing import Any
 
@@ -17,6 +18,9 @@ from agentix.core.providers.ollama_provider import OllamaProvider
 from openai.types.chat import ChatCompletionMessageParam
 
 logger = structlog.get_logger(__name__)
+
+_LLM_CACHE_MAX_SIZE: int = 1000   # max number of cached responses per LLMClient instance
+_LLM_CACHE_TTL: int = 300          # seconds — routing decisions are valid for 5 minutes
 
 
 class LLMProviderFactory:
@@ -60,7 +64,8 @@ class LLMClient:
         self.model = getattr(self._provider, "model", model) 
         self.temperature = temperature
         self.cache_enabled = cache_enabled
-        self._cache: dict[str, dict[str, Any]] = {}
+        # Cache stores (timestamp, response) tuples to support TTL eviction
+        self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
     def _get_cache_key(
         self,
@@ -80,6 +85,19 @@ class LLMClient:
         raw = json.dumps(request_obj, sort_keys=True, default=str)
         return hashlib.sha256(raw.encode()).hexdigest()
 
+    def _evict_if_needed(self) -> None:
+        """Remove expired entries; if still over limit, drop the oldest entry (LRU-approx)."""
+        now = time.monotonic()
+        expired = [k for k, (ts, _) in self._cache.items() if now - ts > _LLM_CACHE_TTL]
+        for k in expired:
+            del self._cache[k]
+
+        if len(self._cache) >= _LLM_CACHE_MAX_SIZE:
+            # Drop the single oldest entry (insertion order preserved in Python 3.7+)
+            oldest_key = next(iter(self._cache))
+            del self._cache[oldest_key]
+            logger.debug("llm.cache.evict_oldest", model=self.model)
+
     async def chat(
         self,
         messages: list[ChatCompletionMessageParam],
@@ -89,19 +107,27 @@ class LLMClient:
         """
         Send a chat request to the active LLM provider.
         Supports response caching for deterministic (temperature=0) requests.
+        Cache entries expire after {_LLM_CACHE_TTL}s and are bounded to {_LLM_CACHE_MAX_SIZE} entries.
         """
         # Only cache deterministic requests
         if self.cache_enabled and self.temperature == 0:
             key = self._get_cache_key(messages, tools, tool_choice)
-            if key in self._cache:
-                logger.debug("llm.cache.hit", model=self.model)
-                return self._cache[key]
+            entry = self._cache.get(key)
+            if entry is not None:
+                ts, cached_response = entry
+                if time.monotonic() - ts <= _LLM_CACHE_TTL:
+                    logger.debug("llm.cache.hit", model=self.model)
+                    return cached_response
+                # Stale entry — remove and fall through to API call
+                del self._cache[key]
 
         response = await self._provider.chat(messages, tools, tool_choice)
 
         if self.cache_enabled and self.temperature == 0:
             key = self._get_cache_key(messages, tools, tool_choice)
-            self._cache[key] = response
+            self._evict_if_needed()
+            self._cache[key] = (time.monotonic(), response)
             logger.debug("llm.cache.miss", model=self.model)
 
         return response
+

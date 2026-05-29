@@ -6,11 +6,13 @@ semantic similarity between the user's message and each tool's description.
 """
 from __future__ import annotations
 
+import json
 import math
 import re
 from typing import TYPE_CHECKING, Any
 
 import structlog
+import redis.asyncio as aioredis
 from agentic_common.embeddings import EmbeddingFactory
 from agentic_common.settings import settings
 from agentic_common.base_tool import BaseTool
@@ -19,6 +21,9 @@ if TYPE_CHECKING:
     pass
 
 logger = structlog.get_logger(__name__)
+
+_EMBEDDING_CACHE_KEY = "agentix:tool_embeddings"
+_EMBEDDING_CACHE_TTL = 86400  # 24 hours — embeddings don't change without a deploy
 
 
 class ToolCatalog:
@@ -48,8 +53,13 @@ class ToolCatalog:
 
     def __init__(self) -> None:
         self._tools: dict[str, BaseTool] = {}
-        self._tool_embeddings: dict[str, list[float]] = {}
+        # Local in-process cache for hot path (avoids Redis round-trip on repeated calls)
+        self._local_embeddings: dict[str, list[float]] = {}
         self._embed_provider = EmbeddingFactory.create_provider()
+        # Redis client — shared across all ToolCatalog instances in the same process
+        self._redis: aioredis.Redis = aioredis.from_url(
+            settings.redis_url, decode_responses=True
+        )
 
     # ------------------------------------------------------------------
     # Registration
@@ -90,7 +100,7 @@ class ToolCatalog:
 
     def unregister(self, name: str) -> None:
         self._tools.pop(name, None)
-        self._tool_embeddings.pop(name, None)
+        self._local_embeddings.pop(name, None)
 
     def get(self, name: str) -> BaseTool | None:
         return self._tools.get(name)
@@ -160,15 +170,7 @@ class ToolCatalog:
             score = 0.0
             if msg_embedding is not None:
                 # Lazy evaluation and caching of tool description embedding
-                if tool.name not in self._tool_embeddings:
-                    try:
-                        t_emb = await self._embed_provider.embed_query(tool.description)
-                        self._tool_embeddings[tool.name] = t_emb
-                    except Exception as e:
-                        logger.error("catalog.tool_embedding_failed", tool=tool.name, error=str(e))
-                        self._tool_embeddings[tool.name] = []
-
-                t_emb = self._tool_embeddings.get(tool.name, [])
+                t_emb = await self._get_tool_embedding(tool)
                 if t_emb:
                     score = self._cosine_similarity(msg_embedding, t_emb)
                 else:
@@ -188,6 +190,48 @@ class ToolCatalog:
             selected=[t.name for t in selected],
         )
         return selected
+
+    async def _get_tool_embedding(self, tool: BaseTool) -> list[float]:
+        """
+        Retrieve (or compute and cache) the embedding for a tool's description.
+
+        Cache hierarchy:
+        1. In-process local dict (fastest, no network)
+        2. Redis hash (shared across workers, survives restarts)
+        3. Embedding provider API call (slowest, result written to both caches)
+        """
+        # 1. Local in-process cache hit
+        if tool.name in self._local_embeddings:
+            return self._local_embeddings[tool.name]
+
+        # 2. Redis cache hit
+        try:
+            cached = await self._redis.hget(_EMBEDDING_CACHE_KEY, tool.name)
+            if cached:
+                emb: list[float] = json.loads(cached)
+                self._local_embeddings[tool.name] = emb  # Warm local cache
+                return emb
+        except Exception as redis_err:
+            logger.warning("catalog.redis_cache.read_failed", tool=tool.name, error=str(redis_err))
+
+        # 3. Compute via embedding API
+        try:
+            emb = await self._embed_provider.embed_query(tool.description)
+        except Exception as e:
+            logger.error("catalog.tool_embedding_failed", tool=tool.name, error=str(e))
+            return []
+
+        # Write to both caches
+        self._local_embeddings[tool.name] = emb
+        try:
+            await self._redis.hset(_EMBEDDING_CACHE_KEY, tool.name, json.dumps(emb))
+            # Refresh TTL on every new write so frequently-used keys stay warm
+            await self._redis.expire(_EMBEDDING_CACHE_KEY, _EMBEDDING_CACHE_TTL)
+            logger.debug("catalog.redis_cache.written", tool=tool.name)
+        except Exception as redis_err:
+            logger.warning("catalog.redis_cache.write_failed", tool=tool.name, error=str(redis_err))
+
+        return emb
 
     def _cosine_similarity(self, v1: list[float], v2: list[float]) -> float:
         """Compute cosine similarity between two vectors."""

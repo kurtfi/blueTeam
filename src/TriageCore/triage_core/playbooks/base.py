@@ -335,12 +335,27 @@ class Playbook:
         """
         Returns True if this playbook is relevant for the given Wazuh rule_id
         or MITRE technique IDs.
+
+        Matching logic (OR between criteria):
+        - rule_id: checks ``wazuh-rule-{id}`` convention in playbook tags
+        - mitre_ids: prefix/suffix match against playbook's MITRE IDs
         """
+        # 1. Rule ID match — tags follow the "wazuh-rule-{id}" convention
+        if rule_id:
+            rule_tag = f"wazuh-rule-{rule_id}"
+            if rule_tag in self.tags:
+                return True
+            # Also support exact numeric match without prefix (e.g. tags=["100002"])
+            if str(rule_id) in self.tags:
+                return True
+
+        # 2. MITRE ATT&CK technique ID match
         if mitre_ids:
             for mid in mitre_ids:
                 for pb_mid in self.mitre_ids:
                     if mid.upper().startswith(pb_mid.upper()) or pb_mid.upper().startswith(mid.upper()):
                         return True
+
         return False
 
     def __repr__(self) -> str:

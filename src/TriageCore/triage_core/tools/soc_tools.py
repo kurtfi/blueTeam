@@ -22,9 +22,13 @@ async def trigger_playbook(
     extra_context: dict[str, Any] | None = None,
 ) -> str:
     """
-    Triggers the specified SOC playbook and returns step-by-step response
-    instructions for the SOC agent. Each step specifies which tool to use
-    and which steps require human approval.
+    Triggers the specified SOC playbook and returns a JSON object with:
+    - ``instructions``: Full step-by-step markdown for the SOC agent to follow.
+    - ``playbook_id``, ``playbook_name``, ``mitre_ids``, ``severity``: Playbook metadata.
+    - ``steps_count``: Total number of response steps.
+    - ``approval_required_steps``: List of step titles that require human approval before execution.
+    - ``case_template``: TheHive case template name (if configured).
+    - ``soar_workflow_id``: SOAR workflow to trigger (if configured).
     """
     logger.info(
         "tool.trigger_playbook",
@@ -32,6 +36,21 @@ async def trigger_playbook(
         agent_id=agent_id,
         src_ip=src_ip,
     )
+
+    # Validate extra_context: keys must be str, values must be JSON-safe primitives
+    _ALLOWED_TYPES = (str, int, float, bool, list, dict, type(None))
+    if extra_context is not None:
+        if not isinstance(extra_context, dict):
+            return "Invalid extra_context: must be a dict (key-value pairs)."
+        for k, v in extra_context.items():
+            if not isinstance(k, str):
+                return f"Invalid extra_context: key {k!r} must be a string."
+            if not isinstance(v, _ALLOWED_TYPES):
+                return (
+                    f"Invalid extra_context: value for key '{k}' has unsupported type "
+                    f"'{type(v).__name__}'. Allowed: str, int, float, bool, list, dict, null."
+                )
+
     try:
         from triage_core.playbooks import registry as pb_registry
         from triage_core.playbooks.base import PlaybookContext
@@ -47,7 +66,8 @@ async def trigger_playbook(
             }
         )
         result = pb_registry.trigger(playbook_id, ctx)
-        return result.instructions
+        import json
+        return json.dumps(result.to_dict(), ensure_ascii=False)
 
     except KeyError as e:
         try:
