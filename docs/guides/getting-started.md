@@ -52,33 +52,42 @@ Verify the services are running correctly:
 docker compose ps
 ```
 
-### Step 4: Run the Agentix API and MCP Services
-Open a new terminal session, navigate back to the root, and execute the run script:
+### Step 4: Run the Agentix Services (Docker)
+From the `src/` directory, start all services with Docker Compose:
+```bash
+cd src
+docker compose up -d
+```
+Verify containers are healthy:
+```bash
+docker compose ps
+```
+You should see `agentix-gateway`, `agentix-api`, `triage-core`, `redis`, and `postgres` all in **running** state.
+
+For **local development without Docker**, you can run the Core API directly:
 ```bash
 cd src/Agentix
-uv run uvicorn agentix.api.app:app --host 0.0.0.0 --port 8000 --reload
-```
-You should see:
-```
-INFO:     Started server process [83921]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+uv run uvicorn agentix.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
 
 ## 🧪 Verifying the Deployment
 
-Run a cURL request to verify the agent can analyze Wazuh logs and query Cortex:
-
+### Step 1: Login and get a JWT token
 ```bash
-curl -X POST http://localhost:8000/api/v1/investigate \
-  -H "Authorization: Bearer dev-internal-key-change-me-in-production" \
+curl -X POST http://localhost:8001/web/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "agentix-analyst", "password": "Password-2026!"}'
+```
+
+### Step 2: Send a chat/investigate request
+```bash
+curl -X POST http://localhost:8001/web/chat \
+  -H "Authorization: Bearer <jwt-token-from-step-1>" \
   -H "Content-Type: application/json" \
   -d '{
-    "agent_id": "soc_analyst",
-    "prompt": "Identify any alert with severity level higher than 5 in Wazuh and analyze its source IP using Cortex."
+    "message": "Identify any alert with severity level higher than 5 in Wazuh and analyze its source IP using Cortex."
   }'
 ```
 
@@ -111,5 +120,5 @@ The API should reply with an HTTP 200 containing a markdown summary:
   ```
 
 ### 3. API requests return `401 Unauthorized`
-- **Cause**: The `Authorization` header token does not match the configured `AGENTIX_INTERNAL_API_KEY` env variable.
-- **Solution**: Check your `.env` file at the root. Make sure the value matches the one sent in the Bearer token header.
+- **Cause**: JWT token missing or expired. The Gateway validates JWT on every `/web/*` endpoint.
+- **Solution**: Call `POST http://localhost:8001/web/login` first to get a fresh token, then pass it as `Authorization: Bearer <token>`.

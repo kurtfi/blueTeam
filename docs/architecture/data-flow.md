@@ -74,7 +74,7 @@ flowchart TD
 
 ---
 
-## 2. HITL Confirmation & State Resume Flow
+## 3. HITL Confirmation & State Resume Flow
 
 For sensitive commands (such as firewall modifications or machine isolation), the system halts execution until an analyst manually approves the operation.
 
