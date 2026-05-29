@@ -9,33 +9,38 @@ from utils import ensure_log_file, timestamp, write_log_entry, LOG_FILE, verify_
 
 def simulate_t1110():
     print("\n[T1110] Simulating Brute Force Login Attack...")
-    ts = timestamp()
 
-    log_entries = []
+    success_count = 0
+    # Write 10 failed attempts with dynamic timestamps
     for i in range(1, 11):
+        ts = timestamp()
         entry = (
             f"{ts} wazuh-manager syslog: "
             f"MITRE-ATTACK-SIM: T1110 "
             f"attempt={i} user=admin action=AUTH_FAILED "
             f"src_ip=10.10.10.99 dst_port=22 protocol=SSH"
         )
-        log_entries.append(entry)
+        ok, err = write_log_entry(entry)
+        if ok:
+            success_count += 1
+        time.sleep(0.1)
 
+    # Sleep 1.5 seconds to ensure different second for success
+    print("  Waiting 1.5s before successful login...")
+    time.sleep(1.5)
+
+    ts_success = timestamp()
     success_entry = (
-        f"{ts} wazuh-manager syslog: "
+        f"{ts_success} wazuh-manager syslog: "
         f"MITRE-ATTACK-SIM: T1110 "
         f"attempt=11 user=admin action=AUTH_SUCCESS "
         f"src_ip=10.10.10.99 dst_port=22 protocol=SSH severity=CRITICAL"
     )
-    log_entries.append(success_entry)
+    ok, err = write_log_entry(success_entry)
+    if ok:
+        success_count += 1
 
-    success_count = 0
-    for entry in log_entries:
-        ok, err = write_log_entry(entry)
-        if ok:
-            success_count += 1
-
-    if success_count == len(log_entries):
+    if success_count == 11:
         print(f"  \u2713 {success_count} brute force log entries written to {LOG_FILE}")
         print(f"  \u2192 10 failed attempts + 1 successful login simulated")
         print(f"  \u2192 Expected Wazuh rules: 100011 (Brute Force correlated)")

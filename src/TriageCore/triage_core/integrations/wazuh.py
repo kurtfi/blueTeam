@@ -19,8 +19,8 @@ class WazuhProvider(ISiemProvider, IEndpointProvider):
         
         try:
             async with httpx.AsyncClient(verify=verify_ssl) as client:
-                # Escape Lucene special characters
-                escape_chars = r'+-=&|><!(){}[]^"~*?:\\/'
+                # Escape Lucene special characters except fields (:), wildcards (*, ?), and phrases (")
+                escape_chars = r'+-=&|><!(){}[]^~\\/'
                 safe_query = ''.join(['\\' + c if c in escape_chars else c for c in query])
                 
                 payload = {

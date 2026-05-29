@@ -45,6 +45,14 @@
     <group>authentication_failures,authentication_failed,syslog,errors,</group>
   </rule>
 
+  <!-- Başarılı brute force girişini yakalar ve webhook'a gönderilmesini sağlar -->
+  <rule id="100012" level="10">
+    <if_sid>100010</if_sid>
+    <match>action=AUTH_SUCCESS</match>
+    <description>MITRE ATT&amp;CK T1110 - Successful SSH Login after/during Brute Force</description>
+    <group>authentication_success,syslog,errors,</group>
+  </rule>
+
   <rule id="100004" level="10">
     <if_sid>1002</if_sid>
     <match>MITRE-ATTACK-SIM: T1548.001</match>
