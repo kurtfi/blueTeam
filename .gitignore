@@ -98,3 +98,6 @@ postgres_data/
 .gemini/
 .agent/
 ! .agent/workflows/
+
+
+medium/**
