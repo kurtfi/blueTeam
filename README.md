@@ -175,18 +175,18 @@ sequenceDiagram
 ## 🎓 Educational Focus
 
 This repository is tailored for learning. If you are using this for training or educational purposes:
-- Check out [docs/guides/getting-started.md](file:///Users/firatkurt/Documents/Repos/blueTeam/docs/guides/getting-started.md) for a detailed walkthrough of the environment setup.
-- Read through the [ADRs (Architecture Decision Records)](file:///Users/firatkurt/Documents/Repos/blueTeam/docs/adr/README.md) to understand *why* we chose specific agent patterns over others.
-- Use [docs/guides/adding-a-tool.md](file:///Users/firatkurt/Documents/Repos/blueTeam/docs/guides/adding-a-tool.md) as a tutorial task to build your own security agent tooling.
+- Check out [docs/guides/getting-started.md](docs/guides/getting-started.md) for a detailed walkthrough of the environment setup.
+- Read through the [ADRs (Architecture Decision Records)](docs/adr/README.md) to understand *why* we chose specific agent patterns over others.
+- Use [docs/guides/adding-a-tool.md](docs/guides/adding-a-tool.md) as a tutorial task to build your own security agent tooling.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](file:///Users/firatkurt/Documents/Repos/blueTeam/CONTRIBUTING.md) to understand our coding standards (ruff + mypy), commit guidelines, and branching workflow.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) to understand our coding standards (ruff + mypy), commit guidelines, and branching workflow.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](file:///Users/firatkurt/Documents/Repos/blueTeam/LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
