@@ -143,26 +143,6 @@ services:
     depends_on:
       - agentix-api
 
-  agentix-scheduler:
-    build:
-      context: ..
-      dockerfile: src/Agentix/Dockerfile
-    container_name: agentix-scheduler
-    networks:
-      - agentix_net
-    restart: always
-    environment:
-      - AGENTIX_LOG_LEVEL=DEBUG
-      - AGENTIX_API_URL=http://agentix-api:8000
-      - LANGFUSE_HOST=http://langfuse:3000
-    env_file:
-      - Agentix/.env
-    volumes:
-      - ..:/app
-      - /app/.venv
-    command: [ "uv", "run", "python", "-m", "scheduler.main" ]
-    depends_on:
-      - agentix-api
 
 networks:
   agentix_net:
