@@ -46,7 +46,7 @@ graph TD
     subgraph "Capability Layer (Tools)"
         Catalog["Tool Catalog"]
         GeneralMCP["GeneralMCP (Data/Sys/Action)"]
-        TriageCore["TriageCore (Security/Wazuh)"]
+        TriageCore["TriageCore (Security Integrations)"]
     end
 
     Web & TG --> ORC
@@ -122,7 +122,7 @@ All tools must implement the [BaseTool](./agentix/tools/base.py) interface, defi
 Agentix is natively compatible with the **Model Context Protocol**. It heavily utilizes this architecture by decoupling all significant tools into standalone servers, accessed via the `MCPToolAdapter`:
 
 - **GeneralMCP**: Provides data processing (Docling, Crawl4AI), terminal, file system, and API capabilities.
-- **TriageCore**: Provides high-privilege access to enterprise security tools (Wazuh, TheHive, Cortex) within a highly protected network segment.
+- **TriageCore**: Provides high-privilege access to enterprise security tools (SIEM, Case Management, Enrichment) within a highly protected network segment.
 
 This architecture ensures that vulnerabilities in parsing libraries (e.g., Docling) or API credential leaks do not directly compromise the Agentix orchestrator core.
 

@@ -21,7 +21,7 @@ class AlertDeduplicator:
         self._bypass_rules: set[str] = set()
 
     def _extract_key(self, payload: dict) -> str | None:
-        """Extract dedup key from Wazuh alert JSON."""
+        """Extract dedup key from SIEM alert JSON."""
         all_fields = payload.get("all_fields", {})
         
         rule_id = (payload.get("rule_id") 

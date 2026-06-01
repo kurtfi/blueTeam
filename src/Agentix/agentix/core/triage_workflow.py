@@ -51,7 +51,7 @@ Analyze this alert, gather necessary context, distinguish between False Positive
 IMPORTANT ACTION RULES:
 1. **Playbook-Driven Response**: First, use the `find_playbook_for_alert` with the incoming alert's rule.id or mitre.id to search for an appropriate playbook (e.g. PB-001, PB-003, PB-006 etc.).
 2. Trigger the playbook you found with `trigger_playbook` and strictly follow its step-by-step instructions.
-3. If you cannot find a suitable playbook, perform general analysis methods (IP/File reputation query, SIEM log review, TheHive case creation).
+3. If you cannot find a suitable playbook, perform general analysis methods (IP/File reputation query, SIEM log review, Case Management case creation).
 
 IMPORTANT NOTE (SIEM QUERIES):
 - When using the `query_siem_logs` tool, you must adhere to the Lucene query string format.
@@ -61,7 +61,7 @@ IMPORTANT NOTE (SIEM QUERIES):
   - `data.srcip:"10.10.10.99" AND data.dstuser:"admin"`
   - `rule.id:"5712"`
   - `rule.groups:authentication_failed`
-- Incorrect queries containing equals (`=`) (e.g. `src_ip=10.10.10.99`) produce a 500 error on the Wazuh Indexer side! Strictly avoid them.
+- Incorrect queries containing equals (`=`) (e.g. `src_ip=10.10.10.99`) produce a 500 error on the SIEM Indexer side! Strictly avoid them.
 """
     try:
         # Use the SOC Analyst agent with the shared catalog

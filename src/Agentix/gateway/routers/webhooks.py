@@ -9,10 +9,11 @@ router = APIRouter(prefix="/v1/webhooks", tags=["Webhooks"])
 
 AGENTIX_API_URL = os.getenv("AGENTIX_API_URL", "http://localhost:8000")
 
+@router.post("/siem")
 @router.post("/wazuh")
-async def wazuh_webhook(request: Request):
+async def siem_webhook(request: Request):
     """
-    Gateway endpoint for receiving Wazuh integrations.
+    Gateway endpoint for receiving SIEM alerts.
     Forwards the request body and signature header to agentix-api.
     """
     body = await request.body()
@@ -21,11 +22,14 @@ async def wazuh_webhook(request: Request):
     # We should exclude Host header to let httpx determine it or pass it correctly
     headers.pop("host", None)
     
+    path = request.url.path
+    endpoint = "siem" if "siem" in path else "wazuh"
+    
     # Forward the POST request to agentix-api
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(
-                f"{AGENTIX_API_URL}/v1/webhooks/wazuh",
+                f"{AGENTIX_API_URL}/v1/webhooks/{endpoint}",
                 content=body,
                 headers=headers,
                 timeout=10.0
@@ -39,3 +43,4 @@ async def wazuh_webhook(request: Request):
         except httpx.HTTPError as e:
             logger.error("gateway.webhooks.forward_failed", error=str(e))
             raise HTTPException(status_code=502, detail="Error forwarding request to agentix-api")
+
