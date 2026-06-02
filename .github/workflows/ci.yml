@@ -39,8 +39,8 @@ jobs:
 
       - name: Run Mypy Type Checking
         run: |
-          uv run mypy src/Agentix src/SOCMCP src/AgenticCommon
+          uv run mypy src/Agentix src/TriageCore src/AgenticCommon
 
       - name: Run Unit Tests
         run: |
-          uv run pytest src/Agentix/tests src/SOCMCP/tests
+          uv run pytest tests/unit
