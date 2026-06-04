@@ -1,123 +1,123 @@
 # Security Model & Hardening Guide
 
-Agentix / BlueTeam platformunun güvenlik mimarisi, tehdit modeli ve sertleştirme kılavuzu.
+Security architecture, threat model, and hardening guide for the Agentix / BlueTeam platform.
 
-> **Scope:** Bu doküman platform düzeyindeki güvenliği kapsar. Wazuh/Elasticsearch gibi
-> bileşenlerin kendi güvenlik yapılandırmaları için ilgili ürün belgelerine bakılmalıdır.
+> **Scope:** This document covers platform-level security. For security configurations
+> of components like Wazuh/Elasticsearch, refer to the respective product documentation.
 
 ---
 
-## Güvenlik Katmanları Özeti
+## Security Layers Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    HARICI İSTEKLER                          │
+│                    EXTERNAL REQUESTS                         │
 │              (Browser / API Client / Wazuh)                 │
 └──────────────────────────┬──────────────────────────────────┘
                            │ HTTPS / JWT
 ┌──────────────────────────▼──────────────────────────────────┐
 │                 API GATEWAY (Port 8001)                      │
-│   • JWT doğrulama        • Rate limiting                     │
-│   • CORS denetimi        • Origin whitelisting               │
+│   • JWT validation       • Rate limiting                     │
+│   • CORS enforcement     • Origin whitelisting               │
 │   • Request logging      • Header sanitization              │
 └──────────────────────────┬──────────────────────────────────┘
                            │ X-Internal-Api-Key (Internal)
 ┌──────────────────────────▼──────────────────────────────────┐
 │                  CORE API (Port 8000)                        │
-│   • Tool sandbox         • Workspace izolasyonu             │
-│   • Disk quota           • Path traversal koruması          │
+│   • Tool sandbox         • Workspace isolation              │
+│   • Disk quota           • Path traversal protection        │
 │   • HITL approval        • Structlog audit trail            │
 └────────────┬─────────────────────────┬───────────────────────┘
              │ FastMCP Protocol        │ Redis / Postgres
 ┌────────────▼────────────┐  ┌────────▼────────────────────────┐
 │  TRIAGE CORE (Port 8081)│  │  DATA LAYER                      │
-│  Playbook yürütme        │  │  • Redis: session state          │
-│  SOC araç adaptörleri    │  │  • Postgres: agent config        │
+│  Playbook execution      │  │  • Redis: session state          │
+│  SOC tool adapters       │  │  • Postgres: agent config        │
 └─────────────────────────┘  └──────────────────────────────────┘
 ```
 
 ---
 
-## 1. Kimlik Doğrulama ve Yetkilendirme
+## 1. Authentication and Authorization
 
-### 1.1 Çift Katmanlı Auth Modeli
+### 1.1 Dual-Layer Auth Model
 
-| Katman | Mekanizma | Uygulama Noktası |
+| Layer | Mechanism | Enforcement Point |
 |---|---|---|
-| **Harici (Browser → Gateway)** | JWT Bearer Token | `X-Authorization: Bearer <token>` |
-| **Dahili (Gateway → Core)** | Pre-shared key | `X-Internal-Api-Key: <key>` |
+| **External (Browser → Gateway)** | JWT Bearer Token | `X-Authorization: Bearer <token>` |
+| **Internal (Gateway → Core)** | Pre-shared key | `X-Internal-Api-Key: <key>` |
 | **WebHook (Wazuh → Gateway)** | Path-based secret token | `/webhook/wazuh/{token}` |
 
-### 1.2 JWT Doğrulama (Gateway Katmanı)
+### 1.2 JWT Validation (Gateway Layer)
 
-Gateway, her istekte JWT'yi doğrular. Token içeriğinden `user_id` ve `roles` çekilir ve Core'a `X-User-Id` / `X-User-Roles` header'ları ile iletilir.
+The Gateway validates the JWT on every request. `user_id` and `roles` are extracted from the token payload and forwarded to Core via `X-User-Id` / `X-User-Roles` headers.
 
-**Kritik Yapılandırma:**
+**Critical Configuration:**
 
 ```env
 # .env
-AGENTIX_JWT_SECRET=<en az 32 karakter güçlü rastgele dize>
-AGENTIX_JWT_ALGORITHM=HS256       # veya RS256
+AGENTIX_JWT_SECRET=<strong random string of at least 32 characters>
+AGENTIX_JWT_ALGORITHM=HS256       # or RS256
 AGENTIX_JWT_EXPIRE_MINUTES=60
 ```
 
 > [!WARNING]
-> Varsayılan `dev-internal-key-change-me-in-production` değeri **asla** production'da kullanılmamalıdır. `AGENTIX_INTERNAL_API_KEY`'i `openssl rand -hex 32` ile üret.
+> The default value `dev-internal-key-change-me-in-production` must **never** be used in production. Generate `AGENTIX_INTERNAL_API_KEY` with `openssl rand -hex 32`.
 
-### 1.3 Dahili API Key (Gateway → Core)
+### 1.3 Internal API Key (Gateway → Core)
 
-Core API, Gateway'den gelen tüm isteklerde `X-Internal-Api-Key` header'ını kontrol eder.
-Bu header eşleşmezse istek `403 Forbidden` ile reddedilir.
+The Core API checks the `X-Internal-Api-Key` header on all requests coming from the Gateway.
+If this header does not match, the request is rejected with `403 Forbidden`.
 
 ```python
-# src/Agentix/agentix/api/server.py'deki kontrol
+# Check in src/Agentix/agentix/api/server.py
 if request.headers.get("X-Internal-Api-Key") != settings.agentix_internal_api_key:
     raise HTTPException(status_code=403, detail="Forbidden")
 ```
 
-### 1.4 WebHook Token Doğrulama
+### 1.4 WebHook Token Validation
 
-Wazuh'dan gelen webhook'lar bir path parametresi olarak gizli token içerir:
+Webhooks from Wazuh include a secret token as a path parameter:
 
 ```
 POST /webhook/wazuh/{WAZUH_WEBHOOK_SECRET_TOKEN}
 ```
 
-Bu token `.env`'de tanımlanır ve Gateway tarafından doğrulanır.
+This token is defined in `.env` and validated by the Gateway.
 
 ---
 
-## 2. Network Güvenliği
+## 2. Network Security
 
-### 2.1 CORS Politikası
+### 2.1 CORS Policy
 
-Gateway, sadece `GATEWAY_ALLOWED_ORIGINS` içinde listelenen origin'lere izin verir:
+The Gateway only allows origins listed in `GATEWAY_ALLOWED_ORIGINS`:
 
 ```env
 GATEWAY_ALLOWED_ORIGINS=https://app.yourdomain.com,https://soc.yourdomain.com
 ```
 
-**Production'da** `*` (wildcard) kullanmak güvensizdir — asla yapılmamalıdır.
+Using `*` (wildcard) **in production** is insecure — it should never be done.
 
-### 2.2 Servis İzolasyonu (Docker)
+### 2.2 Service Isolation (Docker)
 
-Tüm servislerin Docker Compose ağı üzerinde **iç ağda** konuşlandırılması gerekir. Sadece Gateway dış dünyaya açık olmalıdır:
+All services must be deployed on the Docker Compose **internal network**. Only the Gateway should be exposed to the outside world:
 
 ```yaml
-# docker-compose.yml (önerilen yapı)
+# docker-compose.yml (recommended structure)
 services:
   gateway:
     ports:
-      - "8001:8001"    # Dışa açık tek port
+      - "8001:8001"    # Only externally exposed port
   core:
-    # Port expose edilmez — sadece internal network
+    # Port is not exposed — internal network only
     expose:
       - "8000"
   triage:
     expose:
       - "8081"
   redis:
-    # Dışa kesinlikle açılmamalı
+    # Must never be exposed externally
     expose:
       - "6379"
   postgres:
@@ -127,7 +127,7 @@ services:
 
 ### 2.3 TLS / HTTPS
 
-Production ortamında Gateway önüne bir reverse proxy (nginx / Traefik) konulmalı ve TLS sonlandırması burada yapılmalıdır:
+In production, a reverse proxy (nginx / Traefik) should be placed in front of the Gateway and TLS termination should be handled there:
 
 ```nginx
 server {
@@ -145,19 +145,19 @@ server {
 
 ---
 
-## 3. Dosya Sistemi Güvenliği (SessionWorkspace)
+## 3. File System Security (SessionWorkspace)
 
-### 3.1 Path Traversal Koruması
+### 3.1 Path Traversal Protection
 
-Her araç çağrısında dosya yolu `SessionWorkspace.resolve_path()` üzerinden geçirilir.
-Yol session root'unun dışına çıkıyorsa `PermissionError` fırlatılır:
+On every tool invocation, the file path is passed through `SessionWorkspace.resolve_path()`.
+If the path escapes the session root, a `PermissionError` is raised:
 
 ```python
 def resolve_path(self, relative_path: str, subdirectory: str = "outputs") -> Path:
     base = self.root / subdirectory
     resolved = (base / relative_path).resolve()
 
-    # Kritik güvenlik kontrolü:
+    # Critical security check:
     if not str(resolved).startswith(str(self.root.resolve())):
         raise PermissionError(
             f"Access denied: '{relative_path}' is outside the workspace boundary."
@@ -165,7 +165,7 @@ def resolve_path(self, relative_path: str, subdirectory: str = "outputs") -> Pat
     return resolved
 ```
 
-**Kapsanan Saldırı Vektörü:**
+**Covered Attack Vectors:**
 
 ```
 ../../../etc/passwd          → PermissionError ✓
@@ -173,145 +173,145 @@ def resolve_path(self, relative_path: str, subdirectory: str = "outputs") -> Pat
 outputs/../../../etc/shadow  → PermissionError ✓
 ```
 
-### 3.2 Disk Quota Zorlama
+### 3.2 Disk Quota Enforcement
 
-Her session için maksimum disk kullanımı sınırlanır. Yazma öncesinde `check_quota()` çağrılır:
+Maximum disk usage is limited per session. `check_quota()` is called before every write:
 
 ```env
-AGENTIX_SESSION_QUOTA_MB=100    # Varsayılan: 100 MB per session
+AGENTIX_SESSION_QUOTA_MB=100    # Default: 100 MB per session
 ```
 
-Aşıldığında:
+When exceeded:
 ```python
 raise PermissionError("Session workspace quota exceeded: X / Y bytes.")
 ```
 
-### 3.3 Session Sahipliği Doğrulama
+### 3.3 Session Ownership Validation
 
-Workspace erişimi `owner_id` ile kısıtlanır. Farklı kullanıcının session'ına erişim `False` döner:
+Workspace access is restricted by `owner_id`. Access to another user's session returns `False`:
 
 ```python
 def validate_access(self, owner_id: str) -> bool:
     if self.owner_id == "anonymous":
-        return True  # Development modu
+        return True  # Development mode
     return self.owner_id == owner_id
 ```
 
 > [!IMPORTANT]
-> Production'da `owner_id = "anonymous"` olmamasına dikkat et. Bu durum tüm kullanıcılara çapraz erişim verir.
+> Ensure `owner_id = "anonymous"` is never used in production. This condition grants cross-access to all users.
 
-### 3.4 Workspace Dizin Yapısı
+### 3.4 Workspace Directory Structure
 
 ```
 workspace/sessions/{session_id}/
-├── downloads/     # Araçların indirdiği geçici dosyalar (cleanup'ta silinir)
-├── outputs/       # Kalıcı raporlar (cleanup'ta KORUNUR)
-├── uploads/       # Kullanıcı yüklemeleri (cleanup'ta KORUNUR)
-├── temp/          # Geçici işlem dosyaları (cleanup'ta silinir)
+├── downloads/     # Temporary files downloaded by tools (deleted on cleanup)
+├── outputs/       # Persistent reports (PRESERVED on cleanup)
+├── uploads/       # User uploads (PRESERVED on cleanup)
+├── temp/          # Temporary processing files (deleted on cleanup)
 └── .session_meta.json  # Session metadata (owner_id, quota, status)
 ```
 
 ---
 
-## 4. Human-in-the-Loop (HITL) Güvenliği
+## 4. Human-in-the-Loop (HITL) Security
 
-### 4.1 Onay Gerektiren Araçlar
+### 4.1 Tools Requiring Approval
 
-Geri döndürülemez veya yüksek riskli araç çağrıları (`requires_confirmation=True`) kullanıcı onayı olmadan yürütülmez:
+Irreversible or high-risk tool invocations (`requires_confirmation=True`) are not executed without user approval:
 
 ```python
-# Orchestrator'daki kontrol (core/orchestrator.py)
+# Check in Orchestrator (core/orchestrator.py)
 if tool.requires_confirmation(**t_args) and not t_args.get("approved"):
-    # Durumu kaydet, onay iste
+    # Save state, request approval
     await self._memory.set_metadata(session_id, "draft_history", messages)
     yield ReActStep(StepType.CONFIRM, ...)
-    return  # Yürütme durur
+    return  # Execution stops
 ```
 
-### 4.2 Onay Akışı
+### 4.2 Approval Flow
 
 ```
-Kullanıcı İsteği
+User Request
      │
      ▼
 Orchestrator: tool.requires_confirmation() == True?
-     │ Evet
+     │ Yes
      ▼
-draft_history Redis'e kaydedilir
-CONFIRM adımı yield edilir (Teams/Slack bildirim gönderilir)
+draft_history is saved to Redis
+CONFIRM step is yielded (Teams/Slack notification sent)
      │
      ▼
-Kullanıcı "yes" / "evet" / "confirm" yazar
+User responds with "yes" / "confirm" / "approve"
      │
      ▼
-draft_history yüklenir, araç force_approved=True ile çalışır
+draft_history is loaded, tool runs with force_approved=True
 ```
 
-**Güvenli Onay Kelimeleri:**
+**Accepted Confirmation Keywords:**
 ```python
 POSITIVE_CONFIRMATIONS = {
     "yes", "confirm", "evet", "onay", "y", "approve", "ok", "tamam", "go", "proceed"
 }
 ```
 
-Bunların dışındaki tüm yanıtlar "iptal" olarak değerlendirilir.
+All other responses are treated as "cancel".
 
-### 4.3 Riskli Araç Örnekleri
+### 4.3 Examples of Risky Tools
 
-Aşağıdaki araçlar `requires_confirmation=True` olarak işaretlenmelidir:
+The following tools should be marked with `requires_confirmation=True`:
 
-- `isolate_agent` — Agent'ı ağdan kopar
-- `disable_user_account` — Kullanıcı hesabı devre dışı bırakır
-- `block_ip_firewall` — Güvenlik duvarında IP bloklar
-- `delete_file` — Dosya siler
-- `run_shell_command` — Shell komutu çalıştırır
+- `isolate_agent` — Disconnects the agent from the network
+- `disable_user_account` — Disables a user account
+- `block_ip_firewall` — Blocks an IP in the firewall
+- `delete_file` — Deletes a file
+- `run_shell_command` — Executes a shell command
 
 ---
 
-## 5. Gizli Bilgi Yönetimi
+## 5. Secrets Management
 
-### 5.1 Environment Variable Güvenliği
+### 5.1 Environment Variable Security
 
-Tüm hassas değerler `.env` dosyasında tutulur ve Git'e commit edilmez:
+All sensitive values are stored in `.env` files and must never be committed to Git:
 
 ```bash
-# .gitignore'da mutlaka bulunmalı:
+# Must be present in .gitignore:
 .env
 *.env
 *.env.local
 !.env.example
 ```
 
-### 5.2 Secret Üretimi
+### 5.2 Secret Generation
 
 ```bash
-# AGENTIX_INTERNAL_API_KEY için güçlü rastgele değer üret
+# Generate a strong random value for AGENTIX_INTERNAL_API_KEY
 openssl rand -hex 32
 
-# JWT secret için
+# For JWT secret
 openssl rand -base64 48
 
-# Webhook token için
+# For webhook token
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 ### 5.3 Production Secret Checklist
 
-| Secret | Minimum Uzunluk | Öneri |
+| Secret | Minimum Length | Recommendation |
 |---|---|---|
 | `AGENTIX_INTERNAL_API_KEY` | 32 char hex | `openssl rand -hex 32` |
 | `AGENTIX_JWT_SECRET` | 32 char | `openssl rand -base64 48` |
 | `NEXTAUTH_SECRET` | 32 char | `openssl rand -base64 32` |
 | `WAZUH_API_PASSWORD` | 16+ char | Complexity policy |
-| `THEHIVE_API_KEY` | UUID tabanlı | TheHive UI'dan üret |
+| `THEHIVE_API_KEY` | UUID-based | Generate from TheHive UI |
 
 ---
 
-## 6. Audit ve Logging
+## 6. Audit and Logging
 
-### 6.1 Structlog Yapılandırması
+### 6.1 Structlog Configuration
 
-Tüm güvenlik olayları structured JSON formatında loglanır:
+All security events are logged in structured JSON format:
 
 ```python
 logger.info("workspace.initialized", session_id=..., owner=...)
@@ -319,80 +319,80 @@ logger.warning("orchestrator.confirmation_required", tool=...)
 logger.error("auth.failed", reason="invalid_internal_key", remote_ip=...)
 ```
 
-### 6.2 İzlenmesi Gereken Kritik Log Olayları
+### 6.2 Critical Log Events to Monitor
 
-| Log Event | Anlam | Aksiyon |
+| Log Event | Meaning | Action |
 |---|---|---|
-| `auth.failed` | Geçersiz API key / JWT | Alert oluştur |
-| `workspace.quota_exceeded` | Disk kota aşımı | Session incelemesi |
-| `path_traversal_attempt` | `../` saldırısı | Anında engel + alert |
-| `orchestrator.confirmation_required` | HITL tetiklendi | Teams bildirim gönderildi |
-| `orchestrator.resume.approved` | Onay verildi | Araç yürütülüyor |
-| `orchestrator.resume.rejected` | Red edildi | Araç iptal edildi |
+| `auth.failed` | Invalid API key / JWT | Create alert |
+| `workspace.quota_exceeded` | Disk quota exceeded | Review session |
+| `path_traversal_attempt` | `../` attack | Block immediately + alert |
+| `orchestrator.confirmation_required` | HITL triggered | Teams notification sent |
+| `orchestrator.resume.approved` | Approval granted | Tool executing |
+| `orchestrator.resume.rejected` | Rejected | Tool cancelled |
 
-### 6.3 Log Saklama
+### 6.3 Log Retention
 
-Production'da log'lar Wazuh / Elasticsearch'e gönderilmelidir:
+In production, logs should be shipped to Wazuh / Elasticsearch:
 
 ```env
-AGENTIX_LOG_LEVEL=INFO     # DEBUG sadece development'ta
+AGENTIX_LOG_LEVEL=INFO     # DEBUG only in development
 ```
 
 ---
 
-## 7. Tehdit Modeli
+## 7. Threat Model
 
-### STRIDE Analizi
+### STRIDE Analysis
 
-| Tehdit | Bileşen | Mevcut Kontrol | Risk |
+| Threat | Component | Existing Control | Risk |
 |---|---|---|---|
-| **Spoofing** | Gateway → Core | `X-Internal-Api-Key` | 🟡 Orta (network izolasyonu ile düşer) |
-| **Tampering** | Webhook payload | Path token + body hash | 🟡 Orta |
-| **Repudiation** | Araç çağrıları | Structlog audit trail | 🟢 Düşük |
-| **Info Disclosure** | SessionWorkspace | Path traversal block + quota | 🟢 Düşük |
-| **Denial of Service** | Core API | Quota enforcement | 🟡 Orta (rate limit eklenebilir) |
-| **Elevation of Privilege** | HITL bypass | `requires_confirmation` + draft_history | 🟢 Düşük |
+| **Spoofing** | Gateway → Core | `X-Internal-Api-Key` | 🟡 Medium (reduced with network isolation) |
+| **Tampering** | Webhook payload | Path token + body hash | 🟡 Medium |
+| **Repudiation** | Tool invocations | Structlog audit trail | 🟢 Low |
+| **Info Disclosure** | SessionWorkspace | Path traversal block + quota | 🟢 Low |
+| **Denial of Service** | Core API | Quota enforcement | 🟡 Medium (rate limiting can be added) |
+| **Elevation of Privilege** | HITL bypass | `requires_confirmation` + draft_history | 🟢 Low |
 
-### Bilinen Riskler ve Öneriler
+### Known Risks and Recommendations
 
 > [!CAUTION]
-> **Yüksek Öncelikli:** `AGENTIX_INTERNAL_API_KEY` sadece pre-shared key koruması sağlar. Production'da mutual TLS (mTLS) ile güçlendirilmesi önerilir.
+> **High Priority:** `AGENTIX_INTERNAL_API_KEY` provides only pre-shared key protection. It is recommended to strengthen it with mutual TLS (mTLS) in production.
 
 > [!WARNING]
-> **Orta Öncelikli:** Redis'te saklanan `draft_history` şifrelenmez. Hassas ortamlarda Redis encryption-at-rest aktif edilmeli veya Redis Cluster ACL kullanılmalıdır.
+> **Medium Priority:** `draft_history` stored in Redis is not encrypted. In sensitive environments, Redis encryption-at-rest should be enabled or Redis Cluster ACLs should be used.
 
 > [!NOTE]
-> **İyileştirme:** API Gateway katmanına rate limiting (ör. `slowapi`) eklenmesi DoS riskini azaltır.
+> **Improvement:** Adding rate limiting (e.g., `slowapi`) to the API Gateway layer reduces DoS risk.
 
 ---
 
-## 8. Production Sertleştirme Kontrol Listesi
+## 8. Production Hardening Checklist
 
-### Zorunlu Adımlar
+### Required Steps
 
-- [ ] `.env` dosyasında tüm `dev-*` ve `your-*` değerleri güvenli değerlerle değiştirildi
-- [ ] `AGENTIX_INTERNAL_API_KEY` en az 32 karakterli rastgele hex
-- [ ] `AGENTIX_JWT_SECRET` güçlü rastgele değer
-- [ ] `WAZUH_API_VERIFY_SSL=true` (production Wazuh'da)
-- [ ] Gateway dışındaki tüm portlar dış ağa kapalı
-- [ ] Docker network `internal: true` olarak yapılandırıldı
-- [ ] TLS reverse proxy (nginx/Traefik) ile HTTPS zorunlu
-- [ ] `GATEWAY_ALLOWED_ORIGINS` sadece production domain'leri içeriyor
-- [ ] Log retention politikası ve Wazuh alerting kuralları aktif
+- [ ] All `dev-*` and `your-*` values in `.env` have been replaced with secure values
+- [ ] `AGENTIX_INTERNAL_API_KEY` is at least 32-character random hex
+- [ ] `AGENTIX_JWT_SECRET` is a strong random value
+- [ ] `WAZUH_API_VERIFY_SSL=true` (for production Wazuh)
+- [ ] All ports except Gateway are closed to external network
+- [ ] Docker network configured with `internal: true`
+- [ ] HTTPS enforced via TLS reverse proxy (nginx/Traefik)
+- [ ] `GATEWAY_ALLOWED_ORIGINS` contains only production domains
+- [ ] Log retention policy and Wazuh alerting rules are active
 
-### Önerilen Ek Güvenlik
+### Recommended Additional Security
 
-- [ ] Redis AUTH password aktif (`requirepass <strong-password>`)
-- [ ] Postgres kullanıcısı minimum privilege ile yapılandırıldı
-- [ ] `AGENTIX_SESSION_QUOTA_MB` iş gereksinimine göre ayarlandı
-- [ ] API rate limiting eklendi (ör. `slowapi`)
-- [ ] Secrets rotation prosedürü dokümante edildi
-- [ ] Penetration test yapıldı (yılda en az 1)
+- [ ] Redis AUTH password enabled (`requirepass <strong-password>`)
+- [ ] Postgres user configured with minimum privileges
+- [ ] `AGENTIX_SESSION_QUOTA_MB` adjusted per business requirements
+- [ ] API rate limiting added (e.g., `slowapi`)
+- [ ] Secrets rotation procedure documented
+- [ ] Penetration test performed (at least annually)
 
 ---
 
-## İlgili Dokümanlar
+## Related Documents
 
 - [API Reference](./api-reference.md)
-- [Testing Guide](../guides/testing-guide.md)
+- [Testing Guide](../guides/6_testing-guide.md)
 - [Deployment Guide](../guides/deployment-guide.md)

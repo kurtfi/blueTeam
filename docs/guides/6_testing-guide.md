@@ -368,5 +368,5 @@ pytest tests/integration/ -v --forked
 ## İlgili Dokümanlar
 
 - [API Reference](../architecture/api-reference.md)
-- [Playbook Development Guide](./playbook-development.md)
+- [Playbook Development Guide](./5_playbook-development.md)
 - [Security Model](../architecture/security-model.md)
