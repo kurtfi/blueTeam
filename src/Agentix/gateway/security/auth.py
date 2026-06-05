@@ -1,23 +1,25 @@
-import os
 import hashlib
+import os
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import asyncpg  # type: ignore[import-untyped]
 import jwt
-from datetime import datetime, timedelta, timezone
-from fastapi import Request, HTTPException, Security, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import asyncpg
 import structlog
-from pathlib import Path
-from dotenv import load_dotenv
 
 # Load settings and env
 from agentic_common.settings import settings
+from fastapi import HTTPException, Request, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 logger = structlog.get_logger(__name__)
 
 # JWT settings
 JWT_SECRET = os.getenv("GATEWAY_JWT_SECRET", "dev-jwt-secret-key-1234567890-change-in-production")
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("GATEWAY_ACCESS_TOKEN_EXPIRE_MINUTES", "1440")) # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("GATEWAY_ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
+)  # 24 hours
 
 # Credentials configuration
 DEFAULT_USERNAME = os.getenv("GATEWAY_USERNAME", "admin")
@@ -54,9 +56,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     """Create a signed JWT access token."""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
@@ -101,10 +103,18 @@ class AuthStore:
                     import uuid
                     user_id = uuid.uuid4()
                     pw_hash = hash_password(DEFAULT_PASSWORD)
-                    await conn.execute(f"""
-                        INSERT INTO {self._table_name} (id, username, password_hash, email, role, permissions, created_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    """, user_id, DEFAULT_USERNAME, pw_hash, f"{DEFAULT_USERNAME}@agentix.ai", "admin", "[]", datetime.now())
+                    await conn.execute(
+                        f"INSERT INTO {self._table_name} "
+                        "(id, username, password_hash, email, role, permissions, created_at) "
+                        "VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                        user_id,
+                        DEFAULT_USERNAME,
+                        pw_hash,
+                        f"{DEFAULT_USERNAME}@agentix.ai",
+                        "admin",
+                        "[]",
+                        datetime.now()
+                    )
                     logger.info("auth_store.default_user_seeded", username=DEFAULT_USERNAME)
 
     async def get_user_by_username(self, username: str) -> dict | None:
@@ -112,7 +122,8 @@ class AuthStore:
         pool = await self.get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                f"SELECT id, username, password_hash, email, role, permissions FROM {self._table_name} WHERE username = $1",
+                f"SELECT id, username, password_hash, email, role, permissions "
+                f"FROM {self._table_name} WHERE username = $1",
                 username
             )
             if row:
@@ -127,14 +138,34 @@ class AuthStore:
 # Singleton instance of AuthStore
 auth_store = AuthStore()
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-async def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
+async def verify_jwt_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(security)
+) -> dict[str, Any]:
     """
-    FastAPI Dependency to verify the local JWT token from the Authorization header.
-    Returns the decoded token claims if valid.
+    FastAPI Dependency to verify the local JWT token.
+    First checks the 'agentix_access_token' cookie,
+    then falls back to the Authorization Bearer header.
     """
-    token = credentials.credentials
+    token = None
+    
+    # 1. Try to read from cookie
+    if request.cookies:
+        token = request.cookies.get("agentix_access_token")
+        
+    # 2. Try to read from Authorization header if not in cookies
+    if not token and credentials:
+        token = credentials.credentials
+        
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated. Invalid or missing credentials.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
     try:
         decoded_token = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return decoded_token
@@ -153,7 +184,7 @@ async def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Security(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-async def get_current_user(claims: dict = Security(verify_jwt_token)) -> dict:
+async def get_current_user(claims: dict[str, Any] = Security(verify_jwt_token)) -> dict[str, Any]:
     """
     Extracts the user info from the verified claims.
     """

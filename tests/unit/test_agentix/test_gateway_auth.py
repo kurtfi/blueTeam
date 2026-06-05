@@ -15,24 +15,28 @@ with patch("gateway.security.auth.auth_store.setup_db", new_callable=AsyncMock) 
     from gateway.main import app
     from gateway.security.auth import create_access_token, hash_password
 
-client = TestClient(app)
+@pytest.fixture
+def client():
+    c = TestClient(app)
+    c.cookies.clear()
+    return c
 
-def test_health_check():
+def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "Agentix Gateway"}
 
-def test_me_endpoint_unauthorized():
+def test_me_endpoint_unauthorized(client):
     response = client.get("/web/me")
     assert response.status_code == 401
 
-def test_me_endpoint_invalid_token():
+def test_me_endpoint_invalid_token(client):
     response = client.get("/web/me", headers={"Authorization": "Bearer invalid-token"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid authentication credentials"
 
 @patch("gateway.routers.web.auth_store.get_user_by_username", new_callable=AsyncMock)
-def test_login_endpoint_success(mock_get_user):
+def test_login_endpoint_success(mock_get_user, client):
     pw_hash = hash_password("test-pass")
     mock_get_user.return_value = {
         "username": "test-user",
@@ -45,18 +49,18 @@ def test_login_endpoint_success(mock_get_user):
     response = client.post("/web/login", json={"username": "test-user", "password": "test-pass"})
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"
+    assert data == {"status": "success", "message": "Logged in successfully"}
+    assert "agentix_access_token" in response.cookies
 
 @patch("gateway.routers.web.auth_store.get_user_by_username", new_callable=AsyncMock)
-def test_login_endpoint_invalid_credentials(mock_get_user):
+def test_login_endpoint_invalid_credentials(mock_get_user, client):
     mock_get_user.return_value = None
     
     response = client.post("/web/login", json={"username": "test-user", "password": "test-pass"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Incorrect username or password"
 
-def test_me_endpoint_success():
+def test_me_endpoint_success(client):
     # Generate a valid JWT token
     token = create_access_token(data={
         "uid": "test-user-123",
@@ -72,7 +76,7 @@ def test_me_endpoint_success():
     assert data["role"] == "admin"
     assert data["email"] == "test-user@agentix.ai"
 
-def test_chat_endpoint_success():
+def test_chat_endpoint_success(client):
     # Generate a valid JWT token
     token = create_access_token(data={
         "uid": "test-user-123",

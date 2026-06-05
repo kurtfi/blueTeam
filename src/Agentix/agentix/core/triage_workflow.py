@@ -4,6 +4,8 @@ import asyncio
 from agentix.agents.factory import AgentFactory
 from agentix.core.orchestrator import Orchestrator
 from agentix.registry.catalog import ToolCatalog
+from agentix.core.react import StepType
+from agentic_common.memory import postgres_session_repo
 
 logger = structlog.get_logger(__name__)
 
@@ -70,9 +72,9 @@ IMPORTANT NOTE (SIEM QUERIES):
             catalog=catalog,
         )
 
+        final_answer = None
         async for step in orchestrator.run_stream(session_id=session_id, user_message=prompt):
-            # Since this is a background task, we just log the steps.
-            # In a full implementation, these steps could be streamed to a SOC dashboard or Slack.
+            # Log the steps locally
             logger.info(
                 "triage_workflow.step",
                 session_id=session_id,
@@ -81,8 +83,64 @@ IMPORTANT NOTE (SIEM QUERIES):
                 tool=step.tool_name,
             )
 
+            # Record event in PostgreSQL
+            try:
+                event_type = step.step_type.value
+                actor = "agent" if step.step_type in (StepType.THINK, StepType.ACT, StepType.ANSWER) else "system"
+                if step.step_type == StepType.CONFIRM:
+                    event_type = "hitl_request"
+                    actor = "agent"
+                elif step.step_type == StepType.OBSERVE:
+                    actor = "system" if "Teams Integration" in (step.content or "") else "tool"
+
+                await postgres_session_repo.add_event(
+                    session_id=session_id,
+                    event_type=event_type,
+                    actor=actor,
+                    content=step.content,
+                    metadata={
+                        "tool_name": step.tool_name,
+                        "tool_input": step.tool_input,
+                        "tool_output": step.tool_output,
+                    }
+                )
+            except Exception as ex:
+                logger.error("triage_workflow.event_log_failed", session_id=session_id, error=str(ex))
+
+            if step.step_type == StepType.ANSWER:
+                final_answer = step.content
+
+        # Determine verdict from final answer
+        verdict = "UNDETERMINED"
+        if final_answer:
+            final_answer_upper = final_answer.upper()
+            if "TRUE POSITIVE" in final_answer_upper or "TRUE_POSITIVE" in final_answer_upper or " TP " in f" {final_answer_upper} ":
+                verdict = "TRUE_POSITIVE"
+            elif "FALSE POSITIVE" in final_answer_upper or "FALSE_POSITIVE" in final_answer_upper or " FP " in f" {final_answer_upper} ":
+                verdict = "FALSE_POSITIVE"
+
+        await postgres_session_repo.update_status(
+            session_id=session_id,
+            status="COMPLETED",
+            verdict=verdict,
+        )
+
     except Exception as e:
         logger.exception("triage_workflow.error", session_id=session_id, error=str(e))
+        # Update status to FAILED in Postgres
+        try:
+            await postgres_session_repo.update_status(
+                session_id=session_id,
+                status="FAILED",
+            )
+            await postgres_session_repo.add_event(
+                session_id=session_id,
+                event_type="error",
+                actor="system",
+                content=f"Workflow failed with error: {str(e)}",
+            )
+        except Exception as db_ex:
+            logger.error("triage_workflow.db_fail_log_failed", session_id=session_id, error=str(db_ex))
 
 
 # Maintain backwards compatibility / alias for webhook router

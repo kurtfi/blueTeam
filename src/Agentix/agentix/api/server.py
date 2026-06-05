@@ -23,6 +23,7 @@ from agentix.core.cleanup import run_periodic_cleanup, cleanup_expired_workspace
 from agentic_common.memory.redis_store import RedisSessionStore
 from agentix.registry.catalog import ToolCatalog
 from agentic_common.memory.redis_preferences import RedisPreferenceStore
+from agentic_common.memory import postgres_session_repo
 from agentix.api.internal_auth import InternalApiKeyMiddleware
 from agentix.api.routes import webhooks
 from agentix.core.alert_dedup import AlertDeduplicator
@@ -57,6 +58,13 @@ async def get_pref_store(request: Request) -> RedisPreferenceStore:
 async def startup_event():
     logger.info("Starting up Agentix Service...")
     
+    # Run database migrations
+    try:
+        await postgres_session_repo.run_migrations()
+        logger.info("Database migrations run successfully.")
+    except Exception as e:
+        logger.error("Failed to run database migrations", error=str(e))
+        
     app.state.catalog = ToolCatalog()
     app.state.redis_store = RedisSessionStore(redis_url=settings.redis_url)
     app.state.pref_store = RedisPreferenceStore(redis_url=settings.redis_url)
@@ -137,6 +145,7 @@ async def shutdown_event():
         await app.state.pref_store.close()
     if hasattr(app.state, "deduplicator"):
         await app.state.deduplicator.aclose()
+    await postgres_session_repo.close()
 
 # --- Request Models ---
 
@@ -171,7 +180,20 @@ async def create_session(
     user_id = req.user_id if req else "anonymous"
     new_uuid = str(uuid.uuid4())
 
-    # Register the session in the store
+    # Create persistent session in PostgreSQL first
+    display_name = f"User Chat — {datetime.now().strftime('%b %d %H:%M')}"
+    try:
+        await postgres_session_repo.create_session(
+            session_id=new_uuid,
+            display_name=display_name,
+            source="USER",
+            owner_id=user_id,
+        )
+    except Exception as e:
+        logger.error("session.postgres_creation_failed", session_id=new_uuid, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to persist session in Database: {str(e)}")
+
+    # Register the session in the Redis store
     await redis_store.set_metadata(new_uuid, "created_at", datetime.now().isoformat())
     await redis_store.set_metadata(new_uuid, "owner_id", user_id)
 
@@ -343,3 +365,103 @@ async def get_session_owner(
 
     owner_id = await redis_store.get_metadata(session_id, "owner_id")
     return {"session_id": session_id, "owner_id": owner_id or "anonymous"}
+
+
+@app.get("/v1/playbooks")
+async def get_cached_playbooks(catalog: ToolCatalog = Depends(get_catalog)) -> dict[str, str]:
+    """
+    Return the cached playbooks markdown text from TriageCore.
+    """
+    return {"playbooks_markdown": getattr(catalog, "cached_playbooks", "")}
+
+
+# --- Sessions Persistance Endpoints ---
+
+class UpdateSessionRequest(BaseModel):
+    status: str | None = None
+    verdict: str | None = None
+
+@app.get("/v1/sessions")
+async def list_sessions(
+    source: str | None = None,
+    status: str | None = None,
+    owner_id: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    try:
+        return await postgres_session_repo.list_sessions(
+            source=source,
+            status=status,
+            owner_id=owner_id,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/v1/sessions/stats")
+async def get_session_stats():
+    try:
+        return await postgres_session_repo.get_session_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/v1/sessions/{session_id}")
+async def get_session(session_id: str):
+    try:
+        session = await postgres_session_repo.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+        return session
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/v1/sessions/{session_id}")
+async def update_session(session_id: str, req: UpdateSessionRequest):
+    try:
+        session = await postgres_session_repo.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+        
+        if req.status:
+            valid_statuses = {"ACTIVE", "WAITING_APPROVAL", "COMPLETED", "FAILED", "ARCHIVED"}
+            if req.status.upper() not in valid_statuses:
+                raise HTTPException(status_code=400, detail=f"Invalid status: {req.status}")
+            
+            verdict_val = None
+            if req.verdict:
+                valid_verdicts = {"TRUE_POSITIVE", "FALSE_POSITIVE", "UNDETERMINED"}
+                if req.verdict.upper() not in valid_verdicts:
+                    raise HTTPException(status_code=400, detail=f"Invalid verdict: {req.verdict}")
+                verdict_val = req.verdict.upper()
+                
+            await postgres_session_repo.update_status(session_id, req.status.upper(), verdict_val)
+            
+            await postgres_session_repo.add_event(
+                session_id=session_id,
+                event_type="status_change",
+                actor="system",
+                content=f"Session status updated to {req.status.upper()}" + (f" with verdict {verdict_val}" if verdict_val else ""),
+            )
+            
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/v1/sessions/{session_id}/events")
+async def get_session_events(session_id: str, limit: int = 100):
+    try:
+        session = await postgres_session_repo.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+        return await postgres_session_repo.get_events(session_id, limit=limit)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

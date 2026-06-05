@@ -149,3 +149,138 @@ async def ask_agentix_aggregated(user_id: str, message: str, session_id: str | N
         return "Sorry, a system error occurred."
         
     return "\n".join(aggregated_response) if aggregated_response else "No response generated."
+
+
+async def get_playbooks() -> str:
+    """
+    Fetch the cached playbooks markdown text from the Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/playbooks",
+                headers=_internal_headers(),
+                timeout=5.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            return str(data.get("playbooks_markdown", ""))
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_playbooks_failed", error=str(e))
+            return ""
+
+
+async def list_sessions(
+    owner_id: str | None = None,
+    source: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0
+) -> list[dict]:
+    """
+    Fetch list of sessions from Core API with filters.
+    """
+    params = {}
+    if owner_id:
+        params["owner_id"] = owner_id
+    if source:
+        params["source"] = source
+    if status:
+        params["status"] = status
+    params["limit"] = limit
+    params["offset"] = offset
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/sessions",
+                params=params,
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.list_sessions_failed", error=str(e))
+            raise
+
+
+async def get_session_detail(session_id: str) -> dict:
+    """
+    Fetch session details from Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/sessions/{session_id}",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_session_detail_failed", session_id=session_id, error=str(e))
+            raise
+
+
+async def get_session_events(session_id: str, limit: int = 100) -> list[dict]:
+    """
+    Fetch session audit events from Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/sessions/{session_id}/events",
+                params={"limit": limit},
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_session_events_failed", session_id=session_id, error=str(e))
+            raise
+
+
+async def update_session_status(session_id: str, status: str, verdict: str | None = None) -> dict:
+    """
+    Update session status/verdict on Core API.
+    """
+    payload = {}
+    if status:
+        payload["status"] = status
+    if verdict:
+        payload["verdict"] = verdict
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.patch(
+                f"{AGENTIX_API_URL}/v1/sessions/{session_id}",
+                json=payload,
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.update_session_status_failed", session_id=session_id, error=str(e))
+            raise
+
+
+async def get_session_stats() -> dict:
+    """
+    Fetch session aggregated stats from Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/sessions/stats",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_session_stats_failed", error=str(e))
+            raise
+

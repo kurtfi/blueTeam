@@ -31,6 +31,7 @@ from agentix.core.react import ReActStep, ReActTrace, StepType
 from agentic_common.settings import settings
 from agentic_common.workspace import SessionWorkspace
 from agentic_common.memory.session import SessionStore
+from agentic_common.memory import postgres_session_repo
 from agentix.registry.catalog import ToolCatalog
 from agentic_common.base_tool import BaseTool, ToolResult
 from agentic_common.telemetry import track_tool_call
@@ -163,6 +164,20 @@ class Orchestrator:
         log = logger.bind(session_id=session_id)
         log.info("orchestrator.run_stream.start", message=user_message[:120])
 
+        # Increment message count and log user message event in Postgres
+        try:
+            await postgres_session_repo.increment_stats(session_id, message_count=1)
+            # Avoid duplicate logs for automated siem triage prompt
+            if not user_message.strip().startswith("You are an autonomous Tier 1 (T1) SOC Analyst."):
+                await postgres_session_repo.add_event(
+                    session_id=session_id,
+                    event_type="message",
+                    actor="user",
+                    content=user_message,
+                )
+        except Exception as e:
+            log.error("orchestrator.postgres_user_msg_log_failed", error=str(e))
+
         # 0. Initialise per-session workspace (if enabled).
         if settings.agentix_session_workspace_enabled:
             self._workspace = SessionWorkspace.from_session_id(session_id)
@@ -188,6 +203,19 @@ class Orchestrator:
             if is_positive:
                 is_resume = True
                 log.info("orchestrator.resume.approved", user_message=user_message)
+                
+                # Update status and add event in Postgres
+                try:
+                    await postgres_session_repo.update_status(session_id, "ACTIVE")
+                    await postgres_session_repo.add_event(
+                        session_id=session_id,
+                        event_type="hitl_response",
+                        actor="user",
+                        content="User approved the pending tool execution.",
+                    )
+                except Exception as e:
+                    log.error("orchestrator.postgres_hitl_approved_log_failed", error=str(e))
+                
                 messages = draft_history
                 # Clear draft_history
                 await self._memory.set_metadata(session_id, "draft_history", None)
@@ -201,6 +229,19 @@ class Orchestrator:
                 tool_calls = last_msg.get("tool_calls") or []
             else:
                 log.info("orchestrator.resume.rejected", user_message=user_message)
+                
+                # Update status and add event in Postgres
+                try:
+                    await postgres_session_repo.update_status(session_id, "COMPLETED")
+                    await postgres_session_repo.add_event(
+                        session_id=session_id,
+                        event_type="hitl_response",
+                        actor="user",
+                        content="User rejected the pending tool execution. Workflow cancelled.",
+                    )
+                except Exception as e:
+                    log.error("orchestrator.postgres_hitl_rejected_log_failed", error=str(e))
+                
                 await self._memory.set_metadata(session_id, "draft_history", None)
                 await self._memory.append(
                     session_id,
@@ -272,6 +313,12 @@ class Orchestrator:
             user_message=user_message[:120],
             tool_count=len(tool_map)
         )
+
+        if trace and hasattr(trace, "id") and trace.id:
+            try:
+                await postgres_session_repo.update_stats(session_id, langfuse_trace_id=str(trace.id))
+            except Exception as e:
+                log.error("orchestrator.update_trace_id_failed", error=str(e))
 
         final_answer = ""
         iterations = 0
@@ -402,6 +449,20 @@ class Orchestrator:
                         # Save the current messages history as draft state for resumption
                         await self._memory.set_metadata(session_id, "draft_history", messages)
                         
+                        # Increment hitl_count and update status in Postgres
+                        try:
+                            await postgres_session_repo.increment_stats(session_id, hitl_count=1)
+                            await postgres_session_repo.update_status(session_id, "WAITING_APPROVAL")
+                            await postgres_session_repo.add_event(
+                                session_id=session_id,
+                                event_type="hitl_request",
+                                actor="agent",
+                                content=f"Tool '{t_name}' requires manual confirmation.",
+                                metadata={"tool_name": t_name, "tool_args": t_args}
+                            )
+                        except Exception as e:
+                            log.error("orchestrator.postgres_hitl_request_log_failed", error=str(e))
+                        
                         import sys
                         import time
                         
@@ -434,6 +495,12 @@ class Orchestrator:
                         return  # Caller must re-submit with approved=True.
 
         # Fan-out: execute all tool calls in parallel.
+        # Increment tool_calls count in Postgres
+        try:
+            await postgres_session_repo.increment_stats(session_id, tool_calls=len(tool_calls))
+        except Exception as e:
+            log.error("orchestrator.postgres_increment_tool_calls_failed", error=str(e))
+
         # Make sure tool_executor has latest workspace
         self._tool_executor._workspace = self._workspace
         observation_results = await self._tool_executor.execute_tools_parallel(
