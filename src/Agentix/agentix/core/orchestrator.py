@@ -210,21 +210,38 @@ class Orchestrator:
                 yield ReActStep(StepType.ANSWER, "Action cancelled by user.")
                 return
         else:
-            # 2. Native RAG — inject relevant context into the system prompt.
-            system_prompt = await self._rag.build_system_prompt(user_message, user_id, log)
-
-            # 3. Dynamically select tools that match the user's intent.
+            # 2. Dynamically select tools.
             category_filter = self._config.tool_filters.categories if self._config else None
             name_filter = self._config.tool_filters.names if self._config else None
+            exclude_names = self._config.tool_filters.exclude_names if self._config else None
 
             matched_tools: list[BaseTool] = await self._catalog.select(
                 user_message,
                 category_filter=category_filter,
                 name_filter=name_filter,
+                exclude_names=exclude_names,
+                use_semantic_search=False,
             )
             tool_schemas = [t.to_openai_schema() for t in matched_tools]
             tool_map = {t.name: t for t in matched_tools}
             log.debug("tools.selected", count=len(matched_tools), names=list(tool_map.keys()))
+
+            # 3. Retrieve RAG context if enabled
+            rag_context = await self._rag.retrieve_context(user_message, user_id, log)
+
+            # 4. Compose final system prompt using SystemPromptComposer
+            base_prompt = (
+                self._config.system_prompt_override 
+                if self._config and self._config.system_prompt_override 
+                else None
+            )
+            from agentix.core.prompt_composer import SystemPromptComposer
+            composer = SystemPromptComposer(base_prompt)
+            system_prompt = composer.compose(
+                available_tools=matched_tools,
+                playbooks_str=getattr(self._catalog, "cached_playbooks", None),
+                rag_context=rag_context,
+            )
 
             if not matched_tools:
                 log.error(

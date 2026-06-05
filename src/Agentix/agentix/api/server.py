@@ -79,6 +79,17 @@ async def startup_event():
             
             # Sync TriageCore Tools into our Catalog
             await app.state.catalog.register_mcp_client(app.state.triage_core_session)
+
+            # Sync TriageCore Playbooks into our Catalog
+            try:
+                result = await app.state.triage_core_session.call_tool("list_playbooks")
+                from agentix.tools.mcp_adapter import MCPToolAdapter
+                playbooks_str = MCPToolAdapter._parse_result(result)
+                app.state.catalog.cached_playbooks = playbooks_str
+                logger.info("Successfully fetched and cached playbooks from TriageCore.")
+            except Exception as e:
+                logger.warning("Failed to fetch and cache playbooks at startup", error=str(e))
+
             logger.info("Successfully connected to SOC MCP Server and synced tools.")
             break
         except Exception as e:

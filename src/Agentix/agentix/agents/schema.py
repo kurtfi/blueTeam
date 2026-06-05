@@ -11,6 +11,7 @@ class ToolFilter(BaseModel):
     """Filter criteria for limiting tools in the catalog."""
     categories: list[str] = Field(default_factory=list)
     names: list[str] = Field(default_factory=list)
+    exclude_names: list[str] = Field(default_factory=list)
 
 
 class LLMConfig(BaseModel):

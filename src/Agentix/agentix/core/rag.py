@@ -1,24 +1,10 @@
 """
-Context Enrichment Service (RAG) for injecting knowledge into system prompts.
+Context Enrichment Service (RAG) for retrieving knowledge from vector stores.
 """
 from typing import Any
 
 from agentic_common.settings import settings
 
-
-_SYSTEM_PROMPT = """\
-You are Agentix, a Tool-First AI orchestrator.
-
-When responding, follow this logical flow:
-1. Thought: Briefly explain your reasoning and which tool you will use.
-2. Tool Call: Call the appropriate function from the available tools.
-3. Final Answer: Once you have all necessary information, provide a comprehensive response prefixed with 'Final Answer:'.
-
-Rules:
-- Only use the tools provided to you.
-- If a task is unsafe or out of scope, refuse and explain why.
-- For academic research, always prioritize arXiv findings and download relevant PDFs for analysis.
-"""
 
 _RAG_CONTEXT_HEADER = """<retrieved_context>
 <!-- The following passages were retrieved from the knowledge base.
@@ -32,8 +18,7 @@ _RAG_CONTEXT_FOOTER = """\n</retrieved_context>"""
 
 class ContextEnrichmentService:
     """
-    Responsible for retrieving context from vector stores and injecting it 
-    into the system prompt.
+    Responsible for retrieving context from vector stores.
     """
     
     def __init__(self, config: Any = None, vector_store: Any | None = None, rag_top_k: int = 5, rag_enabled: bool = True):
@@ -42,18 +27,13 @@ class ContextEnrichmentService:
         self._rag_top_k = rag_top_k
         self._rag_enabled = config.rag_enabled if config else rag_enabled
 
-    async def build_system_prompt(self, user_message: str, user_id: str, log: Any) -> str:
+    async def retrieve_context(self, user_message: str, user_id: str, log: Any) -> str | None:
         """
-        Build the system prompt, optionally prepending RAG context.
+        Query the vector store and return the formatted retrieved context string.
+        Returns None if RAG is disabled, search fails, or no results found.
         """
-        base_prompt = (
-            self._config.system_prompt_override 
-            if self._config and self._config.system_prompt_override 
-            else _SYSTEM_PROMPT
-        )
-        
         if not self._rag_enabled:
-            return base_prompt
+            return None
 
         # Lazy-init the singleton vector store (shared connection pool).
         if self._vector_store is None:
@@ -62,7 +42,7 @@ class ContextEnrichmentService:
                 self._vector_store = vector_store
             except Exception as e:
                 log.warning("orchestrator.rag.vector_store_unavailable", error=str(e))
-                return base_prompt
+                return None
 
         try:
             # Cross-session retrieval: filter by user_id
@@ -73,10 +53,10 @@ class ContextEnrichmentService:
             )
         except Exception as e:
             log.warning("orchestrator.rag.search_failed", error=str(e))
-            return base_prompt
+            return None
 
         if not results:
-            return base_prompt
+            return None
 
         # Format the retrieved passages.
         passages: list[str] = []
@@ -88,4 +68,4 @@ class ContextEnrichmentService:
 
         rag_block = _RAG_CONTEXT_HEADER + "\n\n".join(passages) + _RAG_CONTEXT_FOOTER
         log.debug("orchestrator.rag.injected", passage_count=len(passages))
-        return f"{base_prompt}\n\n{rag_block}"
+        return rag_block

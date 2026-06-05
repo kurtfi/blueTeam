@@ -60,6 +60,7 @@ class ToolCatalog:
         self._redis: aioredis.Redis = aioredis.from_url(
             settings.redis_url, decode_responses=True
         )
+        self.cached_playbooks: str | None = None
 
     # ------------------------------------------------------------------
     # Registration
@@ -118,6 +119,8 @@ class ToolCatalog:
         max_tools: int = 6,
         category_filter: list[str] | None = None,
         name_filter: list[str] | None = None,
+        exclude_names: list[str] | None = None,
+        use_semantic_search: bool = False,
     ) -> list[BaseTool]:
         """
         Return up to *max_tools* tools that are relevant to *user_message*.
@@ -135,18 +138,25 @@ class ToolCatalog:
         if not self._tools:
             return []
 
-        # If name_filter is explicitly provided, return all matching tools directly.
-        # This prevents semantic filtering from discarding necessary playbook tools.
-        if name_filter:
-            selected = []
-            for name in name_filter:
-                tool = self.get(name)
-                if tool:
-                    if category_filter and tool.category.lower() not in [c.lower() for c in category_filter]:
-                        continue
-                    selected.append(tool)
+        # If name_filter is provided (and not wildcard/empty), filter candidates.
+        if name_filter and "*" not in name_filter:
+            candidates = [self.get(name) for name in name_filter if self.get(name)]
+        else:
+            candidates = list(self._tools.values())
+
+        # Filter by exclusions and categories
+        selected = []
+        for tool in candidates:
+            if exclude_names and tool.name in exclude_names:
+                continue
+            if category_filter and tool.category.lower() not in [c.lower() for c in category_filter]:
+                continue
+            selected.append(tool)
+
+        # If not using semantic search, return the filtered candidates directly
+        if not use_semantic_search:
             logger.debug(
-                "catalog.select.bypass_by_name_filter",
+                "catalog.select.direct_filter",
                 selected=[t.name for t in selected],
             )
             return selected
@@ -160,13 +170,7 @@ class ToolCatalog:
 
         # 2. Score mapping
         scored: list[tuple[float, BaseTool]] = []
-        for tool in self._tools.values():
-            # 2.1 Apply Filters
-            if category_filter and tool.category.lower() not in [c.lower() for c in category_filter]:
-                continue
-            if name_filter and tool.name.lower() not in [n.lower() for n in name_filter]:
-                continue
-
+        for tool in selected:
             score = 0.0
             if msg_embedding is not None:
                 # Lazy evaluation and caching of tool description embedding
@@ -182,14 +186,14 @@ class ToolCatalog:
                 scored.append((score, tool))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        selected = [t for _, t in scored[:max_tools]]
+        selected_semantic = [t for _, t in scored[:max_tools]]
 
         logger.debug(
-            "catalog.select",
+            "catalog.select.semantic",
             message_preview=user_message[:60],
-            selected=[t.name for t in selected],
+            selected=[t.name for t in selected_semantic],
         )
-        return selected
+        return selected_semantic
 
     async def _get_tool_embedding(self, tool: BaseTool) -> list[float]:
         """

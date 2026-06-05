@@ -49,53 +49,7 @@ system_prompt_override: |
   - All actions must be logged with timestamp and justification
   - For ransomware (T1486): isolation is URGENT - ask for approval immediately
 
-  **Available Playbooks**:
-  - PB-001: OS Credential Dumping (T1003.008) - HIGH
-  - PB-002: Reverse Shell / C2 (T1059.004) - CRITICAL
-  - PB-003: Brute Force Attack (T1110) - MEDIUM
-  - PB-004: Pass-the-Hash / Lateral Movement (T1550.002) - CRITICAL
-  - PB-005: DNS Exfiltration (T1048) - HIGH
-  - PB-006: Ransomware (T1486) - CRITICAL [P0: Isolation FIRST]
-  - PB-007: SUID Privilege Escalation (T1548.001) - HIGH
-
-  **Available Tools**:
-  - find_playbook_for_alert: Automatic playbook matching (by rule_id or MITRE ID)
-  - trigger_playbook: Trigger playbook and get step-by-step instructions
-  - list_playbooks: List all registered playbooks
-  - query_siem_logs: Query logs in the SIEM
-  - create_alert: Create alert for triage
-  - create_case: Open a case for confirmed incidents
-  - add_case_note: Add a timestamped note to the case
-  - update_case_status: Update the status of the case
-  - get_ip_reputation: IP reputation query
-  - get_file_reputation: File hash reputation query
-  - get_domain_url_reputation: Domain/URL reputation query
-  - isolate_endpoint: Endpoint isolation
-  - block_ip: Firewall IP blocking
-  - disable_user_account: Suspend IAM/AD user account
-  - get_ad_user_info: User account details
-  - get_endpoint_info: Endpoint details (OS, IP, version)
-  - trigger_soar_workflow: Trigger SOAR workflow
-
-tool_filters:
-  names:
-    - find_playbook_for_alert
-    - trigger_playbook
-    - list_playbooks
-    - query_siem_logs
-    - create_alert
-    - create_case
-    - add_case_note
-    - update_case_status
-    - get_ip_reputation
-    - get_file_reputation
-    - get_domain_url_reputation
-    - isolate_endpoint
-    - block_ip
-    - disable_user_account
-    - get_ad_user_info
-    - get_endpoint_info
-    - trigger_soar_workflow
+tool_filters: {}
 
 rag_enabled: false
 max_iterations: 20
