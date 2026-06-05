@@ -19,14 +19,14 @@ from triage_core.playbooks.base import Playbook, PlaybookContext, PlaybookResult
 class PlaybookRegistry:
     """Thread-safe singleton that holds all registered playbooks."""
 
-    _instance: "PlaybookRegistry | None" = None
+    _instance: PlaybookRegistry | None = None
     _lock: threading.Lock = threading.Lock()
 
     def __init__(self) -> None:
         self._playbooks: dict[str, Playbook] = {}
 
     @classmethod
-    def instance(cls) -> "PlaybookRegistry":
+    def instance(cls) -> PlaybookRegistry:
         if cls._instance is None:
             with cls._lock:
                 # Double-checked locking

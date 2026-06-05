@@ -1,11 +1,11 @@
-import structlog
-from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+import os
 
-from gateway.services.agentix_client import ask_agentix_aggregated
 # import httpx for sending messages back to telegram
 import httpx
-import os
+import structlog
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+
+from gateway.services.agentix_client import ask_agentix_aggregated
 
 logger = structlog.get_logger(__name__)
 

@@ -3,12 +3,10 @@ YAML loader for Agent configurations.
 """
 from __future__ import annotations
 
-import os
-from yaml import safe_load
 from pathlib import Path
-from typing import Any
 
 from agentix.agents.schema import AgentConfig
+from yaml import safe_load
 
 
 class AgentLoader:
@@ -21,7 +19,7 @@ class AgentLoader:
         if not path.exists():
             raise FileNotFoundError(f"Agent config not found: {path}")
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = safe_load(f)
 
         return AgentConfig(**data)

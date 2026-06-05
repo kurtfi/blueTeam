@@ -7,13 +7,15 @@ sys.path.insert(0, str(root_dir))
 sys.path.insert(0, str(root_dir.parent / "AgenticCommon"))
 
 import asyncio
+
 import pytest
-from agentix.core.observability import obs
 from agentic_common.settings import settings
+from agentix.core.observability import obs
+
 
 @pytest.mark.asyncio
 async def test_langfuse():
-    print(f"Checking Langfuse Settings...")
+    print("Checking Langfuse Settings...")
     print(f"Enabled: {settings.langfuse_enabled}")
     print(f"Host: {settings.langfuse_host}")
     print(f"Public Key: {settings.langfuse_public_key[:8]}...")

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from gateway.routers import telegram, web, webhooks, sessions
+from gateway.routers import sessions, telegram, web, webhooks
 from gateway.security.auth import auth_store
 
 logger = structlog.get_logger(__name__)

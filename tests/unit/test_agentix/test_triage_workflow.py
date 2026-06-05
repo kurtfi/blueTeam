@@ -1,6 +1,8 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from agentix.core.triage_workflow import set_shared_catalog, process_siem_alert
+from agentix.core.triage_workflow import process_siem_alert, set_shared_catalog
+
 
 @pytest.mark.asyncio
 async def test_process_siem_alert_no_catalog():

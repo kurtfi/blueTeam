@@ -1,18 +1,18 @@
-import os
 import json
+import os
 import uuid
+from typing import Any
+
 import httpx
 import structlog
-from typing import Any, Optional, List, Dict
-
 from triage_core.integrations.base import (
+    ICaseManagementProvider,
+    IEndpointProvider,
+    IEnrichmentProvider,
     IFirewallProvider,
     IIamProvider,
-    ISoarProvider,
     ISiemProvider,
-    ICaseManagementProvider,
-    IEnrichmentProvider,
-    IEndpointProvider,
+    ISoarProvider,
 )
 
 logger = structlog.get_logger(__name__)
@@ -176,7 +176,7 @@ class DummyCaseManagementProvider(ICaseManagementProvider):
         title: str = "",
         description: str = "",
         severity: int = 2,
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ) -> str:
         global _CASE_COUNTER
         _CASE_COUNTER += 1
@@ -202,8 +202,8 @@ class DummyCaseManagementProvider(ICaseManagementProvider):
         source: str = "Agentix",
         source_ref: str = "",
         severity: int = 2,
-        tags: Optional[List[str]] = None,
-        observables: Optional[List[Dict[str, Any]]] = None,
+        tags: list[str] | None = None,
+        observables: list[dict[str, Any]] | None = None,
     ) -> str:
         alert_id = f"~alert-{uuid.uuid4().hex[:8]}"
         logger.info("provider.dummy_case.create_alert", title=title, alert_id=alert_id)
@@ -346,7 +346,7 @@ class DummyIamProvider(IIamProvider):
 
 class DummySoarProvider(ISoarProvider):
     async def trigger_workflow(
-        self, workflow_id: str, data: Optional[dict] = None, webhook_url: str = ""
+        self, workflow_id: str, data: dict | None = None, webhook_url: str = ""
     ) -> str:
         logger.info("provider.soar.trigger_workflow", workflow_id=workflow_id, data=data)
         return f"SOAR workflow '{workflow_id}' triggered successfully (Dummy SOAR Provider)."

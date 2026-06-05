@@ -1,7 +1,8 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
 from agentix.api.server import app
+from fastapi.testclient import TestClient
 
 # Create FastAPI TestClient for Core API
 client = TestClient(app)

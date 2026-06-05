@@ -1,0 +1,14 @@
+# Global Ruff configuration for the workspace
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "I", "UP"]
+ignore = [
+    "E501",  # Line too long (standard to ignore or warn, formatting handles this)
+]
+
+[lint.per-file-ignores]
+# Ignore import order and position violations in tests due to sys.path hacks
+"tests/**/*.py" = ["E402", "I001"]
+"src/**/tests/**/*.py" = ["E402", "I001"]

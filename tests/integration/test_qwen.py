@@ -1,14 +1,13 @@
-import pytest
-import os
 import json
+import os
 from contextlib import AsyncExitStack
 
+import pytest
+from agentic_common.settings import settings
+from agentix.agents.loader import AgentLoader
+from agentix.registry.catalog import ToolCatalog
 from mcp import ClientSession
 from mcp.client.sse import sse_client
-
-from agentic_common.settings import settings
-from agentix.registry.catalog import ToolCatalog
-from agentix.agents.loader import AgentLoader
 from ollama import AsyncClient
 
 pytestmark = pytest.mark.skipif(

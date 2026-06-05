@@ -1,9 +1,8 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 from agentic_common.base_tool import BaseTool
-from agentix.registry.catalog import ToolCatalog
 from agentix.core.prompt_composer import SystemPromptComposer
-from agentix.agents.schema import AgentConfig, ToolFilter
+from agentix.registry.catalog import ToolCatalog
+
 
 class DummyTool(BaseTool):
     def __init__(self, name: str, description: str, category: str = "data"):

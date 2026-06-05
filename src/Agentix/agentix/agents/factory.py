@@ -4,9 +4,10 @@ Agent Factory - provides pre-configured Orchestrator instances.
 from __future__ import annotations
 
 from typing import Any
+
 from agentix.agents.loader import AgentLoader
-from agentix.core.orchestrator import Orchestrator
 from agentix.core.llm import LLMClient
+from agentix.core.orchestrator import Orchestrator
 from agentix.registry.catalog import ToolCatalog
 
 

@@ -6,6 +6,7 @@ Runs the Agentix FastAPI streaming app via Uvicorn.
 from __future__ import annotations
 
 import sys
+
 import uvicorn
 
 if __name__ == "__main__":

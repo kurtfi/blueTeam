@@ -5,9 +5,10 @@ Prevents context window overflow by truncating or summarizing message history.
 """
 from __future__ import annotations
 
-import tiktoken
-import structlog
 from typing import Any
+
+import structlog
+import tiktoken
 
 logger = structlog.get_logger(__name__)
 

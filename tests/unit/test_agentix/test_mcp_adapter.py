@@ -1,8 +1,8 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-import json
-from unittest.mock import AsyncMock, patch, MagicMock
 from agentix.tools.mcp_adapter import MCPToolAdapter
-from agentic_common.base_tool import ToolResult
+
 
 @pytest.fixture
 def base_adapter():

@@ -1,8 +1,9 @@
+import os
 import subprocess
 import sys
-import os
+from datetime import UTC, datetime
+
 import httpx
-from datetime import datetime, timezone
 
 CONTAINER = "wazuh-manager"
 LOG_FILE = "/var/log/attack_simulation.log"
@@ -12,7 +13,7 @@ WAZUH_API_PASS = os.getenv("WAZUH_API_PASSWORD", "wazuh-wui")
 
 def timestamp():
     """Returns ISO-8601 UTC timestamp."""
-    return datetime.now(timezone.utc).strftime("%b %d %H:%M:%S")
+    return datetime.now(UTC).strftime("%b %d %H:%M:%S")
 
 def run_docker_exec(cmd: list[str]) -> tuple[int, str, str]:
     """Executes a generic command inside the wazuh-manager container."""
@@ -67,8 +68,7 @@ def verify_wazuh_alerts(expected_rules: list[str] = None):
             print(f"  \u2717 Auth failed: {auth_resp.status_code}")
             return
 
-        token = auth_resp.json().get("data", {}).get("token")
-        
+
         es_url = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
         es_user = os.getenv("ELASTICSEARCH_USER", "admin")
         es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "admin")
@@ -102,8 +102,8 @@ def verify_wazuh_alerts(expected_rules: list[str] = None):
                 print(f"    \u2022 [{src.get('@timestamp', '?')}] Rule {rule.get('id')}: {rule.get('description')}")
         else:
             print(f"  \u2192 Elasticsearch query returned: {es_resp.status_code}")
-            print(f"    (Alerts might still be in the Wazuh Indexer pipeline \u2014 wait 30s and retry)")
+            print("    (Alerts might still be in the Wazuh Indexer pipeline \u2014 wait 30s and retry)")
 
     except Exception as e:
         print(f"  \u2717 Verification error: {e}")
-        print(f"    (Make sure all containers are running and accessible)")
+        print("    (Make sure all containers are running and accessible)")

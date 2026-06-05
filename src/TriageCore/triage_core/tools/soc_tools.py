@@ -1,9 +1,8 @@
-import os
-import json
-import structlog
 from typing import Any
-from triage_core.tools import mcp
+
+import structlog
 from triage_core.integrations.registry import registry
+from triage_core.tools import mcp
 
 logger = structlog.get_logger(__name__)
 

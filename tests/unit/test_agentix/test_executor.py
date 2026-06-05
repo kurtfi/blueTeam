@@ -1,7 +1,9 @@
-import pytest
 import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from agentix.sandbox.executor import run_command
+
 
 @pytest.mark.asyncio
 async def test_run_command_sandbox_disabled():

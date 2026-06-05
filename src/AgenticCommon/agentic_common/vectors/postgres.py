@@ -8,11 +8,10 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 import asyncpg
-from pgvector.asyncpg import register_vector
-
 from agentic_common.embeddings import EmbeddingFactory
 from agentic_common.settings import settings
 from agentic_common.vectors.base import BaseVectorStore, VectorSearchResult
+from pgvector.asyncpg import register_vector
 
 if TYPE_CHECKING:
     from agentic_common.embeddings import BaseEmbeddingProvider

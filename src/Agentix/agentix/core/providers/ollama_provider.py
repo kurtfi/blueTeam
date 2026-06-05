@@ -1,11 +1,13 @@
-import structlog
 import json
 import uuid
 from typing import Any
-from ollama import AsyncClient
+
+import structlog
 from agentic_common.settings import settings
-from agentix.core.providers.base import BaseLLMProvider
+from ollama import AsyncClient
 from openai.types.chat import ChatCompletionMessageParam
+
+from agentix.core.providers.base import BaseLLMProvider
 
 logger = structlog.get_logger(__name__)
 

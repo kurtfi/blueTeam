@@ -1,8 +1,8 @@
 import os
+from typing import Any
+
 import httpx
 import structlog
-from typing import Optional, List, Dict, Any
-
 from triage_core.integrations.base import ICaseManagementProvider
 
 logger = structlog.get_logger(__name__)
@@ -16,7 +16,7 @@ class TheHiveProvider(ICaseManagementProvider):
             "Content-Type": "application/json"
         }
 
-    async def create_case(self, title: str = "", description: str = "", severity: int = 2, tags: Optional[List[str]] = None) -> str:
+    async def create_case(self, title: str = "", description: str = "", severity: int = 2, tags: list[str] | None = None) -> str:
         tags = tags or []
         if not title and not description:
             return "Error: Both title and description cannot be empty."
@@ -183,7 +183,7 @@ class TheHiveProvider(ICaseManagementProvider):
             logger.error("thehive.status.error", error=str(e), payload=payload)
             return f"Error updating case status: {str(e)}"
 
-    async def create_alert(self, title: str = "", description: str = "", source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: Optional[List[str]] = None, observables: Optional[List[Dict[str, Any]]] = None) -> str:
+    async def create_alert(self, title: str = "", description: str = "", source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: list[str] | None = None, observables: list[dict[str, Any]] | None = None) -> str:
         if not title and not description:
             return "Error: Both title and description cannot be empty."
         if not title:

@@ -20,30 +20,28 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, AsyncGenerator, TYPE_CHECKING
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING, Any
 
 import structlog
+from agentic_common.base_tool import BaseTool
+from agentic_common.memory import postgres_session_repo
+from agentic_common.memory.session import SessionStore
+from agentic_common.settings import settings
+from agentic_common.workspace import SessionWorkspace
 
 from agentix.core.context.manager import ContextManager
 from agentix.core.llm import LLMClient
 from agentix.core.observability import obs
+from agentix.core.rag import ContextEnrichmentService
 from agentix.core.react import ReActStep, ReActTrace, StepType
-from agentic_common.settings import settings
-from agentic_common.workspace import SessionWorkspace
-from agentic_common.memory.session import SessionStore
-from agentic_common.memory import postgres_session_repo
+from agentix.core.tool_executor import ToolExecutionEngine
 from agentix.registry.catalog import ToolCatalog
-from agentic_common.base_tool import BaseTool, ToolResult
-from agentic_common.telemetry import track_tool_call
 
 if TYPE_CHECKING:
     from agentix.agents.schema import AgentConfig
 
 logger = structlog.get_logger(__name__)
-
-from agentix.core.rag import ContextEnrichmentService
-from agentix.core.tool_executor import ToolExecutionEngine
-
 
 
 class Orchestrator:

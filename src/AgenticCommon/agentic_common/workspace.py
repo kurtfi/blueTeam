@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -88,7 +88,7 @@ class SessionWorkspace:
         meta = {
             "session_id": self.session_id,
             "owner_id": self.owner_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "status": "active",
             "quota_bytes": self._quota_bytes,
         }
@@ -228,7 +228,7 @@ class SessionWorkspace:
                 subdir.mkdir(exist_ok=True)  # Re-create empty dir
                 dirs_cleaned.append(sub)
 
-        self.update_metadata(status="cleaned", cleaned_at=datetime.now(timezone.utc).isoformat())
+        self.update_metadata(status="cleaned", cleaned_at=datetime.now(UTC).isoformat())
 
         logger.info(
             "workspace.cleanup",

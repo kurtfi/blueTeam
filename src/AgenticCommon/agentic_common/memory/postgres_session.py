@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 import asyncpg  # type: ignore[import-untyped]
@@ -53,7 +53,7 @@ class PostgresSessionRepository:
             return
 
         logger.info("postgres_session.running_migrations", path=migration_file)
-        with open(migration_file, "r") as f:
+        with open(migration_file) as f:
             sql = f.read()
 
         async with pool.acquire() as conn:

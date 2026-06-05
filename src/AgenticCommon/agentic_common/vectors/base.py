@@ -4,7 +4,8 @@ Abstract base class for vector store providers.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TypedDict, Any
+from typing import Any, TypedDict
+
 
 class VectorSearchResult(TypedDict):
     """Result of a semantic search."""

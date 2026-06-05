@@ -1,6 +1,6 @@
 import os
 import sys
-import time
+
 from playwright.sync_api import sync_playwright
 
 CORTEX_URL = os.getenv("CORTEX_URL", "http://localhost:9001")

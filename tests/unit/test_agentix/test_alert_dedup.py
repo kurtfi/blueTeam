@@ -7,8 +7,9 @@ sys.path.insert(0, str(root_dir))
 sys.path.insert(0, str(root_dir.parent / "AgenticCommon"))
 
 import pytest
-from agentix.core.alert_dedup import AlertDeduplicator
 from agentic_common.settings import settings
+from agentix.core.alert_dedup import AlertDeduplicator
+
 
 @pytest.mark.asyncio
 async def test_alert_deduplication_flow():

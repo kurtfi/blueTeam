@@ -1,7 +1,9 @@
-import pytest
 import json
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from agentic_common.memory.redis_preferences import RedisPreferenceStore
+
 
 @pytest.fixture
 def mock_redis():

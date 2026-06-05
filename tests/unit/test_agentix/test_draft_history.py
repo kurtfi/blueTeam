@@ -6,13 +6,15 @@ root_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_dir))
 sys.path.insert(0, str(root_dir.parent / "AgenticCommon"))
 
+from unittest.mock import ANY, AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, ANY
-from agentix.core.orchestrator import Orchestrator
-from agentix.core.react import StepType, ReActStep
-from agentix.registry.catalog import ToolCatalog
-from agentic_common.memory.redis_store import RedisSessionStore
 from agentic_common.base_tool import ToolResult
+from agentic_common.memory.redis_store import RedisSessionStore
+from agentix.core.orchestrator import Orchestrator
+from agentix.core.react import StepType
+from agentix.registry.catalog import ToolCatalog
+
 
 @pytest.mark.asyncio
 async def test_orchestrator_saves_draft_history_on_confirm():

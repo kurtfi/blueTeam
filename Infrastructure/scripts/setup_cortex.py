@@ -16,7 +16,7 @@ Usage:
 
 import os
 import sys
-import json
+
 import httpx
 from dotenv import load_dotenv
 
@@ -45,11 +45,11 @@ def get_admin_token(client: httpx.Client) -> str:
         print(f"  ✗ Admin login failed: {resp.status_code} – {resp.text}")
         print()
         print("  IMPORTANT: Before running this script, complete Cortex first-time setup:")
-        print(f"    1. Open http://localhost:9001 in your browser")
-        print(f"    2. Click 'Update database'")
-        print(f"    3. Create an admin account (user: admin, password of your choice)")
-        print(f"    4. Set CORTEX_ADMIN_PASSWORD in .env to that password")
-        print(f"    5. Run this script again")
+        print("    1. Open http://localhost:9001 in your browser")
+        print("    2. Click 'Update database'")
+        print("    3. Create an admin account (user: admin, password of your choice)")
+        print("    4. Set CORTEX_ADMIN_PASSWORD in .env to that password")
+        print("    5. Run this script again")
         sys.exit(1)
     token = resp.json().get("token", "")
     print("  ✓ Admin authentication successful.")
@@ -132,19 +132,19 @@ def renew_api_key(client: httpx.Client, headers: dict, user_id: str) -> str:
 
 def check_analyzers(client: httpx.Client, headers: dict):
     """Lists enabled analyzers and checks if VirusTotal is available."""
-    print(f"\n[Analyzers] Checking available analyzers...")
+    print("\n[Analyzers] Checking available analyzers...")
     resp = client.get(f"{CORTEX_URL}/api/analyzer", headers=headers)
     if resp.status_code == 200:
         analyzers = resp.json() if isinstance(resp.json(), list) else []
         vt_analyzers = [a for a in analyzers if "VirusTotal" in a.get("name", "")]
         if vt_analyzers:
-            print(f"  ✓ VirusTotal analyzers found:")
+            print("  ✓ VirusTotal analyzers found:")
             for a in vt_analyzers:
                 print(f"    • {a.get('name')} (id={a.get('id', '?')}, version={a.get('version', '?')})")
         else:
-            print(f"  → No VirusTotal analyzers enabled yet.")
-            print(f"    To enable: Cortex UI → Organization → Analyzers → VirusTotal_GetReport_3_1 → Enable")
-            print(f"    Then add your VirusTotal API key in the analyzer settings.")
+            print("  → No VirusTotal analyzers enabled yet.")
+            print("    To enable: Cortex UI → Organization → Analyzers → VirusTotal_GetReport_3_1 → Enable")
+            print("    Then add your VirusTotal API key in the analyzer settings.")
     else:
         print(f"  → Could not list analyzers: {resp.status_code}")
 
@@ -161,10 +161,10 @@ def main():
         status_data = ping.json()
         print(f"  ✓ Cortex is reachable (status: {ping.status_code})")
         if "config" not in status_data and "versions" not in status_data:
-            print(f"  → Cortex might not be fully initialised yet.")
+            print("  → Cortex might not be fully initialised yet.")
     except Exception as e:
         print(f"  ✗ Cortex is not reachable at {CORTEX_URL}: {e}")
-        print(f"    Make sure 'docker compose up cortex' is running.")
+        print("    Make sure 'docker compose up cortex' is running.")
         sys.exit(1)
 
     with httpx.Client(timeout=15.0) as client:

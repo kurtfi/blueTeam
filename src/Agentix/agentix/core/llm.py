@@ -7,15 +7,16 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-import structlog
 from typing import Any
 
+import structlog
 from agentic_common.settings import settings
+from openai.types.chat import ChatCompletionMessageParam
+
 from agentix.core.providers.base import BaseLLMProvider
-from agentix.core.providers.openai_provider import OpenAIProvider
 from agentix.core.providers.gemini_provider import GeminiProvider
 from agentix.core.providers.ollama_provider import OllamaProvider
-from openai.types.chat import ChatCompletionMessageParam
+from agentix.core.providers.openai_provider import OpenAIProvider
 
 logger = structlog.get_logger(__name__)
 

@@ -1,6 +1,7 @@
 import pytest
 from agentic_common.memory.preferences import PreferenceStore
 
+
 @pytest.mark.asyncio
 async def test_preference_store():
     store = PreferenceStore()

@@ -1,15 +1,14 @@
 import os
-import structlog
-from typing import Optional
 
+import structlog
 from triage_core.integrations.base import (
-    ISiemProvider,
     ICaseManagementProvider,
-    IEnrichmentProvider,
-    ISoarProvider,
     IEndpointProvider,
+    IEnrichmentProvider,
     IFirewallProvider,
     IIamProvider,
+    ISiemProvider,
+    ISoarProvider,
 )
 
 logger = structlog.get_logger(__name__)
@@ -17,13 +16,13 @@ logger = structlog.get_logger(__name__)
 
 class ProviderRegistry:
     def __init__(self) -> None:
-        self._siem_provider: Optional[ISiemProvider] = None
-        self._case_provider: Optional[ICaseManagementProvider] = None
-        self._enrichment_provider: Optional[IEnrichmentProvider] = None
-        self._soar_provider: Optional[ISoarProvider] = None
-        self._endpoint_provider: Optional[IEndpointProvider] = None
-        self._firewall_provider: Optional[IFirewallProvider] = None
-        self._iam_provider: Optional[IIamProvider] = None
+        self._siem_provider: ISiemProvider | None = None
+        self._case_provider: ICaseManagementProvider | None = None
+        self._enrichment_provider: IEnrichmentProvider | None = None
+        self._soar_provider: ISoarProvider | None = None
+        self._endpoint_provider: IEndpointProvider | None = None
+        self._firewall_provider: IFirewallProvider | None = None
+        self._iam_provider: IIamProvider | None = None
 
     def get_siem_provider(self) -> ISiemProvider:
         if not self._siem_provider:

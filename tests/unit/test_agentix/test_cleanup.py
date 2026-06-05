@@ -1,12 +1,14 @@
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from datetime import datetime, timezone, timedelta
 from agentix.core.cleanup import cleanup_expired_workspaces, run_periodic_cleanup
+
 
 @pytest.fixture
 def mock_now():
     # Fix the current time for predictable tests
-    fixed_now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+    fixed_now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=UTC)
     with patch("agentix.core.cleanup.datetime") as dt_mock:
         dt_mock.now.return_value = fixed_now
         dt_mock.fromisoformat = datetime.fromisoformat

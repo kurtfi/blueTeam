@@ -1,6 +1,8 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from agentic_common.embeddings import OllamaEmbeddingProvider, OpenAIEmbeddingProvider
+
 
 @pytest.mark.asyncio
 async def test_ollama_embed_query():

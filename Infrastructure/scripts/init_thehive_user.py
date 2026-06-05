@@ -1,5 +1,6 @@
 import os
 import sys
+
 import httpx
 from dotenv import load_dotenv
 
@@ -79,7 +80,7 @@ def ensure_analyst_user(client: httpx.Client, admin_headers: dict) -> str:
             selected_profile = "analyst"
             print("  → Profile 'soc-analyst' not found. Using built-in 'analyst' profile.")
         else:
-            print(f"  → Profile 'soc-analyst' not found. Will try to use 'soc-analyst' anyway.")
+            print("  → Profile 'soc-analyst' not found. Will try to use 'soc-analyst' anyway.")
 
     # 3. Create user
     print(f"  → Creating analyst user with profile '{selected_profile}'...")
@@ -154,14 +155,14 @@ def main():
     # Verify TheHive connectivity
     try:
         httpx.get(f"{THEHIVE_URL}/api/v1/status", timeout=5.0)
-    except Exception as e:
+    except Exception:
         # Try /api/status or similar
         pass
 
     with httpx.Client(timeout=10.0) as client:
         admin_headers = get_admin_headers(client)
         user_id = ensure_analyst_user(client, admin_headers)
-        api_key = renew_analyst_key(client, admin_headers, user_id)
+        renew_analyst_key(client, admin_headers, user_id)
         
     print("\n=== Initialization Complete ===")
 

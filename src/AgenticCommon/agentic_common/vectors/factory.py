@@ -3,9 +3,9 @@ Factory to instantiate the appropriate vector store provider.
 """
 from __future__ import annotations
 
-import structlog
 from typing import TYPE_CHECKING
 
+import structlog
 from agentic_common.settings import settings
 from agentic_common.vectors.in_memory import InMemoryVectorStore
 from agentic_common.vectors.postgres import PostgresVectorStore

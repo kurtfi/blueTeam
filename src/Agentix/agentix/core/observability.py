@@ -6,12 +6,12 @@ Provides a singleton Langfuse client and context-aware tracing utilities.
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import structlog
-from langfuse import Langfuse
-
 from agentic_common.settings import settings
+from langfuse import Langfuse
 
 logger = structlog.get_logger(__name__)
 
@@ -27,7 +27,7 @@ class ObservabilityManager:
 
     def __new__(cls) -> ObservabilityManager:
         if cls._instance is None:
-            cls._instance = super(ObservabilityManager, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             if settings.langfuse_enabled:
                 if not settings.langfuse_public_key or not settings.langfuse_secret_key:
                     logger.warning("observability.langfuse.missing_keys", action="disabling")
@@ -78,9 +78,6 @@ def trace_it(name: str | None = None) -> Callable[[Callable[..., Any]], Callable
             if not obs.client:
                 return await func(*args, **kwargs)
 
-            # Try to find a trace in the kwargs or args
-            # This is a simplification; a better way would be using a ContextVar
-            span_name = name or func.__name__
             # For now, we'll assume the trace is pass-through or handled by the caller
             return await func(*args, **kwargs)
 

@@ -5,7 +5,9 @@ Simulate T1048 - Data Exfiltration via DNS Tunneling
 
 import sys
 import time
-from utils import ensure_log_file, timestamp, write_log_entry, LOG_FILE, verify_log_contents, verify_wazuh_alerts
+
+from utils import LOG_FILE, ensure_log_file, timestamp, verify_log_contents, verify_wazuh_alerts, write_log_entry
+
 
 def simulate_t1048():
     print("\n[T1048] Simulating DNS Exfiltration Tunnel...")
@@ -36,8 +38,8 @@ def simulate_t1048():
     if success_count == len(log_entries):
         print(f"  \u2713 {success_count} DNS tunnel log entries written to {LOG_FILE}")
         print(f"  \u2192 Destination domain: {dns_domain}")
-        print(f"  \u2192 Expected Wazuh rule: network traffic anomaly")
-        print(f"  \u2192 Expected MITRE tag: T1048 - Exfiltration via DNS")
+        print("  \u2192 Expected Wazuh rule: network traffic anomaly")
+        print("  \u2192 Expected MITRE tag: T1048 - Exfiltration via DNS")
         return True
     else:
         print(f"  \u2717 Only {success_count}/{len(log_entries)} entries written")

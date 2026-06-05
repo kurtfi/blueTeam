@@ -13,11 +13,10 @@ Cleanup Strategy
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-
 from agentic_common.settings import settings
 from agentic_common.workspace import SessionWorkspace
 
@@ -31,7 +30,7 @@ async def cleanup_expired_workspaces() -> dict[str, Any]:
     Returns a summary dict with counts and details.
     """
     ttl_hours = settings.agentix_session_ttl_hours
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session_ids = SessionWorkspace.list_sessions()
 
     cleaned: list[str] = []

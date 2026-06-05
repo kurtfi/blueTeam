@@ -5,7 +5,9 @@ Simulate T1548.001 - Privilege Escalation via SUID/SGID Abuse
 
 import sys
 import time
-from utils import ensure_log_file, timestamp, write_log_entry, LOG_FILE, verify_log_contents, verify_wazuh_alerts
+
+from utils import LOG_FILE, ensure_log_file, timestamp, verify_log_contents, verify_wazuh_alerts, write_log_entry
+
 
 def simulate_t1548_001():
     print("\n[T1548.001] Simulating SUID Privilege Escalation...")
@@ -26,8 +28,8 @@ def simulate_t1548_001():
     if ok:
         print(f"  \u2713 SUID modification log entry written to {LOG_FILE}")
         print(f"  \u2192 Entry: {log_entry[:120]}")
-        print(f"  \u2192 Expected Wazuh rule: syscheck (file permission change)")
-        print(f"  \u2192 Expected MITRE tag: T1548.001 - SUID Abuse")
+        print("  \u2192 Expected Wazuh rule: syscheck (file permission change)")
+        print("  \u2192 Expected MITRE tag: T1548.001 - SUID Abuse")
     else:
         print(f"  \u2717 Failed to write log: {err}")
         return False
@@ -43,7 +45,7 @@ def simulate_t1548_001():
     )
     ok2, _ = write_log_entry(root_entry)
     if ok2:
-        print(f"  \u2713 Root shell execution log entry written")
+        print("  \u2713 Root shell execution log entry written")
     return True
 
 if __name__ == "__main__":

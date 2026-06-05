@@ -1,13 +1,15 @@
-import pytest
 import json
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from agentix.core.providers.ollama_provider import OllamaProvider
+
 
 @pytest.mark.asyncio
 async def test_ollama_chat_tool_call_parsing():
     provider = OllamaProvider(model="test-model")
     
-    with patch("agentix.core.providers.ollama_provider.AsyncClient") as MockClient:
+    with patch("agentix.core.providers.ollama_provider.AsyncClient"):
         mock_client = AsyncMock()
         provider._client = mock_client
         

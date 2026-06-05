@@ -2,7 +2,7 @@
 System Prompt Composer — compiling final system prompts with dynamic context elements.
 """
 from __future__ import annotations
-from typing import Any
+
 from agentic_common.base_tool import BaseTool
 
 _SYSTEM_PROMPT = """\

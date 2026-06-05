@@ -4,7 +4,6 @@ Embedding providers to generate vector representations of text.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 import structlog
 from ollama import AsyncClient as OllamaAsyncClient

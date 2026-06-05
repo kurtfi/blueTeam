@@ -1,9 +1,9 @@
 import pytest
-import asyncio
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
 import redis.asyncio as redis
 from agentic_common.settings import settings
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
 
 @pytest.mark.asyncio
 async def test_postgres_connection():

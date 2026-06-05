@@ -55,7 +55,7 @@ def main(args):
     try:
         bad_arguments = False
         if len(args) >= 4:
-            msg = '{0} {1} {2} {3} {4}'.format(
+            msg = '{} {} {} {} {}'.format(
                 args[1], args[2], args[3],
                 args[4] if len(args) > 4 else '',
                 args[5] if len(args) > 5 else ''
@@ -69,7 +69,7 @@ def main(args):
             f.write(msg + '\n')
 
         if bad_arguments:
-            debug('# ERROR: Exiting, bad arguments. Inputted: %s' % args)
+            debug(f'# ERROR: Exiting, bad arguments. Inputted: {args}')
             sys.exit(ERR_BAD_ARGUMENTS)
 
         process_args(args)
@@ -151,10 +151,10 @@ def get_json_alert(file_location):
         with open(file_location) as alert_file:
             return json.load(alert_file)
     except FileNotFoundError:
-        debug("# JSON file for alert %s doesn't exist" % file_location)
+        debug(f"# JSON file for alert {file_location} doesn't exist")
         sys.exit(ERR_FILE_NOT_FOUND)
     except json.decoder.JSONDecodeError as e:
-        debug('Failed getting JSON alert. Error: %s' % e)
+        debug(f'Failed getting JSON alert. Error: {e}')
         sys.exit(ERR_INVALID_JSON)
 
 

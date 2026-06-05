@@ -1,15 +1,14 @@
-import hmac
 import hashlib
+import hmac
 import os
 import uuid
-import structlog
 from datetime import datetime
+
+import structlog
 from agentic_common.memory import postgres_session_repo
-from fastapi import APIRouter, Request, BackgroundTasks, HTTPException, Header, Depends
-
-from agentix.core.triage_workflow import process_siem_alert
-
 from agentix.core.alert_dedup import AlertDeduplicator
+from agentix.core.triage_workflow import process_siem_alert
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 
 logger = structlog.get_logger(__name__)
 

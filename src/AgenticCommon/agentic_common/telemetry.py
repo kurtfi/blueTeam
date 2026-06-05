@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
-from typing import Any, Coroutine
+from collections.abc import Coroutine
+from typing import Any
 
 import structlog
 

@@ -11,6 +11,7 @@ Authenticates as:
 
 import os
 import sys
+
 import httpx
 from dotenv import load_dotenv
 
@@ -496,7 +497,7 @@ def create_or_skip_template(client: httpx.Client, admin_headers: dict, template:
     if search_resp.status_code == 200:
         existing = [t["name"] for t in search_resp.json()]
         if name in existing:
-            print(f"  → Already exists – skipping.")
+            print("  → Already exists – skipping.")
             return
 
     # ── 2. Create template ────────────────────────────────────
@@ -570,7 +571,7 @@ def main():
         print("Error: THEHIVE_API_KEY environment variable is not set.")
         sys.exit(1)
 
-    print(f"=== TheHive MITRE ATT&CK Setup ===")
+    print("=== TheHive MITRE ATT&CK Setup ===")
     print(f"Target: {THEHIVE_URL}\n")
 
     with httpx.Client(timeout=15.0) as client:

@@ -1,7 +1,9 @@
-import pytest
 import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from agentix.core.providers.gemini_provider import GeminiProvider
+
 
 @pytest.mark.asyncio
 @patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"})

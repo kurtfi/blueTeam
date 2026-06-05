@@ -1,5 +1,6 @@
 import os
 import sys
+
 import httpx
 from dotenv import load_dotenv
 
@@ -78,7 +79,7 @@ def create_or_update_user(client: httpx.Client, admin_headers: dict) -> str:
             
     if not user_exists:
         # Create user
-        print(f"  → Creating analyst user...")
+        print("  → Creating analyst user...")
         create_payload = {
             "login": ANALYST_LOGIN,
             "name": ANALYST_NAME,
@@ -105,7 +106,7 @@ def create_or_update_user(client: httpx.Client, admin_headers: dict) -> str:
     )
 
     # 3. Map user to both organizations via PUT /api/v1/user/{userId}/organisations
-    print(f"  → Mapping user to 'admin' (read-only) and 'asdg' (org-admin)...")
+    print("  → Mapping user to 'admin' (read-only) and 'asdg' (org-admin)...")
     org_payload = {
         "organisations": [
             {"organisation": "admin", "profile": "read-only"},
@@ -124,7 +125,7 @@ def create_or_update_user(client: httpx.Client, admin_headers: dict) -> str:
         sys.exit(1)
 
     # 4. Set default organisation to 'asdg' via PATCH
-    print(f"  → Setting default organisation to 'asdg'...")
+    print("  → Setting default organisation to 'asdg'...")
     patch_payload = {
         "defaultOrganisation": "asdg"
     }
@@ -167,7 +168,7 @@ def main():
         admin_headers = get_admin_headers(client)
         ensure_organisation(client, admin_headers)
         user_id = create_or_update_user(client, admin_headers)
-        api_key = renew_analyst_key(client, admin_headers, user_id)
+        renew_analyst_key(client, admin_headers, user_id)
         
     print("\n=== Initialization Complete ===")
 

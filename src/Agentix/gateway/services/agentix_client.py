@@ -6,10 +6,11 @@ All requests to the internal Core API carry the shared secret via the
 authenticated ``user_id`` so the Core can enforce ownership.
 """
 import json
+import os
+from collections.abc import AsyncGenerator
+
 import httpx
 import structlog
-import os
-from typing import AsyncGenerator
 
 logger = structlog.get_logger(__name__)
 
@@ -71,8 +72,8 @@ async def verify_session_owner(session_id: str, user_id: str) -> bool:
             try:
                 with open("gateway_ownership_debug.log", "a") as f:
                     f.write(f"Session: {session_id} | Provided: {user_id} | Actual: {owner_id} | Match: {is_match}\n")
-            except:
-                pass
+            except Exception as e:
+                logger.warning("gateway.agentix_client.debug_write_failed", error=str(e))
 
             logger.info(
                 "gateway.agentix_client.verify_owner_result",

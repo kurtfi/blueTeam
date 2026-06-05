@@ -17,10 +17,9 @@ Design decisions:
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 import structlog
-
 from agentix.agents.loader import AgentLoader
 from agentix.core.llm import LLMClient
 
@@ -84,7 +83,7 @@ class AgentRouter:
             try:
                 config = AgentLoader.load_by_name(name)
                 lines.append(f"- {name}: {config.role}")
-            except (FileNotFoundError, ValueError, IOError) as e:
+            except (OSError, FileNotFoundError, ValueError) as e:
                 logger.warning("router.load_agent_failed", agent=name, error=str(e))
                 continue
 
@@ -95,7 +94,7 @@ class AgentRouter:
         self,
         user_message: str,
         threshold: float = 0.5,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Classify the user's intent and return the best agent name.
 

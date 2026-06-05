@@ -12,9 +12,8 @@ Usage:
 """
 
 import argparse
-import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -37,7 +36,7 @@ def _auth() -> tuple:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -166,7 +165,6 @@ def create_index(client: httpx.Client) -> None:
                             "groups": {"type": "keyword"},
                         }
                     },
-                    "x_seed_tag": {"type": "keyword"},
                     "data": {
                         "properties": {
                             "srcip": {"type": "ip"},
@@ -179,7 +177,6 @@ def create_index(client: httpx.Client) -> None:
                             "file": {"type": "keyword"},
                         }
                     },
-                    "full_log": {"type": "text"},
                 }
             },
         },
@@ -283,9 +280,9 @@ def main() -> None:
             seed(client)
             verify(client)
             print(
-                f"\n✓ Done. TriageCore will now find these alerts when querying "
-                f"the wazuh-alerts-* indices.\n"
-                f"  Run with --clean to remove them when done.\n"
+                "\n✓ Done. TriageCore will now find these alerts when querying "
+                "the wazuh-alerts-* indices.\n"
+                "  Run with --clean to remove them when done.\n"
             )
 
 

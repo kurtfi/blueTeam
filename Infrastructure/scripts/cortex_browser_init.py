@@ -1,6 +1,5 @@
 import os
-import sys
-import time
+
 from playwright.sync_api import sync_playwright
 
 CORTEX_URL = os.getenv("CORTEX_URL", "http://localhost:9001")
@@ -28,8 +27,8 @@ def main():
             try:
                 update_btn = page.locator("text=Update database")
                 update_btn.wait_for(timeout=10000)
-            except:
-                pass
+            except Exception as e:
+                print(f"  → Info: 'Update database' button not found or timed out: {e}")
             
             if update_btn.count() > 0:
                 print("Clicking 'Update database'...")
@@ -48,8 +47,8 @@ def main():
             try:
                 password_input = page.locator("input[type='password']")
                 password_input.nth(0).wait_for(timeout=10000)
-            except:
-                pass
+            except Exception as e:
+                print(f"  → Info: Super Admin creation form not found or timed out: {e}")
             
             if password_input.count() > 0:
                 print("Found admin registration form.")
@@ -113,8 +112,8 @@ def main():
             try:
                 page.screenshot(path="cortex_error.png")
                 print("Saved error screenshot to cortex_error.png")
-            except:
-                pass
+            except Exception as screenshot_err:
+                print(f"  → Warning: Could not save error screenshot: {screenshot_err}")
         finally:
             browser.close()
 

@@ -1,5 +1,5 @@
-import pytest
-from triage_core.playbooks.base import PlaybookStep, PlaybookContext, ApprovalGate
+from triage_core.playbooks.base import ApprovalGate, PlaybookContext, PlaybookStep
+
 
 def test_interpolate_string():
     ctx = PlaybookContext(

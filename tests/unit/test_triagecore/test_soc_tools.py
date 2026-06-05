@@ -1,21 +1,14 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from triage_core.tools.soc_tools import (
     create_case,
-    add_case_note,
-    update_case_status,
-    create_alert,
     get_ip_reputation,
-    get_file_reputation,
-    get_domain_url_reputation,
-    get_ad_user_info,
-    query_siem_logs,
     isolate_endpoint,
-    get_endpoint_info,
-    block_ip,
-    disable_user_account,
+    query_siem_logs,
     trigger_soar_workflow,
 )
+
 
 @pytest.fixture
 def mock_registry():

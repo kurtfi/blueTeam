@@ -5,7 +5,9 @@ Simulate T1003.008 - OS Credential Dumping: /etc/shadow Access
 
 import sys
 import time
-from utils import ensure_log_file, timestamp, write_log_entry, LOG_FILE, verify_log_contents, verify_wazuh_alerts
+
+from utils import LOG_FILE, ensure_log_file, timestamp, verify_log_contents, verify_wazuh_alerts, write_log_entry
+
 
 def simulate_t1003_008():
     print("\n[T1003.008] Simulating OS Credential Dumping (/etc/shadow access)...")
@@ -25,8 +27,8 @@ def simulate_t1003_008():
     if ok:
         print(f"  \u2713 Log entry written to {LOG_FILE}")
         print(f"  \u2192 Entry: {log_entry[:120]}")
-        print(f"  \u2192 Expected Wazuh rule: 100002 (level 10)")
-        print(f"  \u2192 Expected MITRE tag: T1003.008 - OS Credential Dumping")
+        print("  \u2192 Expected Wazuh rule: 100002 (level 10)")
+        print("  \u2192 Expected MITRE tag: T1003.008 - OS Credential Dumping")
         return True
     else:
         print(f"  \u2717 Failed to write log: {err}")

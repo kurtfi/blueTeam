@@ -18,15 +18,14 @@ Usage (from an MCP tool / agent):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Enums
 # ─────────────────────────────────────────────────────────────────────────────
 
-class StepStatus(str, Enum):
+class StepStatus(StrEnum):
     PENDING   = "pending"
     APPROVED  = "approved"
     SKIPPED   = "skipped"
@@ -34,7 +33,7 @@ class StepStatus(str, Enum):
     FAILED    = "failed"
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     LOW      = "low"
     MEDIUM   = "medium"
     HIGH     = "high"

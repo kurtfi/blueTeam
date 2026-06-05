@@ -25,7 +25,6 @@ from triage_core.playbooks.base import (
 )
 from triage_core.playbooks.registry import PlaybookRegistry
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # PB-001  T1003.008 – OS Credential Dumping (/etc/shadow)
 # ─────────────────────────────────────────────────────────────────────────────

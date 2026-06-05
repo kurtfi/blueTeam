@@ -1,9 +1,9 @@
-import os
 import json
+import os
+
 import httpx
 import structlog
-
-from triage_core.integrations.base import ISiemProvider, IEndpointProvider
+from triage_core.integrations.base import IEndpointProvider, ISiemProvider
 
 logger = structlog.get_logger(__name__)
 

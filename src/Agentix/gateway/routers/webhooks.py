@@ -1,7 +1,8 @@
-import structlog
-import httpx
 import os
-from fastapi import APIRouter, Request, HTTPException, Response
+
+import httpx
+import structlog
+from fastapi import APIRouter, HTTPException, Request, Response
 
 logger = structlog.get_logger(__name__)
 

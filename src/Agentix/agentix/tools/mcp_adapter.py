@@ -10,12 +10,11 @@ Features
 """
 from __future__ import annotations
 
-import asyncio
-from collections.abc import Callable, Awaitable
-from typing import Any
 import json
-import structlog
+from collections.abc import Awaitable, Callable
+from typing import Any
 
+import structlog
 from agentic_common.base_tool import BaseTool, ToolResult
 
 logger = structlog.get_logger(__name__)

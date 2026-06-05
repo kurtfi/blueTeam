@@ -1,9 +1,10 @@
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
 import httpx
+import pytest
+from fastapi.testclient import TestClient
 
 # Add src/Agentix and src/AgenticCommon to sys.path
 root_dir = Path(__file__).resolve().parent.parent
@@ -11,7 +12,6 @@ sys.path.insert(0, str(root_dir))
 sys.path.insert(0, str(root_dir.parent / "AgenticCommon"))
 
 # Mock auth_store.setup_db during module load before importing app to avoid database connection
-import gateway.security.auth
 with patch("gateway.security.auth.auth_store.setup_db", new_callable=AsyncMock) as mock_setup:
     from gateway.main import app
 

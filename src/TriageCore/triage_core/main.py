@@ -3,8 +3,8 @@ FastMCP Server Entry Point for TriageCore.
 """
 import importlib
 import os
-import structlog
 
+import structlog
 from triage_core.tools import mcp
 
 logger = structlog.get_logger(__name__)
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     transport = os.getenv("FASTMCP_TRANSPORT", "sse")
     port = int(os.getenv("FASTMCP_PORT", "8081"))
 
-    from typing import cast, Literal
+    from typing import Literal, cast
     transport_type = cast(Literal["stdio", "sse", "http", "streamable-http"], transport)
     
     logger.info("mcp_server.starting", server="TriageCore", transport=transport, port=port)

@@ -5,7 +5,9 @@ Simulate T1110 - Brute Force / Password Spray
 
 import sys
 import time
-from utils import ensure_log_file, timestamp, write_log_entry, LOG_FILE, verify_log_contents, verify_wazuh_alerts
+
+from utils import LOG_FILE, ensure_log_file, timestamp, verify_log_contents, verify_wazuh_alerts, write_log_entry
+
 
 def simulate_t1110():
     print("\n[T1110] Simulating Brute Force Login Attack...")
@@ -42,12 +44,12 @@ def simulate_t1110():
 
     if success_count == 11:
         print(f"  \u2713 {success_count} brute force log entries written to {LOG_FILE}")
-        print(f"  \u2192 10 failed attempts + 1 successful login simulated")
-        print(f"  \u2192 Expected Wazuh rules: 100011 (Brute Force correlated)")
-        print(f"  \u2192 Expected MITRE tag: T1110 - Brute Force")
+        print("  \u2192 10 failed attempts + 1 successful login simulated")
+        print("  \u2192 Expected Wazuh rules: 100011 (Brute Force correlated)")
+        print("  \u2192 Expected MITRE tag: T1110 - Brute Force")
         return True
     else:
-        print(f"  \u2717 Only {success_count}/{len(log_entries)} entries written")
+        print(f"  \u2717 Only {success_count}/11 entries written")
         return False
 
 if __name__ == "__main__":

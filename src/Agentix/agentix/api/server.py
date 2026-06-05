@@ -9,28 +9,26 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from contextlib import AsyncExitStack
 from datetime import datetime
+
 import structlog
-
-from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
-from agentic_common.settings import settings
-from agentix.core.orchestrator import Orchestrator
-from agentic_common.workspace import SessionWorkspace
-from agentix.core.cleanup import run_periodic_cleanup, cleanup_expired_workspaces
-from agentic_common.memory.redis_store import RedisSessionStore
-from agentix.registry.catalog import ToolCatalog
-from agentic_common.memory.redis_preferences import RedisPreferenceStore
 from agentic_common.memory import postgres_session_repo
+from agentic_common.memory.redis_preferences import RedisPreferenceStore
+from agentic_common.memory.redis_store import RedisSessionStore
+from agentic_common.settings import settings
+from agentic_common.workspace import SessionWorkspace
 from agentix.api.internal_auth import InternalApiKeyMiddleware
 from agentix.api.routes import webhooks
 from agentix.core.alert_dedup import AlertDeduplicator
-
-from contextlib import AsyncExitStack
+from agentix.core.cleanup import run_periodic_cleanup
+from agentix.core.orchestrator import Orchestrator
+from agentix.registry.catalog import ToolCatalog
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
 
