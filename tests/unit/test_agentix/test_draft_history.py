@@ -14,6 +14,12 @@ from agentic_common.memory.redis_store import RedisSessionStore
 from agentix.core.orchestrator import Orchestrator
 from agentix.core.react import StepType
 from agentix.registry.catalog import ToolCatalog
+from unittest.mock import patch
+
+@pytest.fixture(autouse=True)
+def mock_sleep():
+    with patch("agentix.core.hitl_coordinator.asyncio.sleep", new_callable=AsyncMock) as mock:
+        yield mock
 
 
 @pytest.mark.asyncio
@@ -36,12 +42,10 @@ async def test_orchestrator_saves_draft_history_on_confirm():
     catalog = ToolCatalog()
     catalog.register(mock_tool)
     
-    orchestrator = Orchestrator(catalog=catalog, memory=mock_memory, max_iterations=1, rag_enabled=False)
-    
     # Mock LLM returning a tool call requiring confirmation
-    orchestrator._llm = AsyncMock()
-    orchestrator._llm.model = "test-model"
-    orchestrator._llm.chat.return_value = {
+    mock_llm = AsyncMock()
+    mock_llm.model = "test-model"
+    mock_llm.chat.return_value = {
         "role": "assistant",
         "content": "Need to isolate endpoint",
         "tool_calls": [{
@@ -53,6 +57,8 @@ async def test_orchestrator_saves_draft_history_on_confirm():
             }
         }]
     }
+    
+    orchestrator = Orchestrator(llm=mock_llm, catalog=catalog, memory=mock_memory, max_iterations=1, rag_enabled=False)
     
     steps = []
     async for step in orchestrator.run_stream("session_123", "Run isolation"):
@@ -111,14 +117,16 @@ async def test_orchestrator_resumes_from_draft_history():
     catalog = ToolCatalog()
     catalog.register(mock_tool)
     
-    orchestrator = Orchestrator(catalog=catalog, memory=mock_memory, max_iterations=2, rag_enabled=False)
-    orchestrator._llm = AsyncMock()
-    orchestrator._llm.model = "test-model"
+    # Mock LLM
+    mock_llm = AsyncMock()
+    mock_llm.model = "test-model"
     # Second turn should output final answer
-    orchestrator._llm.chat.return_value = {
+    mock_llm.chat.return_value = {
         "role": "assistant",
         "content": "Final Answer: Isolation is complete."
     }
+    
+    orchestrator = Orchestrator(llm=mock_llm, catalog=catalog, memory=mock_memory, max_iterations=2, rag_enabled=False)
     
     steps = []
     # User message "yes" approves the action
@@ -162,12 +170,10 @@ async def test_orchestrator_yields_teams_steps_on_confirm():
     catalog = ToolCatalog()
     catalog.register(mock_tool)
     
-    orchestrator = Orchestrator(catalog=catalog, memory=mock_memory, max_iterations=1, rag_enabled=False)
-    
     # Mock LLM returning a tool call requiring confirmation
-    orchestrator._llm = AsyncMock()
-    orchestrator._llm.model = "test-model"
-    orchestrator._llm.chat.return_value = {
+    mock_llm = AsyncMock()
+    mock_llm.model = "test-model"
+    mock_llm.chat.return_value = {
         "role": "assistant",
         "content": "Need to isolate endpoint",
         "tool_calls": [{
@@ -179,6 +185,8 @@ async def test_orchestrator_yields_teams_steps_on_confirm():
             }
         }]
     }
+    
+    orchestrator = Orchestrator(llm=mock_llm, catalog=catalog, memory=mock_memory, max_iterations=1, rag_enabled=False)
     
     steps = []
     async for step in orchestrator.run_stream("session_123", "Run isolation"):

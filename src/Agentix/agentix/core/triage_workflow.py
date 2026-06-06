@@ -8,6 +8,7 @@ from agentic_common.settings import settings
 
 from agentix.agents.factory import AgentFactory
 from agentix.core.react import StepType
+from agentix.core.verdict import parse_verdict
 from agentix.registry.catalog import ToolCatalog
 
 logger = structlog.get_logger(__name__)
@@ -52,6 +53,12 @@ ALERT DETAILS:
 
 YOUR TASK:
 Analyze this alert, gather necessary context, distinguish between False Positive (FP) and True Positive (TP), and if necessary, contain the event and create a case.
+
+CRITICAL INSTRUCTION FOR FINAL ANSWER:
+Your "Final Answer" must explicitly include one of the following exact lines at the very end to indicate your verdict:
+- VERDICT: TRUE_POSITIVE (if the alert is a confirmed security incident)
+- VERDICT: FALSE_POSITIVE (if the alert is benign/false alarm/authorized activity)
+- VERDICT: UNDETERMINED (if you cannot determine with the available information)
 
 IMPORTANT ACTION RULES:
 1. **Playbook-Driven Response**: First, use the `find_playbook_for_alert` with the incoming alert's rule.id or mitre.id to search for an appropriate playbook (e.g. PB-001, PB-003, PB-006 etc.).
@@ -123,13 +130,7 @@ IMPORTANT NOTE (SIEM QUERIES):
             return
 
         # Determine verdict from final answer
-        verdict = "UNDETERMINED"
-        if final_answer:
-            final_answer_upper = final_answer.upper()
-            if "TRUE POSITIVE" in final_answer_upper or "TRUE_POSITIVE" in final_answer_upper or " TP " in f" {final_answer_upper} ":
-                verdict = "TRUE_POSITIVE"
-            elif "FALSE POSITIVE" in final_answer_upper or "FALSE_POSITIVE" in final_answer_upper or " FP " in f" {final_answer_upper} ":
-                verdict = "FALSE_POSITIVE"
+        verdict = parse_verdict(final_answer)
 
         await postgres_session_repo.update_status(
             session_id=session_id,

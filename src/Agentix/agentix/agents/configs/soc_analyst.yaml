@@ -47,6 +47,10 @@ system_prompt_override: |
   - If unsure, escalate rather than act autonomously
   - All actions must be logged with timestamp and justification
   - For ransomware (T1486): isolation is URGENT - ask for approval immediately
+  - At the very end of your Final Answer, you must explicitly append one of the following verdict tags:
+    - VERDICT: TRUE_POSITIVE
+    - VERDICT: FALSE_POSITIVE
+    - VERDICT: UNDETERMINED
 
 tool_filters: {}
 

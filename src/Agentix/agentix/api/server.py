@@ -23,6 +23,7 @@ from agentix.api.routes import webhooks
 from agentix.core.alert_dedup import AlertDeduplicator
 from agentix.core.cleanup import run_periodic_cleanup
 from agentix.core.orchestrator import Orchestrator
+from agentix.core.verdict import parse_verdict
 from agentix.registry.catalog import ToolCatalog
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
@@ -347,13 +348,7 @@ async def start_session_background_run(
             
             # If the stream finished and we have no pending confirmation, mark COMPLETED
             if not has_confirm:
-                verdict = "UNDETERMINED"
-                if final_answer:
-                    final_answer_upper = final_answer.upper()
-                    if "TRUE POSITIVE" in final_answer_upper or "TRUE_POSITIVE" in final_answer_upper or " TP " in f" {final_answer_upper} ":
-                        verdict = "TRUE_POSITIVE"
-                    elif "FALSE POSITIVE" in final_answer_upper or "FALSE_POSITIVE" in final_answer_upper or " FP " in f" {final_answer_upper} ":
-                        verdict = "FALSE_POSITIVE"
+                verdict = parse_verdict(final_answer)
                 
                 await postgres_session_repo.update_status(
                     session_id=session_id,
