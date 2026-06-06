@@ -175,9 +175,10 @@ async def list_sessions(
     owner_id: str | None = None,
     source: str | None = None,
     status: str | None = None,
+    search: str | None = None,
     limit: int = 50,
     offset: int = 0
-) -> list[dict]:
+) -> dict:
     """
     Fetch list of sessions from Core API with filters.
     """
@@ -188,6 +189,8 @@ async def list_sessions(
         params["source"] = source
     if status:
         params["status"] = status
+    if search:
+        params["search"] = search
     params["limit"] = limit
     params["offset"] = offset
 
@@ -200,7 +203,8 @@ async def list_sessions(
                 timeout=10.0
             )
             response.raise_for_status()
-            return response.json()
+            total = int(response.headers.get("X-Total-Count", "0"))
+            return {"sessions": response.json(), "total_count": total}
         except Exception as e:
             logger.error("gateway.agentix_client.list_sessions_failed", error=str(e))
             raise
@@ -221,6 +225,24 @@ async def get_session_detail(session_id: str) -> dict:
             return response.json()
         except Exception as e:
             logger.error("gateway.agentix_client.get_session_detail_failed", session_id=session_id, error=str(e))
+            raise
+
+
+async def get_session_workspace(session_id: str) -> dict:
+    """
+    Fetch session workspace stats from Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/session/{session_id}/workspace",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_session_workspace_failed", session_id=session_id, error=str(e))
             raise
 
 
@@ -283,5 +305,41 @@ async def get_session_stats() -> dict:
             return response.json()
         except Exception as e:
             logger.error("gateway.agentix_client.get_session_stats_failed", error=str(e))
+            raise
+
+
+async def approve_session(session_id: str) -> dict:
+    """
+    Approve the session action on Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{AGENTIX_API_URL}/v1/sessions/{session_id}/approve",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.approve_session_failed", session_id=session_id, error=str(e))
+            raise
+
+
+async def reject_session(session_id: str) -> dict:
+    """
+    Reject the session action on Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{AGENTIX_API_URL}/v1/sessions/{session_id}/reject",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.reject_session_failed", session_id=session_id, error=str(e))
             raise
 

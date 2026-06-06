@@ -3,6 +3,8 @@ import json
 
 import structlog
 from agentic_common.memory import postgres_session_repo
+from agentic_common.memory.redis_store import RedisSessionStore
+from agentic_common.settings import settings
 
 from agentix.agents.factory import AgentFactory
 from agentix.core.react import StepType
@@ -66,14 +68,17 @@ IMPORTANT NOTE (SIEM QUERIES):
   - `rule.groups:authentication_failed`
 - Incorrect queries containing equals (`=`) (e.g. `src_ip=10.10.10.99`) produce a 500 error on the SIEM Indexer side! Strictly avoid them.
 """
+    redis_store = RedisSessionStore(redis_url=settings.redis_url)
     try:
         # Use the SOC Analyst agent with the shared catalog
         orchestrator = AgentFactory.create(
             "soc_analyst",
             catalog=catalog,
+            memory=redis_store,
         )
 
         final_answer = None
+        has_confirm = False
         async for step in orchestrator.run_stream(session_id=session_id, user_message=prompt):
             # Log the steps locally
             logger.info(
@@ -91,6 +96,7 @@ IMPORTANT NOTE (SIEM QUERIES):
                 if step.step_type == StepType.CONFIRM:
                     event_type = "hitl_request"
                     actor = "agent"
+                    has_confirm = True
                 elif step.step_type == StepType.OBSERVE:
                     actor = "system" if "Teams Integration" in (step.content or "") else "tool"
 
@@ -110,6 +116,11 @@ IMPORTANT NOTE (SIEM QUERIES):
 
             if step.step_type == StepType.ANSWER:
                 final_answer = step.content
+
+        if has_confirm:
+            # Session is currently WAITING_APPROVAL, do not mark it COMPLETED yet.
+            logger.info("triage_workflow.suspended_for_approval", session_id=session_id)
+            return
 
         # Determine verdict from final answer
         verdict = "UNDETERMINED"
@@ -142,6 +153,9 @@ IMPORTANT NOTE (SIEM QUERIES):
             )
         except Exception as db_ex:
             logger.error("triage_workflow.db_fail_log_failed", session_id=session_id, error=str(db_ex))
+    finally:
+        if hasattr(redis_store, "close"):
+            await redis_store.close()
 
 
 # Maintain backwards compatibility / alias for webhook router

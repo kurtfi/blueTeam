@@ -44,8 +44,8 @@ async def test_handle_siem_alert_persists():
         mock_create_session.assert_called_once()
         kwargs = mock_create_session.call_args[1]
         
-        assert kwargs["wazuh_rule_id"] == "100002"
-        assert kwargs["wazuh_severity"] == 12
+        assert kwargs["siem_rule_id"] == "100002"
+        assert kwargs["siem_severity"] == 12
         assert kwargs["source_ip"] == "192.168.1.50"
         assert kwargs["mitre_ids"] == ["T1110"]
         assert "SSH Brute Force login attempt from 192.168.1.50" in kwargs["display_name"]

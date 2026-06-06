@@ -11,7 +11,6 @@ router = APIRouter(prefix="/v1/webhooks", tags=["Webhooks"])
 AGENTIX_API_URL = os.getenv("AGENTIX_API_URL", "http://localhost:8000")
 
 @router.post("/siem")
-@router.post("/wazuh")
 async def siem_webhook(request: Request):
     """
     Gateway endpoint for receiving SIEM alerts.
@@ -23,14 +22,11 @@ async def siem_webhook(request: Request):
     # We should exclude Host header to let httpx determine it or pass it correctly
     headers.pop("host", None)
     
-    path = request.url.path
-    endpoint = "siem" if "siem" in path else "wazuh"
-    
     # Forward the POST request to agentix-api
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(
-                f"{AGENTIX_API_URL}/v1/webhooks/{endpoint}",
+                f"{AGENTIX_API_URL}/v1/webhooks/siem",
                 content=body,
                 headers=headers,
                 timeout=10.0

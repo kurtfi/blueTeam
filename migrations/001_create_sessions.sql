@@ -2,7 +2,7 @@
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'session_source') THEN
-        CREATE TYPE session_source AS ENUM ('WAZUH', 'USER', 'SYSTEM');
+        CREATE TYPE session_source AS ENUM ('SIEM', 'USER', 'SYSTEM');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'session_status') THEN
         CREATE TYPE session_status AS ENUM (
@@ -28,10 +28,10 @@ CREATE TABLE IF NOT EXISTS sessions (
     owner_id      TEXT NOT NULL DEFAULT 'anonymous',
     agent_name    TEXT,
     
-    -- Wazuh-specific metadata
-    wazuh_rule_id     TEXT,
-    wazuh_rule_desc   TEXT,
-    wazuh_severity    INTEGER,
+    -- SIEM-specific metadata
+    siem_rule_id      TEXT,
+    siem_rule_desc    TEXT,
+    siem_severity     INTEGER,
     source_ip         TEXT,
     mitre_ids         TEXT[],
     verdict           triage_verdict,
@@ -53,19 +53,33 @@ CREATE TABLE IF NOT EXISTS sessions (
     alert_payload JSONB
 );
 
+-- Migration block to rename wazuh columns to generic siem columns if they exist in an already created table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='wazuh_rule_id') THEN
+        ALTER TABLE sessions RENAME COLUMN wazuh_rule_id TO siem_rule_id;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='wazuh_rule_desc') THEN
+        ALTER TABLE sessions RENAME COLUMN wazuh_rule_desc TO siem_rule_desc;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='wazuh_severity') THEN
+        ALTER TABLE sessions RENAME COLUMN wazuh_severity TO siem_severity;
+    END IF;
+END$$;
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_sessions_source ON sessions(source);
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_owner ON sessions(owner_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_sessions_wazuh_rule ON sessions(wazuh_rule_id) WHERE source = 'WAZUH';
+CREATE INDEX IF NOT EXISTS idx_sessions_siem_rule ON sessions(siem_rule_id) WHERE source = 'SIEM';
 
 -- Create session events table (Audit Trail)
 CREATE TABLE IF NOT EXISTS session_events (
     id          BIGSERIAL PRIMARY KEY,
     session_id  UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     event_type  TEXT NOT NULL,         -- 'message', 'tool_call', 'hitl_request', 'hitl_response', 'status_change', 'error', 'system'
-    actor       TEXT NOT NULL,         -- 'agent', 'user', 'system', 'wazuh'
+    actor       TEXT NOT NULL,         -- 'agent', 'user', 'system', 'siem'
     content     TEXT,
     metadata    JSONB,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()

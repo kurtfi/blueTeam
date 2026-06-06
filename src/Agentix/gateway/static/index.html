@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agentix 🛡️ BlueTeam SOC Console</title>
-    <!-- Google Fonts: Inter and JetBrains Mono -->
+    <!-- Google Fonts: Space Grotesk, Inter and JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- FontAwesome for high-fidelity icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Local style -->
@@ -20,7 +20,7 @@
         <div class="login-card glass-panel">
             <div class="login-header">
                 <div class="logo-area">
-                    <i class="fa-solid fa-shield-halved logo-icon"></i>
+                    <i class="fa-solid fa-shield-halved logo-icon" aria-hidden="true"></i>
                     <h2>AGENTIX</h2>
                 </div>
                 <p class="subtitle">BlueTeam AI SecOps Platform</p>
@@ -30,27 +30,27 @@
                 <div class="form-group">
                     <label for="username">USERNAME</label>
                     <div class="input-wrapper">
-                        <i class="fa-regular fa-user input-icon"></i>
-                        <input type="text" id="username" placeholder="admin" required autocomplete="username">
+                        <i class="fa-regular fa-user input-icon" aria-hidden="true"></i>
+                        <input type="text" id="username" placeholder="e.g. admin…" required autocomplete="username" spellcheck="false">
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label for="password">PASSWORD</label>
                     <div class="input-wrapper">
-                        <i class="fa-solid fa-lock input-icon"></i>
-                        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+                        <i class="fa-solid fa-lock input-icon" aria-hidden="true"></i>
+                        <input type="password" id="password" placeholder="e.g. ••••••••…" required autocomplete="current-password">
                     </div>
                 </div>
                 
                 <div id="login-error" class="error-msg hide">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
                     <span id="error-text">Incorrect username or password</span>
                 </div>
                 
                 <button type="submit" class="btn btn-primary btn-block">
                     <span>INITIALIZE CONSOLE</span>
-                    <i class="fa-solid fa-terminal"></i>
+                    <i class="fa-solid fa-terminal" aria-hidden="true"></i>
                 </button>
             </form>
             <div class="login-footer">
@@ -66,7 +66,7 @@
         <aside class="sidebar glass-panel">
             <div class="sidebar-header">
                 <div class="logo-area">
-                    <i class="fa-solid fa-shield-halved logo-icon"></i>
+                    <i class="fa-solid fa-shield-halved logo-icon" aria-hidden="true"></i>
                     <h1>AGENTIX</h1>
                 </div>
                 <div class="status-indicator">
@@ -77,25 +77,25 @@
 
             <nav class="nav-menu">
                 <div class="nav-section">NAVIGATION</div>
-                <a href="#" id="nav-dashboard" class="nav-item active"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
-                <a href="#" id="nav-sessions" class="nav-item"><i class="fa-solid fa-list-check"></i> Sessions</a>
-                <a href="#" id="nav-hitl" class="nav-item"><i class="fa-solid fa-clipboard-question"></i> HITL Queue <span id="hitl-badge-count" class="badge badge-error hide" style="padding: 1px 5px; font-size: 9px; margin-left: auto;">0</span></a>
-                <a href="#" id="nav-personas" class="nav-item"><i class="fa-solid fa-circle-nodes"></i> Agent Personas</a>
-                <a href="#" id="nav-playbooks" class="nav-item"><i class="fa-solid fa-file-shield"></i> Playbooks</a>
-                <a href="#" id="nav-settings" class="nav-item"><i class="fa-solid fa-gear"></i> System Settings</a>
+                <a href="#" id="nav-dashboard" class="nav-item active"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Dashboard</a>
+                <a href="#" id="nav-sessions" class="nav-item"><i class="fa-solid fa-list-check" aria-hidden="true"></i> Sessions</a>
+                <a href="#" id="nav-hitl" class="nav-item"><i class="fa-solid fa-clipboard-question" aria-hidden="true"></i> HITL Queue <span id="hitl-badge-count" class="badge badge-error hide hitl-badge-count">0</span></a>
+                <a href="#" id="nav-personas" class="nav-item"><i class="fa-solid fa-circle-nodes" aria-hidden="true"></i> Agent Personas</a>
+                <a href="#" id="nav-playbooks" class="nav-item"><i class="fa-solid fa-file-shield" aria-hidden="true"></i> Playbooks</a>
+                <a href="#" id="nav-settings" class="nav-item"><i class="fa-solid fa-gear" aria-hidden="true"></i> System Settings</a>
             </nav>
 
             <div class="sidebar-footer">
                 <div class="user-profile">
                     <div class="avatar">
-                        <i class="fa-regular fa-user"></i>
+                        <i class="fa-regular fa-user" aria-hidden="true"></i>
                     </div>
                     <div class="user-info">
                         <span class="username" id="profile-username">admin</span>
                         <span class="role" id="profile-role">SOC Administrator</span>
                     </div>
-                    <button id="logout-btn" class="logout-btn" title="Log Out">
-                        <i class="fa-solid fa-right-from-bracket"></i>
+                    <button id="logout-btn" class="logout-btn" title="Log Out" aria-label="Log Out">
+                        <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -119,91 +119,105 @@
                         </select>
                     </div>
                     <button id="new-session-btn" class="btn btn-secondary" title="New Session">
-                        <i class="fa-solid fa-plus"></i> New
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i> New
                     </button>
                 </div>
             </header>
 
             <!-- PANEL 1: DASHBOARD VIEW (ACTIVE STATE) -->
-            <div id="panel-dashboard" class="flex-col active-panel" style="gap: 20px; height: 100%; min-height: 0; overflow: hidden;">
+            <div id="panel-dashboard" class="flex-col active-panel list-flex-container">
                 <!-- Top Stats Cards -->
-                <div class="stats-row" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; flex-shrink: 0;">
-                    <div class="stat-card glass-panel" style="padding: 15px; display: flex; align-items: center; gap: 15px;">
-                        <div class="stat-icon" style="background: rgba(6, 182, 212, 0.1); color: var(--primary); padding: 12px; border-radius: 6px; font-size: 20px;"><i class="fa-solid fa-rotate"></i></div>
-                        <div>
-                            <p style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">ACTIVE SESSIONS</p>
-                            <h3 id="stat-active" style="font-size: 20px; font-weight: 700; color: var(--text-bright); margin: 0;">0</h3>
+                <div class="stats-row stats-grid">
+                    <div class="stat-card stat-card-inner">
+                        <div class="stat-icon-wrapper stat-icon-cyan"><i class="fa-solid fa-rotate" aria-hidden="true"></i></div>
+                        <div class="stat-content">
+                            <p class="stat-label-text">ACTIVE SESSIONS</p>
+                            <h3 id="stat-active" class="stat-number">0</h3>
                         </div>
                     </div>
-                    <div class="stat-card glass-panel" style="padding: 15px; display: flex; align-items: center; gap: 15px;">
-                        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning); padding: 12px; border-radius: 6px; font-size: 20px;"><i class="fa-solid fa-clipboard-question"></i></div>
-                        <div>
-                            <p style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">PENDING HITL</p>
-                            <h3 id="stat-hitl" style="font-size: 20px; font-weight: 700; color: var(--text-bright); margin: 0;">0</h3>
+                    <div class="stat-card stat-card-inner">
+                        <div class="stat-icon-wrapper stat-icon-amber"><i class="fa-solid fa-clipboard-question" aria-hidden="true"></i></div>
+                        <div class="stat-content">
+                            <p class="stat-label-text">PENDING HITL</p>
+                            <h3 id="stat-hitl" class="stat-number">0</h3>
                         </div>
                     </div>
-                    <div class="stat-card glass-panel" style="padding: 15px; display: flex; align-items: center; gap: 15px;">
-                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: var(--secondary); padding: 12px; border-radius: 6px; font-size: 20px;"><i class="fa-solid fa-calendar-day"></i></div>
-                        <div>
-                            <p style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">CREATED (24H)</p>
-                            <h3 id="stat-today" style="font-size: 20px; font-weight: 700; color: var(--text-bright); margin: 0;">0</h3>
+                    <div class="stat-card stat-card-inner">
+                        <div class="stat-icon-wrapper stat-icon-emerald"><i class="fa-solid fa-calendar-day" aria-hidden="true"></i></div>
+                        <div class="stat-content">
+                            <p class="stat-label-text">CREATED (24H)</p>
+                            <h3 id="stat-today" class="stat-number">0</h3>
                         </div>
                     </div>
-                    <div class="stat-card glass-panel" style="padding: 15px; display: flex; align-items: center; gap: 15px;">
-                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--error); padding: 12px; border-radius: 6px; font-size: 20px;"><i class="fa-solid fa-circle-check"></i></div>
-                        <div>
-                            <p style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">COMPLETED SESSIONS</p>
-                            <h3 id="stat-completed" style="font-size: 20px; font-weight: 700; color: var(--text-bright); margin: 0;">0</h3>
+                    <div class="stat-card stat-card-inner">
+                        <div class="stat-icon-wrapper stat-icon-error"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></div>
+                        <div class="stat-content">
+                            <p class="stat-label-text">COMPLETED SESSIONS</p>
+                            <h3 id="stat-completed" class="stat-number">0</h3>
                         </div>
                     </div>
                 </div>
 
                 <!-- Two Column Dashboard Body -->
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; flex-grow: 1; min-height: 0; overflow: hidden;">
+                <div class="split-layout-2-1">
                     <!-- Column 1: Recent Sessions -->
-                    <section class="glass-panel flex-col" style="padding: 16px; height: 100%; overflow: hidden;">
+                    <section class="glass-panel flex-col glass-panel-content">
                         <div class="panel-header">
-                            <h3><i class="fa-solid fa-network-wired text-cyan"></i> LIVE INVESTIGATION SESSIONS</h3>
-                            <button id="dashboard-refresh-btn" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+                            <h3><i class="fa-solid fa-network-wired text-cyan" aria-hidden="true"></i> LIVE INVESTIGATION SESSIONS</h3>
+                            <button id="dashboard-refresh-btn" class="btn btn-secondary btn-xs-padding"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Refresh</button>
                         </div>
                         <p class="panel-desc">Click "Review" on any session below to open the complete ReAct timeline and audit details.</p>
-                        <div id="dashboard-recent-list" class="alert-list-container scrollable">
+                        <div id="dashboard-recent-list" class="alert-list-container scrollable list-flex-container">
                             <!-- Populated dynamically -->
-                            <div class="tree-empty">Loading active sessions...</div>
+                            <div class="tree-empty">Loading active sessions…</div>
+                        </div>
+                        <div class="pagination-controls pagination-controls-bar" id="dashboard-pagination">
+                            <button id="dashboard-prev-btn" class="btn btn-secondary btn-xs-padding"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Prev</button>
+                            <span id="dashboard-page-info" class="pagination-info">Page 1 of 1</span>
+                            <button id="dashboard-next-btn" class="btn btn-secondary btn-xs-padding">Next <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                            <div class="select-container pagination-limit-container">
+                                <select id="dashboard-limit-select" class="pagination-limit-select" aria-label="Sessions per page">
+                                    <option value="5">5</option>
+                                    <option value="10">10</option>
+                                    <option value="20" selected>20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
                         </div>
                     </section>
 
                     <!-- Column 2: Threat Triage Analytics -->
-                    <section class="glass-panel flex-col" style="padding: 16px; height: 100%; overflow-y: auto;">
-                        <div class="panel-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 15px;">
-                            <h3><i class="fa-solid fa-chart-pie text-amber"></i> TRIAGE CLASSIFICATION</h3>
+                    <section class="glass-panel flex-col glass-panel-scrollable">
+                        <div class="panel-header alert-panel-header">
+                            <h3><i class="fa-solid fa-chart-pie text-amber" aria-hidden="true"></i> TRIAGE CLASSIFICATION</h3>
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 15px;">
-                            <div style="background: rgba(34, 197, 94, 0.05); border: 1px solid rgba(34, 197, 94, 0.15); padding: 12px; border-radius: var(--border-radius); display: flex; justify-content: space-between; align-items: center;">
+                        <div class="alert-info-rows">
+                            <div class="verdict-card verdict-card-success">
                                 <div>
-                                    <h4 style="font-size: 13px; font-weight: 600; color: var(--text-bright);">True Positive (TP)</h4>
-                                    <p style="font-size: 11px; color: var(--text-muted);">Confirmed security incidents</p>
+                                    <h4 class="verdict-title">True Positive (TP)</h4>
+                                    <p class="verdict-desc">Confirmed security incidents</p>
                                 </div>
-                                <span id="verdict-tp-count" style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--secondary);">0</span>
+                                <span id="verdict-tp-count" class="verdict-value success">0</span>
                             </div>
-                            <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); padding: 12px; border-radius: var(--border-radius); display: flex; justify-content: space-between; align-items: center;">
+                            <div class="verdict-card verdict-card-error">
                                 <div>
-                                    <h4 style="font-size: 13px; font-weight: 600; color: var(--text-bright);">False Positive (FP)</h4>
-                                    <p style="font-size: 11px; color: var(--text-muted);">Benign anomalies cleared</p>
+                                    <h4 class="verdict-title">False Positive (FP)</h4>
+                                    <p class="verdict-desc">Benign anomalies cleared</p>
                                 </div>
-                                <span id="verdict-fp-count" style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--error);">0</span>
+                                <span id="verdict-fp-count" class="verdict-value error">0</span>
                             </div>
-                            <div style="background: rgba(134, 147, 151, 0.05); border: 1px solid rgba(134, 147, 151, 0.15); padding: 12px; border-radius: var(--border-radius); display: flex; justify-content: space-between; align-items: center;">
+                            <div class="verdict-card verdict-card-muted">
                                 <div>
-                                    <h4 style="font-size: 13px; font-weight: 600; color: var(--text-bright);">Undetermined</h4>
-                                    <p style="font-size: 11px; color: var(--text-muted);">Unclassified investigations</p>
+                                    <h4 class="verdict-title">Undetermined</h4>
+                                    <p class="verdict-desc">Unclassified investigations</p>
                                 </div>
-                                <span id="verdict-und-count" style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--text-muted);">0</span>
+                                <span id="verdict-und-count" class="verdict-value muted">0</span>
                             </div>
                             
-                            <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 5px;">
-                                <p style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 5px;">AVG TRIAGE DURATION</p>
-                                <h3 id="stat-avg-duration" style="font-size: 18px; font-weight: 700; color: var(--text-bright);">0s</h3>
+                            <div class="avg-duration-wrapper">
+                                <p class="avg-duration-label">AVG TRIAGE DURATION</p>
+                                <h3 id="stat-avg-duration" class="avg-duration-value">0s</h3>
                             </div>
                         </div>
                     </section>
@@ -211,23 +225,23 @@
             </div>
 
             <!-- PANEL 2: SESSIONS LIST VIEW -->
-            <div id="panel-sessions" class="hide flex-col full-height-panel" style="height: 100%; min-height: 0; overflow: hidden;">
-                <div class="glass-panel" style="padding: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; flex-shrink: 0;">
-                    <div class="form-group" style="margin-bottom: 0; flex-grow: 1; min-width: 250px;">
+            <div id="panel-sessions" class="hide flex-col full-height-panel">
+                <div class="glass-panel filter-search-container">
+                    <div class="form-group filter-search-input-wrapper">
                         <div class="input-wrapper">
-                            <i class="fa-solid fa-magnifying-glass input-icon"></i>
-                            <input type="text" id="sessions-search" placeholder="Search sessions by name, rule, or IP...">
+                            <i class="fa-solid fa-magnifying-glass input-icon" aria-hidden="true"></i>
+                            <input type="text" id="sessions-search" placeholder="Search sessions by name, rule, or IP…">
                         </div>
                     </div>
-                    <div class="select-container" style="width: 150px;">
+                    <div class="select-container filter-select-container">
                         <select id="filter-source" class="session-select" style="width: 100%;">
                             <option value="">All Sources</option>
-                            <option value="WAZUH">Wazuh Alerts</option>
+                            <option value="SIEM">SIEM Alerts</option>
                             <option value="USER">User Chats</option>
                             <option value="SYSTEM">System</option>
                         </select>
                     </div>
-                    <div class="select-container" style="width: 150px;">
+                    <div class="select-container filter-select-container">
                         <select id="filter-status" class="session-select" style="width: 100%;">
                             <option value="">All Statuses</option>
                             <option value="ACTIVE">Active</option>
@@ -236,66 +250,98 @@
                             <option value="FAILED">Failed</option>
                         </select>
                     </div>
-                    <button id="sessions-refresh-btn" class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+                    <button id="sessions-refresh-btn" class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Refresh</button>
                 </div>
-                <div id="sessions-list-container" class="scrollable" style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; padding-bottom: 20px;">
+                <div id="sessions-list-container" class="scrollable list-flex-container">
                     <!-- Filled dynamically -->
                     <div class="tree-empty">No sessions found.</div>
+                </div>
+                <div class="pagination-controls pagination-controls-bar-padded" id="sessions-pagination">
+                    <button id="sessions-prev-btn" class="btn btn-secondary"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Prev</button>
+                    <span id="sessions-page-info" class="pagination-info-12">Page 1 of 1</span>
+                    <button id="sessions-next-btn" class="btn btn-secondary">Next <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                    <div class="select-container pagination-limit-container">
+                        <select id="sessions-limit-select" class="pagination-limit-select" aria-label="Sessions per page">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             <!-- PANEL 3: HITL QUEUE VIEW -->
-            <div id="panel-hitl" class="hide flex-col full-height-panel" style="height: 100%; min-height: 0; overflow: hidden;">
-                <div class="glass-panel" style="padding: 12px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <div id="panel-hitl" class="hide flex-col full-height-panel">
+                <div class="glass-panel hitl-intro-bar">
                     <p class="panel-desc" style="margin-bottom: 0;">Pending agent containment actions that require explicit operator authorization before execution.</p>
-                    <button id="hitl-refresh-btn" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+                    <button id="hitl-refresh-btn" class="btn btn-secondary btn-xs-padding"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Refresh</button>
                 </div>
-                <div id="hitl-list-container" class="scrollable" style="flex-grow: 1; display: flex; flex-direction: column; gap: 15px; padding-bottom: 20px;">
+                <div id="hitl-list-container" class="scrollable list-flex-container">
                     <!-- Filled dynamically -->
                     <div class="tree-empty">No actions awaiting approval.</div>
+                </div>
+                <div class="pagination-controls pagination-controls-bar-padded" id="hitl-pagination">
+                    <button id="hitl-prev-btn" class="btn btn-secondary"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Prev</button>
+                    <span id="hitl-page-info" class="pagination-info-12">Page 1 of 1</span>
+                    <button id="hitl-next-btn" class="btn btn-secondary">Next <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                    <div class="select-container pagination-limit-container">
+                        <select id="hitl-limit-select" class="pagination-limit-select" aria-label="Items per page">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             <!-- PANEL 4: SESSION DETAIL VIEW (ADAPTIVE) -->
-            <div id="panel-session-detail" class="hide flex-col full-height-panel" style="height: 100%; min-height: 0; overflow: hidden;">
-                <div class="detail-header" style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-shrink: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                    <button id="detail-back-btn" class="btn btn-secondary" style="padding: 6px 12px;"><i class="fa-solid fa-arrow-left"></i> Back</button>
+            <div id="panel-session-detail" class="hide flex-col full-height-panel">
+                <div class="detail-header session-detail-header-bar">
+                    <button id="detail-back-btn" class="btn btn-secondary"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back</button>
                     <div style="flex-grow: 1; min-width: 0;">
-                        <h3 id="detail-display-name" style="font-size: 16px; font-weight: 600; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; margin-top: 0;">Session Name</h3>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span id="detail-source-badge" class="badge">WAZUH</span>
+                        <h3 id="detail-display-name" class="detail-display-title">Session Name</h3>
+                        <div class="detail-badges-row">
+                            <span id="detail-source-badge" class="badge">SIEM</span>
                             <span id="detail-status-badge" class="badge">ACTIVE</span>
                             <span id="detail-verdict-badge" class="badge hide">TRUE_POSITIVE</span>
-                            <span id="detail-time-badge" class="font-mono text-xs text-muted" style="margin-left: 5px;">Created: Jun 05 15:30</span>
+                            <span id="detail-time-badge" class="font-mono text-xs text-muted detail-time-offset">Created: Jun 05 15:30</span>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; flex-grow: 1; min-height: 0; overflow: hidden;">
+                <div class="split-layout-2-1">
                     <!-- Left: Timeline of events -->
-                    <div class="glass-panel flex-col" style="padding: 16px; height: 100%; overflow: hidden;">
+                    <div class="glass-panel flex-col glass-panel-content">
                         <div class="panel-header">
-                            <h3><i class="fa-solid fa-terminal text-cyan"></i> PROCESS LOGS & EVENT TIMELINE</h3>
+                            <h3><i class="fa-solid fa-terminal text-cyan" aria-hidden="true"></i> PROCESS LOGS & EVENT TIMELINE</h3>
                         </div>
-                        <div id="detail-timeline" class="terminal-body scrollable" style="flex-grow: 1; margin-bottom: 0;">
+                        <div id="detail-timeline" class="terminal-body scrollable flex-grow-1-no-margin">
                             <!-- Populate dynamically -->
+                        </div>
+                        <div id="thinking-indicator" class="thinking-step hide thinking-indicator-margin">
+                            <i class="fa-solid fa-brain pulsing-brain" aria-hidden="true"></i>
+                            <span class="thinking-text">Agent is thinking…</span>
                         </div>
                     </div>
                     
                     <!-- Right: Metadata & Context Panel -->
-                    <div class="flex-col scrollable" style="gap: 20px; height: 100%; padding-right: 4px;">
+                    <div class="flex-col scrollable right-metadata-col">
                         <!-- Wazuh Specific Panel -->
-                        <div id="detail-wazuh-card" class="glass-panel hide" style="padding: 16px;">
-                            <div class="panel-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 10px;">
-                                <h3><i class="fa-solid fa-triangle-exclamation text-amber"></i> SIEM ALERT INFORMATION</h3>
+                        <div id="detail-wazuh-card" class="glass-panel hide glass-panel-content">
+                            <div class="panel-header alert-panel-header">
+                                <h3><i class="fa-solid fa-triangle-exclamation text-amber" aria-hidden="true"></i> SIEM ALERT INFORMATION</h3>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
-                                <div style="display: flex; justify-content: space-between;"><span class="text-muted">Rule ID:</span><span id="wazuh-rule-id" class="font-mono text-bright">N/A</span></div>
-                                <div style="display: flex; justify-content: space-between;"><span class="text-muted">Rule Level:</span><span id="wazuh-rule-level" class="font-mono text-bright">N/A</span></div>
-                                <div style="display: flex; justify-content: space-between;"><span class="text-muted">Source IP:</span><span id="wazuh-src-ip" class="font-mono text-cyan">N/A</span></div>
+                            <div class="alert-info-rows">
+                                <div class="info-row-item"><span class="text-muted">Rule ID:</span><span id="wazuh-rule-id" class="font-mono text-bright">N/A</span></div>
+                                <div class="info-row-item"><span class="text-muted">Rule Level:</span><span id="wazuh-rule-level" class="font-mono text-bright">N/A</span></div>
+                                <div class="info-row-item"><span class="text-muted">Source IP:</span><span id="wazuh-src-ip" class="font-mono text-cyan">N/A</span></div>
                                 <div>
                                     <span class="text-muted" style="display: block; margin-bottom: 4px;">MITRE ATT&CK IDs:</span>
-                                    <div id="wazuh-mitre-ids" style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <div id="wazuh-mitre-ids" class="mitre-chips-container">
                                         <!-- chips -->
                                     </div>
                                 </div>
@@ -303,34 +349,37 @@
                         </div>
                         
                         <!-- Raw Alert Accordion -->
-                        <div id="detail-raw-alert-card" class="glass-panel hide" style="padding: 16px;">
-                            <div class="panel-header" style="cursor: pointer;" id="raw-alert-toggle-header">
-                                <h3><i class="fa-solid fa-file-code text-muted"></i> RAW ALERT DATA</h3>
-                                <i class="fa-solid fa-chevron-down text-muted" style="font-size: 12px;"></i>
+                        <div id="detail-raw-alert-card" class="glass-panel hide glass-panel-content">
+                            <div class="panel-header" id="raw-alert-toggle-header">
+                                <h3><i class="fa-solid fa-file-code text-muted" aria-hidden="true"></i> RAW ALERT DATA</h3>
+                                <i class="fa-solid fa-chevron-down text-muted" style="font-size: 12px;" aria-hidden="true"></i>
                             </div>
                             <pre id="raw-alert-body" class="hide" style="background: rgba(10, 15, 17, 0.9); padding: 10px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; overflow-x: auto; max-height: 200px; margin-top: 8px;"><code id="wazuh-raw-payload">{}</code></pre>
                         </div>
                         
                         <!-- HITL Approval Card -->
-                        <div id="detail-hitl-card" class="glass-panel hide" style="padding: 16px; border: 1px solid var(--warning); box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);">
-                            <div class="panel-header" style="color: var(--warning); border-bottom: 1px solid rgba(245, 158, 11, 0.2); padding-bottom: 8px; margin-bottom: 10px;">
-                                <h3><i class="fa-solid fa-shield-halved"></i> AUTHORIZATION GATE</h3>
+                        <div id="detail-hitl-card" class="glass-panel hide hitl-warning-card">
+                            <div class="panel-header hitl-card-header">
+                                <h3><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> AUTHORIZATION GATE</h3>
                             </div>
-                            <p style="font-size: 12px; margin-bottom: 12px;">The agent is requesting authorization for a critical response action:</p>
-                            <div style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 4px; margin-bottom: 12px; font-size: 12px;">
-                                <p style="font-family: var(--font-mono); color: var(--warning); font-weight: 600; margin-bottom: 6px;" id="detail-hitl-tool">Tool Name</p>
-                                <pre style="font-family: var(--font-mono); font-size: 11px; overflow-x: auto; color: var(--text-main); margin-bottom: 0;"><code id="detail-hitl-args">{}</code></pre>
+                            <p class="hitl-sub-label">The agent is requesting authorization for a critical response action:</p>
+                            <div id="detail-hitl-justification" class="hitl-justification-block">
+                                Loading justification…
                             </div>
-                            <div style="display: flex; gap: 10px;">
-                                <button id="detail-hitl-reject" class="btn btn-muted flex-grow-1" style="font-size: 12px; padding: 6px 12px;">Reject</button>
-                                <button id="detail-hitl-approve" class="btn btn-success flex-grow-1" style="font-size: 12px; padding: 6px 12px;">Approve</button>
+                            <div class="hitl-code-block-wrapper">
+                                <p class="hitl-tool-title" id="detail-hitl-tool">Tool Name</p>
+                                <pre class="hitl-pre-args"><code id="detail-hitl-args">{}</code></pre>
+                            </div>
+                            <div class="hitl-actions-row">
+                                <button id="detail-hitl-reject" class="btn btn-muted flex-grow-1">Reject</button>
+                                <button id="detail-hitl-approve" class="btn btn-success flex-grow-1">Approve</button>
                             </div>
                         </div>
 
                         <!-- Workspace Files -->
-                        <div id="detail-workspace-card" class="glass-panel hide" style="padding: 16px; max-height: 300px; display: flex; flex-direction: column;">
+                        <div id="detail-workspace-card" class="glass-panel hide workspace-detail-card">
                             <div class="panel-header">
-                                <h3><i class="fa-solid fa-box-archive text-emerald"></i> SESSION WORKSPACE</h3>
+                                <h3><i class="fa-solid fa-box-archive text-emerald" aria-hidden="true"></i> SESSION WORKSPACE</h3>
                             </div>
                             <div id="detail-workspace-files" class="files-tree scrollable" style="flex-grow: 1;">
                                 <!-- files list -->
@@ -338,10 +387,10 @@
                         </div>
                         
                         <!-- Chat Input (only for USER chats) -->
-                        <div id="detail-chat-input-card" class="glass-panel hide" style="padding: 12px;">
-                            <form id="detail-chat-form" style="display: flex; gap: 8px; align-items: center;">
-                                <input type="text" id="detail-chat-input" placeholder="Type a message to the agent..." required autocomplete="off" style="flex-grow: 1; background: rgba(10, 15, 17, 0.7); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 8px 12px; color: var(--text-main); font-size: 13px; outline: none;">
-                                <button type="submit" class="btn btn-primary" style="padding: 8px 12px; border-radius: var(--border-radius);"><i class="fa-solid fa-paper-plane"></i></button>
+                        <div id="detail-chat-input-card" class="glass-panel hide chat-input-card">
+                            <form id="detail-chat-form" class="chat-form-layout">
+                                <input type="text" id="detail-chat-input" placeholder="Type a message to the agent…" required autocomplete="off" class="chat-input-field">
+                                <button type="submit" class="btn btn-primary" aria-label="Send message"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i></button>
                             </form>
                         </div>
                     </div>
@@ -352,7 +401,7 @@
             <div id="panel-personas" class="hide flex-col full-height-panel">
                 <div id="agents-cards-container" class="cards-grid scrollable">
                     <div class="loading-state">
-                        <i class="fa-solid fa-spinner fa-spin text-cyan"></i> Loading registered agent personas...
+                        <i class="fa-solid fa-spinner fa-spin text-cyan" aria-hidden="true"></i> Loading registered agent personas…
                     </div>
                 </div>
             </div>
@@ -365,17 +414,17 @@
                     </div>
                     <div id="playbooks-list-container" class="playbooks-list scrollable">
                         <div class="loading-state">
-                            <i class="fa-solid fa-spinner fa-spin text-cyan"></i> Loading...
+                            <i class="fa-solid fa-spinner fa-spin text-cyan" aria-hidden="true"></i> Loading…
                         </div>
                     </div>
                 </div>
                 <div class="playbooks-viewer glass-panel flex-col">
                     <div class="panel-header">
-                        <h3><i class="fa-solid fa-eye text-cyan"></i> PLAYBOOK STEPS & DOCUMENTATION</h3>
+                        <h3><i class="fa-solid fa-eye text-cyan" aria-hidden="true"></i> PLAYBOOK STEPS & DOCUMENTATION</h3>
                     </div>
                     <div id="playbooks-markdown-viewer" class="playbook-doc-body scrollable">
                         <div class="welcome-message">
-                            <i class="fa-solid fa-file-shield text-muted placeholder-icon"></i>
+                            <i class="fa-solid fa-file-shield text-muted placeholder-icon" aria-hidden="true"></i>
                             <p>Select a playbook from the list to view its response flow and MITRE mapping details.</p>
                         </div>
                     </div>
@@ -390,28 +439,28 @@
                             <div class="form-group">
                                 <label>GATEWAY LISTENER PORT</label>
                                 <div class="input-wrapper">
-                                    <i class="fa-solid fa-server input-icon"></i>
+                                    <i class="fa-solid fa-server input-icon" aria-hidden="true"></i>
                                     <input type="text" value="8001" readonly class="input-disabled">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>CORE API ENDPOINT</label>
                                 <div class="input-wrapper">
-                                    <i class="fa-solid fa-network-wired input-icon"></i>
+                                    <i class="fa-solid fa-network-wired input-icon" aria-hidden="true"></i>
                                     <input type="text" id="setting-core-url" value="http://agentix-api:8000">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>SESSION DISK QUOTA (MB)</label>
                                 <div class="input-wrapper">
-                                    <i class="fa-solid fa-hard-drive input-icon"></i>
+                                    <i class="fa-solid fa-hard-drive input-icon" aria-hidden="true"></i>
                                     <input type="number" id="setting-quota" value="100">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>LOG RETENTION TIME (DAYS)</label>
                                 <div class="input-wrapper">
-                                    <i class="fa-solid fa-clock-rotate-left input-icon"></i>
+                                    <i class="fa-solid fa-clock-rotate-left input-icon" aria-hidden="true"></i>
                                     <input type="number" id="setting-retention" value="30">
                                 </div>
                             </div>
@@ -428,21 +477,21 @@
                             <div class="form-group">
                                 <label>FAST-MCP SSE PORT</label>
                                 <div class="input-wrapper">
-                                    <i class="fa-solid fa-plug input-icon"></i>
+                                    <i class="fa-solid fa-plug input-icon" aria-hidden="true"></i>
                                     <input type="text" value="8081" readonly class="input-disabled">
                                 </div>
                             </div>
                         </div>
 
                         <div id="settings-saved-toast" class="toast-msg hide">
-                            <i class="fa-solid fa-circle-check text-emerald"></i>
+                            <i class="fa-solid fa-circle-check text-emerald" aria-hidden="true"></i>
                             <span>Settings updated successfully!</span>
                         </div>
 
                         <div class="settings-footer">
                             <button type="submit" class="btn btn-primary">
                                 <span>SAVE SYSTEM CONFIGURATION</span>
-                                <i class="fa-solid fa-floppy-disk"></i>
+                                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
                             </button>
                         </div>
                     </form>
@@ -456,7 +505,7 @@
     <div id="hitl-modal" class="modal-overlay hide">
         <div class="modal-card glass-panel modal-warning-pulse">
             <div class="modal-header">
-                <i class="fa-solid fa-triangle-exclamation modal-alert-icon text-error"></i>
+                <i class="fa-solid fa-triangle-exclamation modal-alert-icon text-error" aria-hidden="true"></i>
                 <h3>CRITICAL ACTION AUTHORIZATION REQUIRED</h3>
             </div>
             <div class="modal-body">
@@ -484,6 +533,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="app.js"></script>
+    <script src="app.js?v=20260606"></script>
 </body>
 </html>

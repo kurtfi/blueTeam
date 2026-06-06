@@ -24,13 +24,13 @@ async def test_create_session():
     
     session_id = str(uuid.uuid4())
     display_name = "Test SSH Alert"
-    source = "WAZUH"
+    source = "SIEM"
     
     res = await repo.create_session(
         session_id=session_id,
         display_name=display_name,
         source=source,
-        wazuh_rule_id="100002",
+        siem_rule_id="100002",
         source_ip="10.10.10.99",
     )
     

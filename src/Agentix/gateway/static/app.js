@@ -8,6 +8,7 @@ let activeSessionId = null;
 let activeAgent = 'soc_analyst';
 let isStreaming = false;
 const activeSessionsList = new Set();
+const processingSessions = new Set();
 
 // DOM Elements
 const loginContainer = document.getElementById('login-container');
@@ -63,6 +64,38 @@ const verdictUndCount = document.getElementById('verdict-und-count');
 const statAvgDuration = document.getElementById('stat-avg-duration');
 const dashboardRefreshBtn = document.getElementById('dashboard-refresh-btn');
 
+// Pagination DOM Elements
+const dashboardPrevBtn = document.getElementById('dashboard-prev-btn');
+const dashboardNextBtn = document.getElementById('dashboard-next-btn');
+const dashboardPageInfo = document.getElementById('dashboard-page-info');
+const dashboardLimitSelect = document.getElementById('dashboard-limit-select');
+
+const sessionsPrevBtn = document.getElementById('sessions-prev-btn');
+const sessionsNextBtn = document.getElementById('sessions-next-btn');
+const sessionsPageInfo = document.getElementById('sessions-page-info');
+const sessionsLimitSelect = document.getElementById('sessions-limit-select');
+
+const hitlPrevBtn = document.getElementById('hitl-prev-btn');
+const hitlNextBtn = document.getElementById('hitl-next-btn');
+const hitlPageInfo = document.getElementById('hitl-page-info');
+const hitlLimitSelect = document.getElementById('hitl-limit-select');
+
+// Pagination State
+let dashboardPage = 1;
+let dashboardPageSize = 20;
+let dashboardSessionsList = [];
+let dashboardTotalCount = 0;
+
+let sessionsPage = 1;
+let sessionsPageSize = 20;
+let sessionsFullList = [];
+let sessionsTotalCount = 0;
+
+let hitlPage = 1;
+let hitlPageSize = 20;
+let hitlFullList = [];
+let hitlTotalCount = 0;
+
 // Missing Global Declarations
 const agentsCardsContainer = document.getElementById('agents-cards-container');
 const playbooksListContainer = document.getElementById('playbooks-list-container');
@@ -106,6 +139,7 @@ const detailHitlTool = document.getElementById('detail-hitl-tool');
 const detailHitlArgs = document.getElementById('detail-hitl-args');
 const detailHitlApprove = document.getElementById('detail-hitl-approve');
 const detailHitlReject = document.getElementById('detail-hitl-reject');
+const detailHitlJustification = document.getElementById('detail-hitl-justification');
 
 const detailWorkspaceFiles = document.getElementById('detail-workspace-files');
 const rawAlertToggleHeader = document.getElementById('raw-alert-toggle-header');
@@ -277,6 +311,11 @@ function setupEventListeners() {
         const usernameInput = document.getElementById('username').value;
         const passwordInput = document.getElementById('password').value;
         
+        const submitBtn = loginForm.querySelector('button[type="submit"]');
+        const originalBtnHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>INITIALIZING…</span> <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>';
+        
         try {
             const response = await fetch('/web/login', {
                 method: 'POST',
@@ -289,9 +328,13 @@ function setupEventListeners() {
             } else {
                 const errData = await response.json();
                 showLoginError(errData.detail || 'Authentication failed. Please check credentials.');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
             }
         } catch (error) {
             showLoginError('Connection refused. Is the Gateway running?');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
         }
     });
 
@@ -341,22 +384,37 @@ function setupEventListeners() {
 
     // Dashboard Refresh Button
     if (dashboardRefreshBtn) {
-        dashboardRefreshBtn.addEventListener('click', () => {
-            loadDashboardData();
+        dashboardRefreshBtn.addEventListener('click', async () => {
+            await fetchWithLoader(
+                { buttons: [dashboardRefreshBtn], container: dashboardRecentList },
+                async () => {
+                    await loadDashboardData();
+                }
+            );
         });
     }
 
     // Sessions List Refresh Button
     if (sessionsRefreshBtn) {
-        sessionsRefreshBtn.addEventListener('click', () => {
-            loadSessionsList();
+        sessionsRefreshBtn.addEventListener('click', async () => {
+            await fetchWithLoader(
+                { buttons: [sessionsRefreshBtn], container: sessionsListContainer },
+                async () => {
+                    await loadSessionsList();
+                }
+            );
         });
     }
 
     // HITL Queue Refresh Button
     if (hitlRefreshBtn) {
-        hitlRefreshBtn.addEventListener('click', () => {
-            loadHitlQueue();
+        hitlRefreshBtn.addEventListener('click', async () => {
+            await fetchWithLoader(
+                { buttons: [hitlRefreshBtn], container: hitlListContainer },
+                async () => {
+                    await loadHitlQueue();
+                }
+            );
         });
     }
 
@@ -368,12 +426,158 @@ function setupEventListeners() {
     }
 
     // Filter changes
-    if (filterSource) filterSource.addEventListener('change', () => loadSessionsList());
-    if (filterStatus) filterStatus.addEventListener('change', () => loadSessionsList());
+    if (filterSource) {
+        filterSource.addEventListener('change', async () => {
+            await fetchWithLoader(
+                { buttons: [sessionsPrevBtn, sessionsNextBtn, sessionsLimitSelect], container: sessionsListContainer },
+                async () => {
+                    await loadSessionsList();
+                }
+            );
+        });
+    }
+    if (filterStatus) {
+        filterStatus.addEventListener('change', async () => {
+            await fetchWithLoader(
+                { buttons: [sessionsPrevBtn, sessionsNextBtn, sessionsLimitSelect], container: sessionsListContainer },
+                async () => {
+                    await loadSessionsList();
+                }
+            );
+        });
+    }
     if (sessionsSearch) {
-        sessionsSearch.addEventListener('input', debounce(() => {
-            loadSessionsList();
+        sessionsSearch.addEventListener('input', debounce(async () => {
+            await fetchWithLoader(
+                { buttons: [sessionsPrevBtn, sessionsNextBtn, sessionsLimitSelect], container: sessionsListContainer },
+                async () => {
+                    await loadSessionsList();
+                }
+            );
         }, 300));
+    }
+
+    // Pagination event listeners
+    if (dashboardPrevBtn) {
+        dashboardPrevBtn.addEventListener('click', async () => {
+            if (dashboardPage > 1) {
+                await fetchWithLoader(
+                    { buttons: [dashboardPrevBtn, dashboardNextBtn, dashboardLimitSelect], container: dashboardRecentList },
+                    async () => {
+                        dashboardPage--;
+                        await loadDashboardSessions();
+                    }
+                );
+            }
+        });
+    }
+    if (dashboardNextBtn) {
+        dashboardNextBtn.addEventListener('click', async () => {
+            const maxPage = Math.ceil(dashboardTotalCount / dashboardPageSize) || 1;
+            if (dashboardPage < maxPage) {
+                await fetchWithLoader(
+                    { buttons: [dashboardPrevBtn, dashboardNextBtn, dashboardLimitSelect], container: dashboardRecentList },
+                    async () => {
+                        dashboardPage++;
+                        await loadDashboardSessions();
+                    }
+                );
+            }
+        });
+    }
+
+    if (sessionsPrevBtn) {
+        sessionsPrevBtn.addEventListener('click', async () => {
+            if (sessionsPage > 1) {
+                await fetchWithLoader(
+                    { buttons: [sessionsPrevBtn, sessionsNextBtn, sessionsLimitSelect], container: sessionsListContainer },
+                    async () => {
+                        sessionsPage--;
+                        await loadSessionsList(false);
+                    }
+                );
+            }
+        });
+    }
+    if (sessionsNextBtn) {
+        sessionsNextBtn.addEventListener('click', async () => {
+            const maxPage = Math.ceil(sessionsTotalCount / sessionsPageSize) || 1;
+            if (sessionsPage < maxPage) {
+                await fetchWithLoader(
+                    { buttons: [sessionsPrevBtn, sessionsNextBtn, sessionsLimitSelect], container: sessionsListContainer },
+                    async () => {
+                        sessionsPage++;
+                        await loadSessionsList(false);
+                    }
+                );
+            }
+        });
+    }
+
+    if (hitlPrevBtn) {
+        hitlPrevBtn.addEventListener('click', async () => {
+            if (hitlPage > 1) {
+                await fetchWithLoader(
+                    { buttons: [hitlPrevBtn, hitlNextBtn, hitlLimitSelect], container: hitlListContainer },
+                    async () => {
+                        hitlPage--;
+                        await loadHitlQueue(false);
+                    }
+                );
+            }
+        });
+    }
+    if (hitlNextBtn) {
+        hitlNextBtn.addEventListener('click', async () => {
+            const maxPage = Math.ceil(hitlTotalCount / hitlPageSize) || 1;
+            if (hitlPage < maxPage) {
+                await fetchWithLoader(
+                    { buttons: [hitlPrevBtn, hitlNextBtn, hitlLimitSelect], container: hitlListContainer },
+                    async () => {
+                        hitlPage++;
+                        await loadHitlQueue(false);
+                    }
+                );
+            }
+        });
+    }
+
+    // Limit (page size) selectors
+    if (dashboardLimitSelect) {
+        dashboardLimitSelect.addEventListener('change', async (e) => {
+            await fetchWithLoader(
+                { buttons: [dashboardPrevBtn, dashboardNextBtn, dashboardLimitSelect], container: dashboardRecentList },
+                async () => {
+                    dashboardPageSize = parseInt(e.target.value);
+                    dashboardPage = 1;
+                    await loadDashboardSessions();
+                }
+            );
+        });
+    }
+    if (sessionsLimitSelect) {
+        sessionsLimitSelect.addEventListener('change', async (e) => {
+            await fetchWithLoader(
+                { buttons: [sessionsPrevBtn, sessionsNextBtn, sessionsLimitSelect], container: sessionsListContainer },
+                async () => {
+                    sessionsPageSize = parseInt(e.target.value);
+                    sessionsPage = 1;
+                    await loadSessionsList(true);
+                }
+            );
+        });
+    }
+    if (hitlLimitSelect) {
+        hitlLimitSelect.addEventListener('change', async (e) => {
+            await fetchWithLoader(
+                { buttons: [hitlPrevBtn, hitlNextBtn, hitlLimitSelect], container: hitlListContainer },
+                async () => {
+                    hitlPageSize = parseInt(e.target.value);
+                    hitlPage = 1;
+                    await loadHitlQueue(true);
+                }
+            );
+        });
     }
 
     // Accordion Toggle for Raw Alert Payload
@@ -479,7 +683,7 @@ function switchView(viewName) {
         sessionControls.classList.remove('hide');
         loadDashboardData();
     } else if (viewName === 'sessions') {
-        viewTitle.textContent = "SOC Investigation Sessions";
+        viewTitle.textContent = "Incident Triage Sessions";
         viewDesc.textContent = "Monitor, filter, and review active and historic agent investigations";
         sessionControls.classList.add('hide');
         loadSessionsList();
@@ -530,15 +734,34 @@ async function loadDashboardData() {
             updateHitlBadge(stats.pending_hitl);
         }
         
-        // Fetch 5 most recent sessions
-        const recentRes = await fetch('/web/sessions?limit=5');
+        // Fetch recent sessions for header dropdown and filter to show only active ones
+        const recentRes = await fetch('/web/sessions?limit=100');
         if (recentRes.ok) {
-            const sessions = await recentRes.json();
-            renderRecentSessions(sessions);
-            updateHeaderDropdown(sessions);
+            const data = await recentRes.json();
+            const dropdownList = data.sessions || [];
+            const activeOnly = dropdownList.filter(sess => sess.status === 'ACTIVE' || sess.status === 'WAITING_APPROVAL');
+            updateHeaderDropdown(activeOnly);
         }
+
+        dashboardPage = 1;
+        await loadDashboardSessions();
     } catch (err) {
         console.error('Failed to load dashboard data:', err);
+    }
+}
+
+async function loadDashboardSessions() {
+    try {
+        const offset = (dashboardPage - 1) * dashboardPageSize;
+        const res = await fetch(`/web/sessions?limit=${dashboardPageSize}&offset=${offset}`);
+        if (res.ok) {
+            const data = await res.json();
+            dashboardTotalCount = data.total_count || 0;
+            dashboardSessionsList = data.sessions || [];
+            renderRecentSessionsPage();
+        }
+    } catch (err) {
+        console.error('Failed to load dashboard sessions:', err);
     }
 }
 
@@ -551,21 +774,38 @@ function updateHitlBadge(count) {
     }
 }
 
-function renderRecentSessions(sessions) {
+function renderRecentSessionsPage() {
     if (!dashboardRecentList) return;
     
-    if (!sessions || sessions.length === 0) {
+    if (!dashboardSessionsList || dashboardSessionsList.length === 0) {
         dashboardRecentList.innerHTML = `<div class="tree-empty">No sessions created yet. Start a new chat or trigger a SIEM alert.</div>`;
+        if (dashboardPageInfo) dashboardPageInfo.textContent = "Showing 0–0 of 0";
+        if (dashboardPrevBtn) dashboardPrevBtn.disabled = true;
+        if (dashboardNextBtn) dashboardNextBtn.disabled = true;
         return;
     }
     
+    const maxPage = Math.ceil(dashboardTotalCount / dashboardPageSize) || 1;
+    if (dashboardPage > maxPage) dashboardPage = maxPage;
+    if (dashboardPage < 1) dashboardPage = 1;
+    
+    if (dashboardPageInfo) {
+        const startItem = dashboardTotalCount === 0 ? 0 : (dashboardPage - 1) * dashboardPageSize + 1;
+        const endItem = Math.min(dashboardPage * dashboardPageSize, dashboardTotalCount);
+        dashboardPageInfo.textContent = `Showing ${startItem}–${endItem} of ${dashboardTotalCount}`;
+    }
+    if (dashboardPrevBtn) dashboardPrevBtn.disabled = dashboardPage === 1;
+    if (dashboardNextBtn) dashboardNextBtn.disabled = dashboardPage === maxPage;
+    
+    const pageItems = dashboardSessionsList;
+    
     dashboardRecentList.innerHTML = '';
-    sessions.forEach(sess => {
+    pageItems.forEach(sess => {
         const item = document.createElement('div');
         
         let priorityClass = 'priority-medium';
-        if (sess.source === 'WAZUH') {
-            const level = sess.wazuh_severity || 0;
+        if (sess.source === 'SIEM') {
+            const level = sess.siem_severity || 0;
             if (level >= 12) priorityClass = 'priority-critical';
             else if (level >= 8) priorityClass = 'priority-high';
             else if (level >= 4) priorityClass = 'priority-medium';
@@ -574,40 +814,40 @@ function renderRecentSessions(sessions) {
         
         item.className = `alert-item ${priorityClass}`;
         
-        const sourceBadge = sess.source === 'WAZUH' 
-            ? `<span class="badge badge-error" style="background: rgba(239, 68, 68, 0.1); color: var(--error);">WAZUH</span>` 
-            : `<span class="badge badge-success" style="background: rgba(34, 197, 94, 0.1); color: var(--secondary);">USER</span>`;
+        const sourceBadge = sess.source === 'SIEM' 
+            ? `<span class="badge badge-error recent-source-siem">SIEM</span>` 
+            : `<span class="badge badge-success recent-source-user">USER</span>`;
             
         const statusBadge = sess.status === 'WAITING_APPROVAL'
-            ? `<span class="badge badge-warning" style="background: rgba(245, 158, 11, 0.15); color: var(--warning);">WAITING APPROVAL</span>`
+            ? `<span class="badge badge-warning recent-status-waiting">WAITING APPROVAL</span>`
             : sess.status === 'COMPLETED'
             ? `<span class="badge badge-success">COMPLETED</span>`
             : `<span class="badge badge-info">ACTIVE</span>`;
             
         const verdictBadge = sess.verdict && sess.verdict !== 'UNDETERMINED'
-            ? `<span class="badge badge-info" style="font-size: 9px; margin-left: 5px;">${sess.verdict}</span>`
+            ? `<span class="badge badge-info recent-verdict-badge">${sess.verdict}</span>`
             : '';
             
         const dateStr = formatDate(sess.created_at);
         
         item.innerHTML = `
-            <div class="alert-meta" style="margin-bottom: 6px;">
-                <div style="display: flex; gap: 5px; align-items: center;">
+            <div class="alert-meta alert-meta-container">
+                <div class="badge-container-row">
                     ${sourceBadge}
                     ${statusBadge}
                     ${verdictBadge}
                 </div>
                 <span class="time">${dateStr}</span>
             </div>
-            <h4 style="margin-bottom: 6px; font-size: 13.5px; color: var(--text-bright);">${sess.display_name}</h4>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted);">
+            <h4 class="recent-title">${sess.display_name}</h4>
+            <div class="recent-info-row">
                 <span>Agent: <strong class="text-cyan font-mono">${sess.agent_name || 'N/A'}</strong></span>
                 <span>Tools Executed: <strong>${sess.tool_calls || 0}</strong></span>
             </div>
-            <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-                <button class="btn btn-secondary review-session-btn" data-session-id="${sess.id}" style="padding: 3px 8px; font-size: 11px;">
+            <div class="recent-action-row">
+                <button class="btn btn-secondary review-session-btn btn-xs-padding-review" data-session-id="${sess.id}">
                     <span>Review Session</span>
-                    <i class="fa-solid fa-arrow-right" style="font-size: 9px;"></i>
+                    <i class="fa-solid fa-arrow-right icon-arrow-xs" aria-hidden="true"></i>
                 </button>
             </div>
         `;
@@ -627,15 +867,18 @@ function updateHeaderDropdown(sessions) {
     sessions.forEach(sess => {
         const opt = document.createElement('option');
         opt.value = sess.id;
-        opt.textContent = sess.display_name.length > 30 ? `${sess.display_name.substring(0, 30)}...` : sess.display_name;
+        opt.textContent = sess.display_name.length > 30 ? `${sess.display_name.substring(0, 30)}…` : sess.display_name;
         if (sess.id === activeSessionId) opt.selected = true;
         sessionSelect.appendChild(opt);
     });
 }
 
 // 5. Data Loading - Sessions List View
-async function loadSessionsList() {
+async function loadSessionsList(resetPage = true) {
     try {
+        if (resetPage) {
+            sessionsPage = 1;
+        }
         const srcVal = filterSource.value;
         const statusVal = filterStatus.value;
         const searchVal = sessionsSearch.value.trim();
@@ -643,55 +886,66 @@ async function loadSessionsList() {
         let queryParams = [];
         if (srcVal) queryParams.push(`source=${srcVal}`);
         if (statusVal) queryParams.push(`status_filter=${statusVal}`);
+        if (searchVal) queryParams.push(`search=${encodeURIComponent(searchVal)}`);
+        
+        const offset = (sessionsPage - 1) * sessionsPageSize;
+        queryParams.push(`limit=${sessionsPageSize}`);
+        queryParams.push(`offset=${offset}`);
         
         const url = `/web/sessions?${queryParams.join('&')}`;
         const res = await fetch(url);
         if (res.ok) {
-            let sessions = await res.json();
-            
-            // Client-side search filtering
-            if (searchVal) {
-                const searchLower = searchVal.toLowerCase();
-                sessions = sessions.filter(s => 
-                    s.display_name.toLowerCase().includes(searchLower) ||
-                    (s.source_ip && s.source_ip.toLowerCase().includes(searchLower)) ||
-                    (s.wazuh_rule_id && s.wazuh_rule_id.toLowerCase().includes(searchLower))
-                );
-            }
-            
-            renderSessionsList(sessions);
+            const data = await res.json();
+            sessionsTotalCount = data.total_count || 0;
+            sessionsFullList = data.sessions || [];
+            renderSessionsListPage();
         }
     } catch (err) {
         console.error('Failed to load sessions list:', err);
     }
 }
 
-function renderSessionsList(sessions) {
+function renderSessionsListPage() {
     if (!sessionsListContainer) return;
     
-    if (!sessions || sessions.length === 0) {
+    if (!sessionsFullList || sessionsFullList.length === 0) {
         sessionsListContainer.innerHTML = `<div class="tree-empty">No sessions matching the filters found.</div>`;
+        if (sessionsPageInfo) sessionsPageInfo.textContent = "Showing 0–0 of 0";
+        if (sessionsPrevBtn) sessionsPrevBtn.disabled = true;
+        if (sessionsNextBtn) sessionsNextBtn.disabled = true;
         return;
     }
     
+    const maxPage = Math.ceil(sessionsTotalCount / sessionsPageSize) || 1;
+    if (sessionsPage > maxPage) sessionsPage = maxPage;
+    if (sessionsPage < 1) sessionsPage = 1;
+    
+    if (sessionsPageInfo) {
+        const startItem = sessionsTotalCount === 0 ? 0 : (sessionsPage - 1) * sessionsPageSize + 1;
+        const endItem = Math.min(sessionsPage * sessionsPageSize, sessionsTotalCount);
+        sessionsPageInfo.textContent = `Showing ${startItem}–${endItem} of ${sessionsTotalCount}`;
+    }
+    if (sessionsPrevBtn) sessionsPrevBtn.disabled = sessionsPage === 1;
+    if (sessionsNextBtn) sessionsNextBtn.disabled = sessionsPage === maxPage;
+    
+    const pageItems = sessionsFullList;
+    
     sessionsListContainer.innerHTML = '';
-    sessions.forEach(sess => {
+    pageItems.forEach(sess => {
         const card = document.createElement('div');
         
         let priorityClass = 'priority-medium';
-        if (sess.source === 'WAZUH') {
-            const level = sess.wazuh_severity || 0;
+        if (sess.source === 'SIEM') {
+            const level = sess.siem_severity || 0;
             if (level >= 12) priorityClass = 'priority-critical';
             else if (level >= 8) priorityClass = 'priority-high';
             else priorityClass = 'priority-low';
         }
         
-        card.className = `glass-panel rounded-xl alert-item ${priorityClass}`;
-        card.style.padding = '16px';
-        card.style.cursor = 'default';
+        card.className = `glass-panel alert-item ${priorityClass}`;
         
-        const sourceBadge = sess.source === 'WAZUH' 
-            ? `<span class="badge badge-error">WAZUH</span>` 
+        const sourceBadge = sess.source === 'SIEM' 
+            ? `<span class="badge badge-error">SIEM</span>` 
             : `<span class="badge badge-success">USER</span>`;
             
         const statusBadge = sess.status === 'WAITING_APPROVAL'
@@ -701,22 +955,22 @@ function renderSessionsList(sessions) {
             : `<span class="badge badge-info">ACTIVE</span>`;
             
         const verdictBadge = sess.verdict && sess.verdict !== 'UNDETERMINED'
-            ? `<span class="badge badge-info" style="margin-left: 5px;">${sess.verdict}</span>`
+            ? `<span class="badge badge-info session-item-date">${sess.verdict}</span>`
             : '';
             
         const dateStr = formatDate(sess.created_at);
         
         card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
-                <div style="flex-grow: 1; min-width: 0;">
-                    <div class="alert-meta" style="justify-content: flex-start; gap: 8px; margin-bottom: 6px;">
+            <div class="session-item-layout">
+                <div class="session-item-content-wrapper">
+                    <div class="alert-meta session-item-meta">
                         ${sourceBadge}
                         ${statusBadge}
                         ${verdictBadge}
-                        <span class="time" style="margin-left: 5px;">${dateStr}</span>
+                        <span class="time session-item-date">${dateStr}</span>
                     </div>
-                    <h4 style="font-size: 15px; font-weight: 600; color: var(--text-bright); margin-bottom: 8px;">${sess.display_name}</h4>
-                    <div style="display: flex; gap: 20px; align-items: center; font-size: 12px; color: var(--text-muted); flex-wrap: wrap;">
+                    <h4 class="session-item-title">${sess.display_name}</h4>
+                    <div class="session-item-details-row">
                         <span>Agent: <strong class="text-cyan font-mono">${sess.agent_name || 'N/A'}</strong></span>
                         <span>Messages: <strong>${sess.message_count || 0}</strong></span>
                         <span>Tool Calls: <strong>${sess.tool_calls || 0}</strong></span>
@@ -724,9 +978,9 @@ function renderSessionsList(sessions) {
                     </div>
                 </div>
                 <div>
-                    <button class="btn btn-secondary review-detail-btn" data-session-id="${sess.id}" style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">
+                    <button class="btn btn-secondary review-detail-btn review-detail-btn-padding" data-session-id="${sess.id}">
                         <span>View Details</span>
-                        <i class="fa-solid fa-arrow-right"></i>
+                        <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -741,62 +995,89 @@ function renderSessionsList(sessions) {
 }
 
 // 6. Data Loading - HITL Queue View
-async function loadHitlQueue() {
+async function loadHitlQueue(resetPage = true) {
     try {
-        const res = await fetch('/web/sessions?status_filter=WAITING_APPROVAL');
+        if (resetPage) {
+            hitlPage = 1;
+        }
+        const offset = (hitlPage - 1) * hitlPageSize;
+        const res = await fetch(`/web/sessions?status_filter=WAITING_APPROVAL&limit=${hitlPageSize}&offset=${offset}`);
         if (res.ok) {
-            const hitlSessions = await res.json();
-            renderHitlQueue(hitlSessions);
-            updateHitlBadge(hitlSessions.length);
+            const data = await res.json();
+            hitlTotalCount = data.total_count || 0;
+            hitlFullList = data.sessions || [];
+            renderHitlQueuePage();
+            updateHitlBadge(hitlTotalCount);
         }
     } catch (err) {
         console.error('Failed to load HITL queue:', err);
     }
 }
 
-function renderHitlQueue(sessions) {
+function renderHitlQueuePage() {
     if (!hitlListContainer) return;
     
-    if (!sessions || sessions.length === 0) {
+    if (!hitlFullList || hitlFullList.length === 0) {
         hitlListContainer.innerHTML = `<div class="tree-empty">No pending actions awaiting approval. Active alerts are fully automated.</div>`;
+        if (hitlPageInfo) hitlPageInfo.textContent = "Showing 0–0 of 0";
+        if (hitlPrevBtn) hitlPrevBtn.disabled = true;
+        if (hitlNextBtn) hitlNextBtn.disabled = true;
         return;
     }
     
+    const maxPage = Math.ceil(hitlTotalCount / hitlPageSize) || 1;
+    if (hitlPage > maxPage) hitlPage = maxPage;
+    if (hitlPage < 1) hitlPage = 1;
+    
+    if (hitlPageInfo) {
+        const startItem = hitlTotalCount === 0 ? 0 : (hitlPage - 1) * hitlPageSize + 1;
+        const endItem = Math.min(hitlPage * hitlPageSize, hitlTotalCount);
+        hitlPageInfo.textContent = `Showing ${startItem}–${endItem} of ${hitlTotalCount}`;
+    }
+    if (hitlPrevBtn) hitlPrevBtn.disabled = hitlPage === 1;
+    if (hitlNextBtn) hitlNextBtn.disabled = hitlPage === maxPage;
+    
+    const pageItems = hitlFullList;
+    
     hitlListContainer.innerHTML = '';
-    sessions.forEach(sess => {
+    pageItems.forEach(sess => {
         const card = document.createElement('div');
-        card.className = 'glass-panel rounded-xl';
-        card.style.padding = '16px';
-        card.style.border = '1px solid var(--warning)';
+        card.className = 'glass-panel hitl-warning-card';
         
         const dateStr = formatDate(sess.created_at);
         
         card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 12px;">
+            <div class="hitl-item-header">
                 <div>
-                    <span class="badge badge-warning" style="margin-bottom: 6px;">WAITING APPROVAL</span>
-                    <h4 style="font-size: 15px; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; margin-top: 0;">${sess.display_name}</h4>
-                    <span style="font-size: 11px; color: var(--text-muted);">Source IP: <strong class="text-cyan font-mono">${sess.source_ip || 'N/A'}</strong> | Rule ID: <strong class="font-mono">${sess.wazuh_rule_id || 'N/A'}</strong></span>
+                    <span class="badge badge-warning hitl-badge-spacing">WAITING APPROVAL</span>
+                    <h4 class="hitl-item-title">${sess.display_name}</h4>
+                    <span class="hitl-item-meta">Source IP: <strong class="text-cyan font-mono">${sess.source_ip || 'N/A'}</strong> | Rule ID: <strong class="font-mono">${sess.siem_rule_id || 'N/A'}</strong></span>
                 </div>
-                <span class="time" style="font-size: 11px; color: var(--text-muted);">${dateStr}</span>
+                <span class="time hitl-item-time">${dateStr}</span>
             </div>
             
-            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(245, 158, 11, 0.2); padding: 12px; border-radius: 4px; margin-bottom: 15px;">
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Requested Containment Action:</p>
-                <div style="font-family: var(--font-mono); font-size: 12px; display: flex; flex-direction: column; gap: 4px;">
-                    <div><span class="text-amber">ACTION:</span> <span class="text-bright font-bold" id="hitl-tool-${sess.id}">Loading action...</span></div>
+            <div class="hitl-justification-block-hide" id="hitl-justification-${sess.id}">
+                Loading explanation…
+            </div>
+
+            <div class="hitl-details-container">
+                <p class="hitl-details-label">Requested Containment Action:</p>
+                <div class="hitl-details-mono-layout">
+                    <div><span class="text-amber">ACTION:</span> <span class="text-bright font-bold" id="hitl-tool-${sess.id}">Loading action…</span></div>
                     <div><span class="text-amber">ARGUMENTS:</span></div>
-                    <pre style="margin: 0; background: none; border: none; padding: 0; color: var(--text-main); font-size: 11px; overflow-x: auto;"><code id="hitl-args-${sess.id}">Loading parameters...</code></pre>
+                    <pre class="hitl-details-pre"><code id="hitl-args-${sess.id}">Loading parameters…</code></pre>
                 </div>
             </div>
             
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn btn-secondary inspect-session-btn" data-session-id="${sess.id}" style="font-size: 11px; padding: 4px 8px;">
-                    <i class="fa-solid fa-magnifying-glass"></i> Inspect Session Logs
+            <div class="hitl-footer-layout">
+                <button class="btn btn-secondary inspect-session-btn btn-xs-padding-inspect" data-session-id="${sess.id}">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Inspect Session Logs
                 </button>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-muted quick-reject-btn" data-session-id="${sess.id}" style="padding: 6px 12px; font-size: 12px;">Reject</button>
-                    <button class="btn btn-success quick-approve-btn" data-session-id="${sess.id}" style="padding: 6px 12px; font-size: 12px;">Approve</button>
+                <div class="hitl-footer-actions-row">
+                    <button class="btn btn-muted quick-reject-btn btn-padding-sm" data-session-id="${sess.id}" ${processingSessions.has(sess.id) ? 'disabled' : ''}>Reject</button>
+                    <button class="btn btn-success quick-approve-btn btn-padding-sm" data-session-id="${sess.id}" ${processingSessions.has(sess.id) ? 'disabled' : ''}>
+                        ${processingSessions.has(sess.id) ? '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Processing…' : 'Approve'}
+                    </button>
                 </div>
             </div>
         `;
@@ -805,20 +1086,39 @@ function renderHitlQueue(sessions) {
         fetch(`/web/sessions/${sess.id}/events`)
             .then(res => res.json())
             .then(events => {
+                // Find hitl_request event to get the detailed justification
+                const hitlRequestEvent = events.slice().reverse().find(e => e.event_type === 'hitl_request');
                 // Find last event that represents a think/tool step requesting HITL
                 const hitlEvent = events.slice().reverse().find(e => e.event_type === 'think' && e.metadata && e.metadata.tool_name);
+                
                 const toolEl = card.querySelector(`#hitl-tool-${sess.id}`);
                 const argsEl = card.querySelector(`#hitl-args-${sess.id}`);
+                const justificationEl = card.querySelector(`#hitl-justification-${sess.id}`);
                 
-                if (hitlEvent) {
-                    toolEl.textContent = hitlEvent.metadata.tool_name;
-                    argsEl.textContent = typeof hitlEvent.metadata.tool_input === 'string' 
-                        ? hitlEvent.metadata.tool_input 
-                        : JSON.stringify(hitlEvent.metadata.tool_input, null, 2);
-                } else {
-                    toolEl.textContent = 'isolate_endpoint';
-                    argsEl.textContent = JSON.stringify({ agent_id: sess.alert_payload?.data?.agent?.id || '1' }, null, 2);
+                if (justificationEl) {
+                    if (hitlRequestEvent && hitlRequestEvent.content) {
+                        justificationEl.innerHTML = formatMarkdownToHtml(hitlRequestEvent.content);
+                        justificationEl.style.display = 'block';
+                    } else {
+                        justificationEl.style.display = 'none';
+                    }
                 }
+                
+                let toolName = 'isolate_endpoint';
+                let toolArgs = { agent_id: sess.alert_payload?.data?.agent?.id || '1' };
+                
+                if (hitlRequestEvent && hitlRequestEvent.metadata && hitlRequestEvent.metadata.tool_name) {
+                    toolName = hitlRequestEvent.metadata.tool_name;
+                    toolArgs = hitlRequestEvent.metadata.tool_args || {};
+                } else if (hitlEvent && hitlEvent.metadata && hitlEvent.metadata.tool_name) {
+                    toolName = hitlEvent.metadata.tool_name;
+                    toolArgs = hitlEvent.metadata.tool_input || {};
+                }
+                
+                toolEl.textContent = toolName;
+                argsEl.textContent = typeof toolArgs === 'string' 
+                    ? toolArgs 
+                    : JSON.stringify(toolArgs, null, 2);
             })
             .catch(e => console.error('Failed to fetch events for HITL card:', e));
             
@@ -839,30 +1139,60 @@ function renderHitlQueue(sessions) {
 }
 
 async function submitHitlAction(sessionId, action) {
+    if (processingSessions.has(sessionId)) return;
+    processingSessions.add(sessionId);
+
+    // Disable all approve/reject buttons for this session in the UI immediately
+    const approveButtons = document.querySelectorAll(`.quick-approve-btn[data-session-id="${sessionId}"], #detail-hitl-approve`);
+    const rejectButtons = document.querySelectorAll(`.quick-reject-btn[data-session-id="${sessionId}"], #detail-hitl-reject`);
+    
+    approveButtons.forEach(btn => {
+        btn.disabled = true;
+        if (action === 'approve') {
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Processing…';
+        }
+    });
+    rejectButtons.forEach(btn => {
+        btn.disabled = true;
+        if (action === 'reject') {
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Processing…';
+        }
+    });
+
     try {
-        const statusVal = action === 'approve' ? 'COMPLETED' : 'FAILED';
-        const verdictVal = action === 'approve' ? 'TRUE_POSITIVE' : 'FALSE_POSITIVE';
+        const msg = action === 'approve' ? 'yes' : 'no';
         
-        const response = await fetch(`/web/sessions/${sessionId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: statusVal, verdict: verdictVal })
-        });
-        
-        if (response.ok) {
-            // Reload
-            if (panels.dashboard.classList.contains('active-panel')) {
-                loadDashboardData();
-            } else if (panels.sessions.classList.contains('active-panel')) {
-                loadSessionsList();
-            } else if (panels['session-detail'].classList.contains('active-panel')) {
-                openSessionDetail(sessionId);
-            } else {
-                loadHitlQueue();
+        // If the user is actively viewing the session detail page, stream the execution live to the terminal/timeline
+        if (panels['session-detail'].classList.contains('active-panel') && activeSessionId === sessionId) {
+            if (detailHitlCard) {
+                detailHitlCard.classList.add('hide');
+            }
+            await sendPrompt(msg);
+        } else {
+            // Otherwise (e.g. from Dashboard or HITL Queue quick action buttons), run in the background using REST API
+            const response = await fetch(`/web/sessions/${sessionId}/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to submit HITL action: ${response.status}`);
             }
         }
     } catch (err) {
         console.error('Failed to submit HITL action:', err);
+    } finally {
+        processingSessions.delete(sessionId);
+        
+        // Reload the active panel
+        if (panels.dashboard.classList.contains('active-panel')) {
+            loadDashboardData();
+        } else if (panels.sessions.classList.contains('active-panel')) {
+            loadSessionsList();
+        } else if (panels['session-detail'].classList.contains('active-panel')) {
+            openSessionDetail(sessionId);
+        } else {
+            loadHitlQueue();
+        }
     }
 }
 
@@ -880,7 +1210,7 @@ async function openSessionDetail(sessionId) {
         
         // Load Events
         const eventsRes = await fetch(`/web/sessions/${sessionId}/events`);
-        const events = eventsRes.ok ? await eventsRes.ok && await eventsRes.json() : [];
+        const events = eventsRes.ok ? await eventsRes.json() : [];
         
         renderSessionDetails(sess, events);
     } catch (err) {
@@ -892,7 +1222,7 @@ function renderSessionDetails(sess, events) {
     // Switch to panel
     switchView('session-detail');
     viewTitle.textContent = "Incident Triage Detail";
-    viewDesc.textContent = `Detailed analysis of investigation session ${sess.id.substring(0,8)}...`;
+    viewDesc.textContent = `Detailed analysis of investigation session ${sess.id.substring(0,8)}…`;
     sessionControls.classList.add('hide');
 
     // Populate Headers
@@ -900,7 +1230,7 @@ function renderSessionDetails(sess, events) {
     detailTimeBadge.textContent = `Created: ${formatDate(sess.created_at)}`;
     
     // Source Badge
-    detailSourceBadge.className = sess.source === 'WAZUH' ? 'badge badge-error' : 'badge badge-success';
+    detailSourceBadge.className = sess.source === 'SIEM' ? 'badge badge-error' : 'badge badge-success';
     detailSourceBadge.textContent = sess.source;
     
     // Status Badge
@@ -928,13 +1258,13 @@ function renderSessionDetails(sess, events) {
     detailChatInputCard.classList.add('hide');
 
     // Adaptive Side Panels depending on WAZUH vs USER source
-    if (sess.source === 'WAZUH') {
+    if (sess.source === 'SIEM') {
         detailWazuhCard.classList.remove('hide');
         detailRawAlertCard.classList.remove('hide');
         
         // Fill Wazuh Details
-        wazuhRuleId.textContent = sess.wazuh_rule_id || 'N/A';
-        wazuhRuleLevel.textContent = sess.wazuh_severity || 'N/A';
+        wazuhRuleId.textContent = sess.siem_rule_id || 'N/A';
+        wazuhRuleLevel.textContent = sess.siem_severity || 'N/A';
         wazuhSrcIp.textContent = sess.source_ip || 'N/A';
         
         wazuhMitreIds.innerHTML = '';
@@ -955,18 +1285,42 @@ function renderSessionDetails(sess, events) {
         if (sess.status === 'WAITING_APPROVAL') {
             detailHitlCard.classList.remove('hide');
             
-            // Look for pending action requested
+            // Look for hitl_request event to get the detailed justification/message
+            const hitlRequestEvent = events.slice().reverse().find(e => e.event_type === 'hitl_request');
             const hitlEvent = events.slice().reverse().find(e => e.event_type === 'think' && e.metadata && e.metadata.tool_name);
-            if (hitlEvent) {
-                detailHitlTool.textContent = hitlEvent.metadata.tool_name;
-                detailHitlArgs.textContent = typeof hitlEvent.metadata.tool_input === 'string' 
-                    ? hitlEvent.metadata.tool_input 
-                    : JSON.stringify(hitlEvent.metadata.tool_input, null, 2);
-            } else {
-                detailHitlTool.textContent = 'isolate_endpoint';
-                detailHitlArgs.textContent = JSON.stringify({ agent_id: sess.alert_payload?.data?.agent?.id || '1' }, null, 2);
+            
+            if (detailHitlJustification) {
+                if (hitlRequestEvent && hitlRequestEvent.content) {
+                    detailHitlJustification.innerHTML = formatMarkdownToHtml(hitlRequestEvent.content);
+                    detailHitlJustification.style.display = 'block';
+                } else {
+                    detailHitlJustification.textContent = 'Awaiting human authorization for the response action.';
+                    detailHitlJustification.style.display = 'block';
+                }
             }
             
+            let toolName = 'isolate_endpoint';
+            let toolArgs = { agent_id: sess.alert_payload?.data?.agent?.id || '1' };
+            
+            if (hitlRequestEvent && hitlRequestEvent.metadata && hitlRequestEvent.metadata.tool_name) {
+                toolName = hitlRequestEvent.metadata.tool_name;
+                toolArgs = hitlRequestEvent.metadata.tool_args || {};
+            } else if (hitlEvent && hitlEvent.metadata && hitlEvent.metadata.tool_name) {
+                toolName = hitlEvent.metadata.tool_name;
+                toolArgs = hitlEvent.metadata.tool_input || {};
+            }
+            
+            detailHitlTool.textContent = toolName;
+            detailHitlArgs.textContent = typeof toolArgs === 'string' 
+                ? toolArgs 
+                : JSON.stringify(toolArgs, null, 2);
+            
+            // Reset button states in case they were previously disabled/spinning
+            detailHitlApprove.disabled = false;
+            detailHitlApprove.innerHTML = 'Approve';
+            detailHitlReject.disabled = false;
+            detailHitlReject.innerHTML = 'Reject';
+
             detailHitlApprove.onclick = () => submitHitlAction(sess.id, 'approve');
             detailHitlReject.onclick = () => submitHitlAction(sess.id, 'reject');
         }
@@ -1072,7 +1426,7 @@ async function renderWorkspaceFilesList(sessionId) {
     if (!detailWorkspaceFiles) return;
     
     try {
-        const res = await fetch(`/v1/session/${sessionId}/workspace`);
+        const res = await fetch(`/web/sessions/${sessionId}/workspace`);
         if (res.ok) {
             const data = await res.json();
             const usage = data.workspace;
@@ -1151,6 +1505,7 @@ async function sendPrompt(messageText) {
                     if (dataStr === '[DONE]') {
                         isStreaming = false;
                         thinkingIndicator.classList.add('hide');
+                        openSessionDetail(activeSessionId);
                         break;
                     }
                     
@@ -1167,6 +1522,7 @@ async function sendPrompt(messageText) {
         console.error('Streaming error:', error);
         isStreaming = false;
         thinkingIndicator.classList.add('hide');
+        openSessionDetail(activeSessionId);
     }
 }
 
@@ -1222,13 +1578,11 @@ function handleLiveStep(step) {
 // 9. Session Management (Create USER Session)
 async function createNewSession() {
     try {
-        const response = await fetch('/v1/session', {
+        const response = await fetch('/web/sessions', {
             method: 'POST',
             headers: { 
-                'Content-Type': 'application/json',
-                'X-Internal-Api-Key': 'dev-internal-key-change-me-in-production' // bypass core internal auth
-            },
-            body: JSON.stringify({ user_id: profileUsername.textContent || 'admin' })
+                'Content-Type': 'application/json'
+            }
         });
         
         if (response.ok) {
@@ -1252,7 +1606,7 @@ async function loadAgents() {
     
     agentsCardsContainer.innerHTML = `
         <div class="loading-state">
-            <i class="fa-solid fa-spinner fa-spin text-cyan"></i> Loading registered agent personas...
+            <i class="fa-solid fa-spinner fa-spin text-cyan" aria-hidden="true"></i> Loading registered agent personas…
         </div>
     `;
 
@@ -1341,7 +1695,7 @@ async function loadPlaybooks() {
     
     playbooksListContainer.innerHTML = `
         <div class="loading-state">
-            <i class="fa-solid fa-spinner fa-spin text-cyan"></i> Loading...
+            <i class="fa-solid fa-spinner fa-spin text-cyan" aria-hidden="true"></i> Loading…
         </div>
     `;
 
@@ -1545,3 +1899,141 @@ function debounce(func, wait) {
         timeout = setTimeout(later, wait);
     };
 }
+
+function formatMarkdownToHtml(markdown) {
+    if (!markdown) return '';
+    let html = markdown;
+    
+    // Replace bold text: **text** -> <strong>text</strong>
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Replace bullet points: - item -> <li>item</li> (wrapped in ul)
+    const lines = html.split('\n');
+    let inList = false;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('- ') || line.startsWith('* ')) {
+            const content = line.substring(2);
+            lines[i] = (inList ? '' : '<ul style="margin: 4px 0 8px 16px; padding: 0; list-style-type: disc;">') + `<li style="margin-bottom: 2px;">${content}</li>`;
+            inList = true;
+        } else {
+            if (inList) {
+                lines[i] = '</ul>' + lines[i];
+                inList = false;
+            }
+        }
+    }
+    if (inList) {
+        lines[lines.length - 1] = lines[lines.length - 1] + '</ul>';
+    }
+    
+    // Join lines with <br> for non-list elements
+    html = lines.join('\n');
+    html = html.replace(/\n/g, '<br>');
+    
+    // Clean up double <br> around lists
+    html = html.replace(/<\/ul><br>/g, '</ul>');
+    html = html.replace(/<br><ul/g, '<ul');
+    
+    return html;
+}
+
+// Senior UI Floating Toast System
+function showNotification(message, type = 'success') {
+    let container = document.getElementById('notification-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notification-container';
+        container.style.position = 'fixed';
+        container.style.bottom = '24px';
+        container.style.right = '24px';
+        container.style.zIndex = '9999';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.gap = '12px';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'glass-panel';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '12px';
+    toast.style.padding = '14px 20px';
+    toast.style.borderRadius = '8px';
+    toast.style.minWidth = '280px';
+    toast.style.maxWidth = '400px';
+    toast.style.boxShadow = '0 8px 32px 0 rgba(0, 0, 0, 0.4)';
+    toast.style.animation = 'slideIn 0.3s ease-out, fadeOut 0.5s ease-in 3.5s forwards';
+
+    let icon = '<i class="fa-solid fa-circle-check" style="color: var(--primary);"></i>';
+    let borderColor = 'rgba(6, 182, 212, 0.3)';
+    let bgColor = 'rgba(6, 182, 212, 0.1)';
+
+    if (type === 'error') {
+        icon = '<i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i>';
+        borderColor = 'rgba(239, 68, 68, 0.3)';
+        bgColor = 'rgba(239, 68, 68, 0.1)';
+    } else if (type === 'warning') {
+        icon = '<i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i>';
+        borderColor = 'rgba(245, 158, 11, 0.3)';
+        bgColor = 'rgba(245, 158, 11, 0.1)';
+    }
+
+    toast.style.border = `1px solid ${borderColor}`;
+    toast.style.backgroundColor = bgColor;
+    toast.style.color = '#fff';
+    toast.style.fontSize = '13.5px';
+    toast.style.fontWeight = '500';
+
+    toast.innerHTML = `
+        ${icon}
+        <span style="flex-grow: 1;">${message}</span>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+        if (container.children.length === 0) {
+            container.remove();
+        }
+    }, 4000);
+}
+
+// Senior UI Asynchronous Loader & Concurrency Lock
+async function fetchWithLoader(loaderOptions, fetchFn) {
+    const { buttons, container } = loaderOptions;
+
+    // Disable controls to prevent double clicks / race conditions
+    if (buttons) {
+        buttons.forEach(btn => { if (btn) btn.disabled = true; });
+    }
+    
+    // Set visual loading fade
+    if (container) {
+        container.classList.add('loading-fade');
+    }
+
+    try {
+        await fetchFn();
+    } catch (err) {
+        console.error('Data load error:', err);
+        showNotification(err.message || 'Connection lost. Failed to retrieve dataset.', 'error');
+    } finally {
+        // Restore opacity and events
+        if (container) {
+            container.classList.remove('loading-fade');
+        }
+        if (buttons) {
+            // Re-enable limit selectors or refresh buttons specifically;
+            // prev/next are handled by their render functions.
+            buttons.forEach(btn => {
+                if (btn && (btn.tagName === 'SELECT' || btn.id.includes('refresh') || btn.id === 'logout-btn')) {
+                    btn.disabled = false;
+                }
+            });
+        }
+    }
+}
+

@@ -186,12 +186,21 @@ class PlaybookStep:
         if self.approval_gate:
             action = self._interpolate_string(self.approval_gate.requires_confirmation_for, ctx)
             ask = self._interpolate_string(self.approval_gate.message, ctx)
-            gate_warning = (
-                f"\n  ⚠️  **HUMAN APPROVAL REQUIRED BEFORE THIS STEP** ⚠️\n"
-                f"  Action: {action}\n"
-                f"  Ask: {ask}\n"
-                f"  Do NOT proceed until operator explicitly confirms.\n"
-            )
+            if self.tool_hint:
+                gate_warning = (
+                    f"\n  ⚠️  **HUMAN APPROVAL REQUIRED BEFORE THIS STEP** ⚠️\n"
+                    f"  Action: {action}\n"
+                    f"  Ask: {ask}\n"
+                    f"  To execute this step, you MUST invoke the tool `{self.tool_hint}`. "
+                    f"The system will automatically intercept it, pause the flow, and request approval from the human operator.\n"
+                )
+            else:
+                gate_warning = (
+                    f"\n  ⚠️  **HUMAN APPROVAL REQUIRED BEFORE THIS STEP** ⚠️\n"
+                    f"  Action: {action}\n"
+                    f"  Ask: {ask}\n"
+                    f"  Do NOT proceed until operator explicitly confirms.\n"
+                )
 
         tool_str = f"  Tool: `{self.tool_hint}`" if self.tool_hint else ""
         params_line = f"\n  Parameters: {params_str}" if params_str else ""

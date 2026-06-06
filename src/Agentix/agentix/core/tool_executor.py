@@ -25,6 +25,7 @@ class ToolExecutionEngine:
         tool_map: dict[str, BaseTool],
         session_id: str,
         parent: Any | None = None,
+        workspace: Any | None = None,
     ) -> list[ToolResult]:
         """
         Execute all tool calls concurrently using asyncio.gather.
@@ -32,7 +33,8 @@ class ToolExecutionEngine:
         Each tool call is wrapped in ``track_tool_call`` for telemetry.
         Exceptions are captured as failed ToolResults rather than propagating.
         """
-        workspace_path = str(self._workspace.root) if self._workspace else None
+        active_workspace = workspace if workspace is not None else self._workspace
+        workspace_path = str(active_workspace.root) if active_workspace else None
         
         # Get user_id for tools (from metadata)
         metadata = await self._memory.get_metadata(session_id) if self._memory else {}
@@ -43,7 +45,7 @@ class ToolExecutionEngine:
             "user_id": user_id,
             "memory": self._memory,
             "preference_store": self._preference_store,
-            "workspace": self._workspace,
+            "workspace": active_workspace,
             "workspace_path": workspace_path,
         }
 

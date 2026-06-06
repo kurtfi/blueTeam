@@ -64,5 +64,14 @@ class RedisSessionStore:
         await self._redis.hset(key, k, json.dumps(value)) # type: ignore[misc]
         await self._redis.expire(key, self._ttl) # type: ignore[misc]
 
+    async def acquire_lock(self, session_id: str, expire_seconds: int = 120) -> bool:
+        lock_key = f"session:{session_id}:lock"
+        res = await self._redis.set(lock_key, "1", ex=expire_seconds, nx=True) # type: ignore[misc]
+        return bool(res)
+
+    async def release_lock(self, session_id: str) -> None:
+        lock_key = f"session:{session_id}:lock"
+        await self._redis.delete(lock_key) # type: ignore[misc]
+
     async def close(self) -> None:
         await self._redis.aclose()

@@ -24,13 +24,61 @@ from agentix.core.alert_dedup import AlertDeduplicator
 from agentix.core.cleanup import run_periodic_cleanup
 from agentix.core.orchestrator import Orchestrator
 from agentix.registry.catalog import ToolCatalog
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
+
+class SessionTaskManager:
+    """
+    Manages active agent execution tasks and client subscriber queues.
+    This protects agent runs from client disconnects (cancellations).
+    """
+    def __init__(self) -> None:
+        self.tasks: dict[str, asyncio.Task] = {}
+        self.queues: dict[str, list[asyncio.Queue]] = {}
+        self.lock = asyncio.Lock()
+
+    async def get_or_create_queue(self, session_id: str) -> asyncio.Queue:
+        async with self.lock:
+            q = asyncio.Queue()
+            if session_id not in self.queues:
+                self.queues[session_id] = []
+            self.queues[session_id].append(q)
+            return q
+
+    async def remove_queue(self, session_id: str, queue: asyncio.Queue) -> None:
+        async with self.lock:
+            if session_id in self.queues:
+                if queue in self.queues[session_id]:
+                    self.queues[session_id].remove(queue)
+                if not self.queues[session_id]:
+                    del self.queues[session_id]
+
+    async def publish_step(self, session_id: str, step_data: dict) -> None:
+        async with self.lock:
+            queues = self.queues.get(session_id, [])
+            for q in queues:
+                await q.put(step_data)
+
+    async def register_task(self, session_id: str, task: asyncio.Task) -> None:
+        async with self.lock:
+            self.tasks[session_id] = task
+
+    async def remove_task(self, session_id: str) -> None:
+        async with self.lock:
+            if session_id in self.tasks:
+                del self.tasks[session_id]
+
+    async def is_running(self, session_id: str) -> bool:
+        async with self.lock:
+            task = self.tasks.get(session_id)
+            if task and not task.done():
+                return True
+            return False
 
 # Initialize FastAPI App
 app = FastAPI(
@@ -63,6 +111,7 @@ async def startup_event():
     except Exception as e:
         logger.error("Failed to run database migrations", error=str(e))
         
+    app.state.task_manager = SessionTaskManager()
     app.state.catalog = ToolCatalog()
     app.state.redis_store = RedisSessionStore(redis_url=settings.redis_url)
     app.state.pref_store = RedisPreferenceStore(redis_url=settings.redis_url)
@@ -209,6 +258,130 @@ async def create_session(
         workspace_enabled=workspace_enabled,
     )
 
+async def start_session_background_run(
+    session_id: str,
+    message: str,
+    agent: str | None,
+    redis_store: RedisSessionStore,
+    catalog: ToolCatalog,
+    pref_store: RedisPreferenceStore,
+) -> bool:
+    """
+    Acquires the session lock and spawns a background asyncio task to execute the agent.
+    Returns True if the run was started, False if it was already running or locked.
+    """
+    task_manager = app.state.task_manager
+
+    # 1. Double check task manager status
+    if await task_manager.is_running(session_id):
+        return False
+
+    # 2. Acquire Redis concurrency lock
+    if not await redis_store.acquire_lock(session_id, expire_seconds=120):
+        return False
+
+    # Define background worker
+    async def background_worker():
+        try:
+            # Initialize Orchestrator based on requested agent
+            active_agent = agent
+            if active_agent:
+                try:
+                    from agentix.agents.factory import AgentFactory
+                    orchestrator = AgentFactory.create(
+                        agent_name=active_agent.lower(),
+                        catalog=catalog,
+                        memory=redis_store,
+                    )
+                    orchestrator._preference_store = pref_store
+                except Exception as e:
+                    logger.error("api.agent_loading_failed", agent=active_agent, error=str(e))
+                    orchestrator = Orchestrator(
+                        catalog=catalog,
+                        memory=redis_store,
+                        preference_store=pref_store
+                    )
+            else:
+                try:
+                    from agentix.agents.factory import AgentFactory
+                    orchestrator = await AgentFactory.create_auto(
+                        message=message,
+                        catalog=catalog,
+                        memory=redis_store,
+                    )
+                    orchestrator._preference_store = pref_store
+                except Exception as e:
+                    logger.error("api.auto_agent_failed", error=str(e))
+                    orchestrator = Orchestrator(
+                        catalog=catalog,
+                        memory=redis_store,
+                        preference_store=pref_store
+                    )
+
+            from agentix.core.react import StepType
+            
+            final_answer = None
+            has_confirm = False
+            
+            # Consume the async generator from the orchestrator
+            async for step in orchestrator.run_stream(
+                session_id=session_id,
+                user_message=message
+            ):
+                if step.step_type == StepType.CONFIRM:
+                    has_confirm = True
+                if step.step_type == StepType.ANSWER:
+                    final_answer = step.content
+
+                # Convert ReActStep to dictionary
+                step_dict = {
+                    "type": step.step_type.value,
+                    "content": step.content,
+                    "tool": step.tool_name,
+                    "tool_input": step.tool_input,
+                    "tool_output": step.tool_output,
+                }
+                
+                # Publish to all clients
+                await task_manager.publish_step(session_id, step_dict)
+            
+            # If the stream finished and we have no pending confirmation, mark COMPLETED
+            if not has_confirm:
+                verdict = "UNDETERMINED"
+                if final_answer:
+                    final_answer_upper = final_answer.upper()
+                    if "TRUE POSITIVE" in final_answer_upper or "TRUE_POSITIVE" in final_answer_upper or " TP " in f" {final_answer_upper} ":
+                        verdict = "TRUE_POSITIVE"
+                    elif "FALSE POSITIVE" in final_answer_upper or "FALSE_POSITIVE" in final_answer_upper or " FP " in f" {final_answer_upper} ":
+                        verdict = "FALSE_POSITIVE"
+                
+                await postgres_session_repo.update_status(
+                    session_id=session_id,
+                    status="COMPLETED",
+                    verdict=verdict,
+                )
+                await postgres_session_repo.add_event(
+                    session_id=session_id,
+                    event_type="status_change",
+                    actor="system",
+                    content=f"Session status updated to COMPLETED with verdict {verdict}",
+                )
+        except Exception as e:
+            logger.exception("orchestrator.background.error", session_id=session_id)
+            await task_manager.publish_step(session_id, {"error": str(e)})
+        finally:
+            # Release lock
+            await redis_store.release_lock(session_id)
+            # Unregister task from manager
+            await task_manager.remove_task(session_id)
+            # Signal EOF to all clients
+            await task_manager.publish_step(session_id, {"type": "EOF"})
+
+    # Spawn background task
+    task = asyncio.create_task(background_worker())
+    await task_manager.register_task(session_id, task)
+    return True
+
 @app.post("/v1/chat/stream")
 async def chat_stream(
     req: StreamRequest,
@@ -227,78 +400,116 @@ async def chat_stream(
     if not await redis_store.exists(req.session_id):
         raise HTTPException(status_code=404, detail=f"Session '{req.session_id}' not found.")
 
+    session_id = req.session_id
+    task_manager = app.state.task_manager
+
+    # Get or create subscriber queue for this client connection
+    client_queue = await task_manager.get_or_create_queue(session_id)
+
+    # Check if a task is already running for this session.
+    # If not running, start it.
+    is_running = await task_manager.is_running(session_id)
+    if not is_running:
+        started = await start_session_background_run(
+            session_id=session_id,
+            message=req.message,
+            agent=req.agent,
+            redis_store=redis_store,
+            catalog=catalog,
+            pref_store=pref_store
+        )
+        if not started:
+            await task_manager.remove_queue(session_id, client_queue)
+            raise HTTPException(status_code=409, detail="Session is currently executing another action.")
+
     async def _stream_generator():
-        # 1. Initialize Orchestrator based on requested agent
-        if req.agent:
-            try:
-                from agentix.agents.factory import AgentFactory
-                orchestrator = AgentFactory.create(
-                    agent_name=req.agent.lower(),
-                    catalog=catalog,
-                    memory=redis_store,
-                )
-                # Inject preference store if possible
-                orchestrator._preference_store = pref_store
-            except Exception as e:
-                logger.error("api.agent_loading_failed", agent=req.agent, error=str(e))
-                # Fallback to generic if agent not found
-                orchestrator = Orchestrator(
-                    catalog=catalog,
-                    memory=redis_store,
-                    preference_store=pref_store
-                )
-        else:
-            try:
-                from agentix.agents.factory import AgentFactory
-                orchestrator = await AgentFactory.create_auto(
-                    message=req.message,
-                    catalog=catalog,
-                    memory=redis_store,
-                )
-                orchestrator._preference_store = pref_store
-            except Exception as e:
-                logger.error("api.auto_agent_failed", error=str(e))
-                # Fallback to generic if auto-routing crashes
-                orchestrator = Orchestrator(
-                    catalog=catalog,
-                    memory=redis_store,
-                    preference_store=pref_store
-                )
-        
         try:
-            # Consume the async generator from the orchestrator
-            async for step in orchestrator.run_stream(
-                session_id=req.session_id,
-                user_message=req.message
-            ):
-                # Convert ReActStep to dictionary then to JSON string
-                step_dict = {
-                    "type": step.step_type.value,
-                    "content": step.content,
-                    "tool": step.tool_name,
-                    "tool_input": step.tool_input,
-                    "tool_output": step.tool_output,
-                }
-                
-                # yield SSE payload format
-                # The SSE format is strictly `data: {payload}\n\n`
-                json_data = json.dumps(step_dict, default=str)
+            while True:
+                item = await client_queue.get()
+                if item.get("type") == "EOF":
+                    break
+                if "error" in item:
+                    yield f"data: {json.dumps(item)}\n\n"
+                    break
+                json_data = json.dumps(item, default=str)
                 yield f"data: {json_data}\n\n"
-                
-                # Yield context back to event loop briefly
-                await asyncio.sleep(0.01)
-                
-        except Exception as e:
-            logger.exception("orchestrator.stream.error")
-            err_payload = json.dumps({"error": str(e)})
-            yield f"data: {err_payload}\n\n"
-            
-        yield "data: [DONE]\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await task_manager.remove_queue(session_id, client_queue)
 
     return StreamingResponse(
         _stream_generator(),
         media_type="text/event-stream"
     )
+
+@app.post("/v1/sessions/{session_id}/approve")
+async def approve_session(
+    session_id: str,
+    redis_store: RedisSessionStore = Depends(get_redis_store),
+    catalog: ToolCatalog = Depends(get_catalog),
+    pref_store: RedisPreferenceStore = Depends(get_pref_store)
+):
+    """
+    REST API endpoint to approve the pending action of a session.
+    Triggers resumption in a background task and returns immediately.
+    """
+    session = await postgres_session_repo.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+        
+    if session.get("status") != "WAITING_APPROVAL":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Session '{session_id}' is not awaiting approval. Current status: {session.get('status')}"
+        )
+        
+    started = await start_session_background_run(
+        session_id=session_id,
+        message="yes",
+        agent=session.get("agent_name"),
+        redis_store=redis_store,
+        catalog=catalog,
+        pref_store=pref_store
+    )
+    if not started:
+        raise HTTPException(status_code=409, detail="Session is already executing another action.")
+        
+    return {"status": "success", "message": "Approval processed. Session execution resumed in background."}
+
+@app.post("/v1/sessions/{session_id}/reject")
+async def reject_session(
+    session_id: str,
+    redis_store: RedisSessionStore = Depends(get_redis_store),
+    catalog: ToolCatalog = Depends(get_catalog),
+    pref_store: RedisPreferenceStore = Depends(get_pref_store)
+):
+    """
+    REST API endpoint to reject the pending action of a session.
+    Triggers cancellation/completion in a background task and returns immediately.
+    """
+    session = await postgres_session_repo.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+        
+    if session.get("status") != "WAITING_APPROVAL":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Session '{session_id}' is not awaiting approval. Current status: {session.get('status')}"
+        )
+        
+    started = await start_session_background_run(
+        session_id=session_id,
+        message="no",
+        agent=session.get("agent_name"),
+        redis_store=redis_store,
+        catalog=catalog,
+        pref_store=pref_store
+    )
+    if not started:
+        raise HTTPException(status_code=409, detail="Session is already executing another action.")
+        
+    return {"status": "success", "message": "Rejection processed. Session execution resumed in background."}
 
 
 @app.delete("/v1/session/{session_id}")
@@ -381,17 +592,27 @@ class UpdateSessionRequest(BaseModel):
 
 @app.get("/v1/sessions")
 async def list_sessions(
+    response: Response,
     source: str | None = None,
     status: str | None = None,
     owner_id: str | None = None,
+    search: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ):
     try:
+        total = await postgres_session_repo.count_sessions(
+            source=source,
+            status=status,
+            owner_id=owner_id,
+            search=search,
+        )
+        response.headers["X-Total-Count"] = str(total)
         return await postgres_session_repo.list_sessions(
             source=source,
             status=status,
             owner_id=owner_id,
+            search=search,
             limit=limit,
             offset=offset,
         )

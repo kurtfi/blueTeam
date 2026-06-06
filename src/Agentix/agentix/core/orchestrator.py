@@ -36,6 +36,7 @@ from agentix.core.observability import obs
 from agentix.core.rag import ContextEnrichmentService
 from agentix.core.react import ReActStep, ReActTrace, StepType
 from agentix.core.tool_executor import ToolExecutionEngine
+from agentix.core.hitl_coordinator import HitlCoordinator
 from agentix.registry.catalog import ToolCatalog
 
 if TYPE_CHECKING:
@@ -79,10 +80,12 @@ class Orchestrator:
         rag_enabled: bool = True,
         config: AgentConfig | None = None,
         vector_store: Any | None = None,
+        db_repo: Any | None = None,
     ) -> None:
         self._llm = llm or LLMClient()
         self._catalog = catalog or ToolCatalog()
         self._memory = memory or SessionStore()
+        self._db_repo = db_repo or postgres_session_repo
         self._preference_store = preference_store
         self._config = config
         
@@ -120,6 +123,11 @@ class Orchestrator:
             memory=self._memory,
             preference_store=self._preference_store,
             workspace=self._workspace
+        )
+        self._hitl_coordinator = HitlCoordinator(
+            llm=self._llm,
+            db_repo=self._db_repo,
+            memory=self._memory,
         )
 
     # ------------------------------------------------------------------
@@ -163,18 +171,19 @@ class Orchestrator:
         log.info("orchestrator.run_stream.start", message=user_message[:120])
 
         # Increment message count and log user message event in Postgres
-        try:
-            await postgres_session_repo.increment_stats(session_id, message_count=1)
-            # Avoid duplicate logs for automated siem triage prompt
-            if not user_message.strip().startswith("You are an autonomous Tier 1 (T1) SOC Analyst."):
-                await postgres_session_repo.add_event(
-                    session_id=session_id,
-                    event_type="message",
-                    actor="user",
-                    content=user_message,
-                )
-        except Exception as e:
-            log.error("orchestrator.postgres_user_msg_log_failed", error=str(e))
+        if self._db_repo:
+            try:
+                await self._db_repo.increment_stats(session_id, message_count=1)
+                # Avoid duplicate logs for automated siem triage prompt
+                if not user_message.strip().startswith("You are an autonomous Tier 1 (T1) SOC Analyst."):
+                    await self._db_repo.add_event(
+                        session_id=session_id,
+                        event_type="message",
+                        actor="user",
+                        content=user_message,
+                    )
+            except Exception as e:
+                log.error("orchestrator.postgres_user_msg_log_failed", error=str(e))
 
         # 0. Initialise per-session workspace (if enabled).
         if settings.agentix_session_workspace_enabled:
@@ -203,16 +212,17 @@ class Orchestrator:
                 log.info("orchestrator.resume.approved", user_message=user_message)
                 
                 # Update status and add event in Postgres
-                try:
-                    await postgres_session_repo.update_status(session_id, "ACTIVE")
-                    await postgres_session_repo.add_event(
-                        session_id=session_id,
-                        event_type="hitl_response",
-                        actor="user",
-                        content="User approved the pending tool execution.",
-                    )
-                except Exception as e:
-                    log.error("orchestrator.postgres_hitl_approved_log_failed", error=str(e))
+                if self._db_repo:
+                    try:
+                        await self._db_repo.update_status(session_id, "ACTIVE")
+                        await self._db_repo.add_event(
+                            session_id=session_id,
+                            event_type="hitl_response",
+                            actor="user",
+                            content="User approved the pending tool execution.",
+                        )
+                    except Exception as e:
+                        log.error("orchestrator.postgres_hitl_approved_log_failed", error=str(e))
                 
                 messages = draft_history
                 # Clear draft_history
@@ -229,16 +239,17 @@ class Orchestrator:
                 log.info("orchestrator.resume.rejected", user_message=user_message)
                 
                 # Update status and add event in Postgres
-                try:
-                    await postgres_session_repo.update_status(session_id, "COMPLETED")
-                    await postgres_session_repo.add_event(
-                        session_id=session_id,
-                        event_type="hitl_response",
-                        actor="user",
-                        content="User rejected the pending tool execution. Workflow cancelled.",
-                    )
-                except Exception as e:
-                    log.error("orchestrator.postgres_hitl_rejected_log_failed", error=str(e))
+                if self._db_repo:
+                    try:
+                        await self._db_repo.update_status(session_id, "COMPLETED")
+                        await self._db_repo.add_event(
+                            session_id=session_id,
+                            event_type="hitl_response",
+                            actor="user",
+                            content="User rejected the pending tool execution. Workflow cancelled.",
+                        )
+                    except Exception as e:
+                        log.error("orchestrator.postgres_hitl_rejected_log_failed", error=str(e))
                 
                 await self._memory.set_metadata(session_id, "draft_history", None)
                 await self._memory.append(
@@ -313,10 +324,11 @@ class Orchestrator:
         )
 
         if trace and hasattr(trace, "id") and trace.id:
-            try:
-                await postgres_session_repo.update_stats(session_id, langfuse_trace_id=str(trace.id))
-            except Exception as e:
-                log.error("orchestrator.update_trace_id_failed", error=str(e))
+            if self._db_repo:
+                try:
+                    await self._db_repo.update_stats(session_id, langfuse_trace_id=str(trace.id))
+                except Exception as e:
+                    log.error("orchestrator.update_trace_id_failed", error=str(e))
 
         final_answer = ""
         iterations = 0
@@ -424,7 +436,6 @@ class Orchestrator:
                 tool_args = json.loads(tc["function"]["arguments"])
             except json.JSONDecodeError:
                 tool_args = {}
-
             think_step = ReActStep(
                 StepType.THINK,
                 f"Calling tool '{tool_name}' with {tool_args}",
@@ -447,65 +458,32 @@ class Orchestrator:
                         # Save the current messages history as draft state for resumption
                         await self._memory.set_metadata(session_id, "draft_history", messages)
                         
-                        # Increment hitl_count and update status in Postgres
-                        try:
-                            await postgres_session_repo.increment_stats(session_id, hitl_count=1)
-                            await postgres_session_repo.update_status(session_id, "WAITING_APPROVAL")
-                            await postgres_session_repo.add_event(
-                                session_id=session_id,
-                                event_type="hitl_request",
-                                actor="agent",
-                                content=f"Tool '{t_name}' requires manual confirmation.",
-                                metadata={"tool_name": t_name, "tool_args": t_args}
-                            )
-                        except Exception as e:
-                            log.error("orchestrator.postgres_hitl_request_log_failed", error=str(e))
-                        
-                        import sys
-                        import time
-                        
-                        # Yield Teams dispatch notification
-                        yield ReActStep(
-                            StepType.OBSERVE,
-                            content=f"[Teams Integration] Dispatching approval request card to Microsoft Teams #soc-alerts channel for tool '{t_name}'...",
-                            tool_name="microsoft_teams",
-                        )
-                        
-                        # Simulate latency: 1.5s normally, 0.05s during unit testing
-                        delay = 0.05 if "pytest" in sys.modules else 1.5
-                        await asyncio.sleep(delay)
-                        
-                        # Yield Teams delivery confirmation
-                        msg_id = f"msg_{int(time.time())}"
-                        yield ReActStep(
-                            StepType.OBSERVE,
-                            content=f"[Teams Integration] Adaptive Card sent successfully! (Message ID: {msg_id}). Waiting for operator response...",
-                            tool_name="microsoft_teams",
-                        )
-                        
-                        yield ReActStep(
-                            StepType.CONFIRM,
-                            content=f"Tool '{t_name}' requires manual confirmation.",
+                        hitl_message, steps = await self._hitl_coordinator.handle_requires_confirmation(
+                            session_id=session_id,
                             tool_name=t_name,
-                            tool_input=t_args,
+                            tool_args=t_args,
+                            messages=messages,
+                            log=log,
                         )
+                        for step in steps:
+                            yield step
                         log.info("orchestrator.confirmation_required", tool=t_name)
                         return  # Caller must re-submit with approved=True.
 
         # Fan-out: execute all tool calls in parallel.
         # Increment tool_calls count in Postgres
-        try:
-            await postgres_session_repo.increment_stats(session_id, tool_calls=len(tool_calls))
-        except Exception as e:
-            log.error("orchestrator.postgres_increment_tool_calls_failed", error=str(e))
+        if self._db_repo:
+            try:
+                await self._db_repo.increment_stats(session_id, tool_calls=len(tool_calls))
+            except Exception as e:
+                log.error("orchestrator.postgres_increment_tool_calls_failed", error=str(e))
 
-        # Make sure tool_executor has latest workspace
-        self._tool_executor._workspace = self._workspace
         observation_results = await self._tool_executor.execute_tools_parallel(
             tool_calls=tool_calls,
             tool_map=tool_map,
             session_id=session_id,
             parent=trace,
+            workspace=self._workspace,
         )
 
         # Yield OBSERVE steps and feed results back to the model.

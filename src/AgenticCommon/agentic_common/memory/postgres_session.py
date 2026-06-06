@@ -57,6 +57,13 @@ class PostgresSessionRepository:
             sql = f.read()
 
         async with pool.acquire() as conn:
+            # ALTER TYPE ... ADD VALUE cannot be executed inside a transaction block, so run it beforehand
+            try:
+                await conn.execute("ALTER TYPE session_source ADD VALUE 'SIEM';")
+            except Exception:
+                # Ignore if it already exists or type is not created yet
+                pass
+
             async with conn.transaction():
                 await conn.execute(sql)
         logger.info("postgres_session.migrations_completed")
@@ -65,12 +72,12 @@ class PostgresSessionRepository:
         self,
         *,
         display_name: str,
-        source: str,  # WAZUH | USER | SYSTEM
+        source: str,  # SIEM | USER | SYSTEM
         owner_id: str = "anonymous",
         agent_name: str | None = None,
-        wazuh_rule_id: str | None = None,
-        wazuh_rule_desc: str | None = None,
-        wazuh_severity: int | None = None,
+        siem_rule_id: str | None = None,
+        siem_rule_desc: str | None = None,
+        siem_severity: int | None = None,
         source_ip: str | None = None,
         mitre_ids: list[str] | None = None,
         alert_payload: dict | None = None,
@@ -90,7 +97,7 @@ class PostgresSessionRepository:
                 """
                 INSERT INTO sessions (
                     id, display_name, source, owner_id, agent_name,
-                    wazuh_rule_id, wazuh_rule_desc, wazuh_severity,
+                    siem_rule_id, siem_rule_desc, siem_severity,
                     source_ip, mitre_ids, alert_payload, status, created_at, updated_at
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'ACTIVE', NOW(), NOW())
                 """,
@@ -99,9 +106,9 @@ class PostgresSessionRepository:
                 source,
                 owner_id,
                 agent_name,
-                wazuh_rule_id,
-                wazuh_rule_desc,
-                wazuh_severity,
+                siem_rule_id,
+                siem_rule_desc,
+                siem_severity,
                 source_ip,
                 mitre_ids,
                 payload_json,
@@ -259,12 +266,60 @@ class PostgresSessionRepository:
                 return d
         return None
 
+    async def count_sessions(
+        self,
+        *,
+        source: str | None = None,
+        status: str | None = None,
+        owner_id: str | None = None,
+        search: str | None = None,
+        include_archived: bool = False,
+    ) -> int:
+        """
+        Count total matching sessions for pagination calculation.
+        """
+        pool = await self.get_pool()
+
+        where_clauses = []
+        params: list[Any] = []
+
+        if not include_archived:
+            where_clauses.append("deleted_at IS NULL AND status != 'ARCHIVED'")
+
+        if source:
+            params.append(source)
+            where_clauses.append(f"source = ${len(params)}")
+
+        if status:
+            params.append(status)
+            where_clauses.append(f"status = ${len(params)}")
+
+        if owner_id:
+            params.append(owner_id)
+            where_clauses.append(f"owner_id = ${len(params)}")
+
+        if search:
+            params.append(f"%{search}%")
+            param_idx = len(params)
+            where_clauses.append(f"(display_name ILIKE ${param_idx} OR source_ip ILIKE ${param_idx} OR siem_rule_id ILIKE ${param_idx})")
+
+        where_str = ""
+        if where_clauses:
+            where_str = "WHERE " + " AND ".join(where_clauses)
+
+        query = f"SELECT COUNT(*) FROM sessions {where_str}"
+
+        async with pool.acquire() as conn:
+            count = await conn.fetchval(query, *params)
+        return count or 0
+
     async def list_sessions(
         self,
         *,
         source: str | None = None,
         status: str | None = None,
         owner_id: str | None = None,
+        search: str | None = None,
         limit: int = 50,
         offset: int = 0,
         include_archived: bool = False,
@@ -292,6 +347,11 @@ class PostgresSessionRepository:
             params.append(owner_id)
             where_clauses.append(f"owner_id = ${len(params)}")
 
+        if search:
+            params.append(f"%{search}%")
+            param_idx = len(params)
+            where_clauses.append(f"(display_name ILIKE ${param_idx} OR source_ip ILIKE ${param_idx} OR siem_rule_id ILIKE ${param_idx})")
+
         where_str = ""
         if where_clauses:
             where_str = "WHERE " + " AND ".join(where_clauses)
@@ -310,7 +370,7 @@ class PostgresSessionRepository:
 
         async with pool.acquire() as conn:
             rows = await conn.fetch(query, *params)
-            
+
         results = []
         for row in rows:
             d = dict(row)
@@ -318,7 +378,7 @@ class PostgresSessionRepository:
                 d["alert_payload"] = json.loads(d["alert_payload"])
             d["id"] = str(d["id"])
             results.append(d)
-            
+
         return results
 
     async def add_event(
@@ -393,14 +453,14 @@ class PostgresSessionRepository:
                     COUNT(*) FILTER (WHERE status = 'WAITING_APPROVAL') as pending_hitl,
                     COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') as created_last_24h,
                     COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed_sessions,
-                    COUNT(*) FILTER (WHERE source = 'WAZUH') as wazuh_sessions,
+                    COUNT(*) FILTER (WHERE source = 'SIEM') as siem_sessions,
                     COUNT(*) FILTER (WHERE source = 'USER') as user_sessions
                 FROM sessions
                 WHERE deleted_at IS NULL AND status != 'ARCHIVED'
                 """
             )
             
-            # Wazuh specific metrics
+            # SIEM specific metrics
             verdicts = await conn.fetchrow(
                 """
                 SELECT
@@ -408,7 +468,7 @@ class PostgresSessionRepository:
                     COUNT(*) FILTER (WHERE verdict = 'FALSE_POSITIVE') as false_positives,
                     COUNT(*) FILTER (WHERE verdict = 'UNDETERMINED') as undetermined
                 FROM sessions
-                WHERE source = 'WAZUH' AND deleted_at IS NULL AND status != 'ARCHIVED'
+                WHERE source = 'SIEM' AND deleted_at IS NULL AND status != 'ARCHIVED'
                 """
             )
 
@@ -427,7 +487,7 @@ class PostgresSessionRepository:
             "pending_hitl": counts["pending_hitl"] or 0,
             "created_last_24h": counts["created_last_24h"] or 0,
             "completed_sessions": counts["completed_sessions"] or 0,
-            "wazuh_sessions": counts["wazuh_sessions"] or 0,
+            "siem_sessions": counts["siem_sessions"] or 0,
             "user_sessions": counts["user_sessions"] or 0,
             "true_positives": verdicts["true_positives"] or 0,
             "false_positives": verdicts["false_positives"] or 0,

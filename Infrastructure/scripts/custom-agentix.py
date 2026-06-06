@@ -8,7 +8,7 @@ endpoint with X-Internal-Api-Key auth.
 ossec.conf usage:
   <integration>
     <name>custom-agentix</name>
-    <hook_url>http://agentix-gateway:8001/v1/webhooks/wazuh</hook_url>
+    <hook_url>http://agentix-gateway:8001/v1/webhooks/siem</hook_url>
     <api_key>dev-internal-key-change-me-in-production</api_key>
     <group>authentication_failures</group>
     <alert_format>json</alert_format>

@@ -29,6 +29,7 @@ class AlertDeduplicator:
                    or all_fields.get("rule", {}).get("id"))
         
         src_ip = (payload.get("srcip")
+                  or payload.get("data", {}).get("srcip")
                   or all_fields.get("data", {}).get("srcip")
                   or all_fields.get("agent", {}).get("ip")
                   or payload.get("agent", {}).get("ip"))

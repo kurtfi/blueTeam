@@ -88,6 +88,7 @@ async def web_chat(
     streams the SSE response back to the browser client.
     """
     user_id = str(current_user.get("uid", ""))
+    role = str(current_user.get("role", "user"))
 
     # 1. Establish or validate session
     session_id = req.session_id
@@ -98,7 +99,8 @@ async def web_chat(
             raise HTTPException(status_code=500, detail="Could not initialize session")
     else:
         # SECURITY: Verify session ownership to prevent IDOR attacks.
-        is_owner = await verify_session_owner(session_id, user_id)
+        # Admin role is allowed to access any session (e.g. WAZUH alerts)
+        is_owner = (role == "admin") or await verify_session_owner(session_id, user_id)
         if not is_owner:
             logger.warning(
                 "gateway.web.idor_blocked",

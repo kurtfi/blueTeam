@@ -45,7 +45,6 @@ async def verify_hmac_signature(
 router = APIRouter(tags=["webhooks"])
 
 @router.post("/v1/webhooks/siem", dependencies=[Depends(verify_hmac_signature)])
-@router.post("/v1/webhooks/wazuh", dependencies=[Depends(verify_hmac_signature)])
 async def handle_siem_alert(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -82,44 +81,54 @@ async def handle_siem_alert(
         }
 
     # Extract Wazuh alert metadata
-    rule_id = (payload.get("rule", {}).get("id") 
-               or payload.get("rule_id") 
+    rule_id = (payload.get("rule_id") 
+               or payload.get("rule", {}).get("id") 
                or payload.get("all_fields", {}).get("rule", {}).get("id"))
-    rule_desc = (payload.get("rule", {}).get("description") 
-                 or payload.get("rule_description") 
+    rule_desc = (payload.get("title")
+                 or payload.get("rule_description")
+                 or payload.get("rule", {}).get("description")
+                 or payload.get("all_fields", {}).get("rule", {}).get("description")
                  or "Unknown SIEM Alert")
-    severity_val = (payload.get("rule", {}).get("level") 
+    severity_val = (payload.get("severity")
+                     or payload.get("rule", {}).get("level")
+                     or payload.get("all_fields", {}).get("rule", {}).get("level")
                      or payload.get("level"))
     try:
         severity = int(severity_val) if severity_val is not None else None
     except ValueError:
         severity = None
         
-    src_ip = (payload.get("data", {}).get("srcip") 
-              or payload.get("srcip"))
-    mitre_ids = (payload.get("rule", {}).get("mitre", {}).get("id") 
-                 or payload.get("mitre_ids"))
+    src_ip = (payload.get("srcip")
+              or payload.get("data", {}).get("srcip")
+              or payload.get("all_fields", {}).get("data", {}).get("srcip")
+              or payload.get("all_fields", {}).get("syslog_headers", {}).get("from"))
+    mitre_ids = (payload.get("mitre_ids")
+                 or payload.get("rule", {}).get("mitre", {}).get("id")
+                 or payload.get("all_fields", {}).get("rule", {}).get("mitre", {}).get("id"))
     if mitre_ids and isinstance(mitre_ids, str):
         mitre_ids = [mitre_ids]
 
-    # Display name format: rule_description + src_ip + timestamp
+    # Display name format: [MITRE_ID] rule_description from src_ip — timestamp
     timestamp_str = datetime.now().strftime("%b %d %H:%M")
+    mitre_str = ", ".join(mitre_ids) if mitre_ids else ""
+    prefix = f"[{mitre_str}] " if mitre_str else ""
+    
     if src_ip:
-        display_name = f"{rule_desc} from {src_ip} — {timestamp_str}"
+        display_name = f"{prefix}{rule_desc} from {src_ip} — {timestamp_str}"
     else:
-        display_name = f"{rule_desc} — {timestamp_str}"
+        display_name = f"{prefix}{rule_desc} — {timestamp_str}"
 
     # Create persistent session in PostgreSQL
     try:
         await postgres_session_repo.create_session(
             session_id=session_id,
             display_name=display_name,
-            source="WAZUH",
-            owner_id="wazuh",
+            source="SIEM",
+            owner_id="siem",
             agent_name="soc_analyst",
-            wazuh_rule_id=str(rule_id) if rule_id else None,
-            wazuh_rule_desc=rule_desc,
-            wazuh_severity=severity,
+            siem_rule_id=str(rule_id) if rule_id else None,
+            siem_rule_desc=rule_desc,
+            siem_severity=severity,
             source_ip=src_ip,
             mitre_ids=mitre_ids,
             alert_payload=payload,
@@ -128,7 +137,7 @@ async def handle_siem_alert(
         await postgres_session_repo.add_event(
             session_id=session_id,
             event_type="system",
-            actor="wazuh",
+            actor="siem",
             content=f"Triage workflow initiated for alert: {rule_desc}",
         )
     except Exception as e:

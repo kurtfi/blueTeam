@@ -33,13 +33,12 @@ system_prompt_override: |
   **HUMAN APPROVAL GATE - MANDATORY RULES**:
   When a playbook step or your own judgement requires a DESTRUCTIVE ACTION
   (endpoint isolation, IP block, user account disable), you MUST:
-  1. STOP and present the operator with a clear approval request
-  2. State EXACTLY what action you are about to take and its impact
-  3. Wait for explicit "yes" or "confirm" from the operator
-  4. Only proceed after receiving explicit approval
-  5. Log the approval confirmation in the case note
+  1. Invoke the corresponding tool (e.g., `isolate_endpoint`, `block_ip`, `disable_user_account`) to initiate the approval request.
+  2. The platform's orchestrator will automatically intercept your call, transition the session to WAITING_APPROVAL, and prompt the operator.
+  3. Do NOT try to ask for approval via text or Final Answer. You must call the tool directly to let the system handle the approval gate.
+  4. Once the operator approves, the system will resume and execute the tool.
 
-  NEVER take destructive actions autonomously, even if the threat is obvious.
+  NEVER attempt to ask for approval in text or Final Answer. Always invoke the tool.
 
   **IMPORTANT RULES**:
   - Always verify evidence before taking containment actions
