@@ -38,11 +38,13 @@ from agentix.core.react import ReActStep, ReActTrace, StepType
 from agentix.core.tool_executor import ToolExecutionEngine
 from agentix.core.hitl_coordinator import HitlCoordinator
 from agentix.registry.catalog import ToolCatalog
+from agentix.core.guardrails.base import BaseGuardrail
 
 if TYPE_CHECKING:
     from agentix.agents.schema import AgentConfig
 
 logger = structlog.get_logger(__name__)
+
 
 
 class Orchestrator:
@@ -81,6 +83,7 @@ class Orchestrator:
         config: AgentConfig | None = None,
         vector_store: Any | None = None,
         db_repo: Any | None = None,
+        guardrails: list[BaseGuardrail] | None = None,
     ) -> None:
         self._llm = llm or LLMClient()
         self._catalog = catalog or ToolCatalog()
@@ -88,6 +91,8 @@ class Orchestrator:
         self._db_repo = db_repo or postgres_session_repo
         self._preference_store = preference_store
         self._config = config
+        self._guardrails = guardrails
+
         
         # Log agent identity
         identity = config.name if config else "Generic Orchestrator"
@@ -203,7 +208,49 @@ class Orchestrator:
         is_resume = False
         tool_calls: list[Any] = []
 
+        if not draft_history:
+            # Check session source to only run guardrails for USER sessions
+            session_source = "USER"
+            if self._db_repo:
+                try:
+                    session = await self._db_repo.get_session(session_id)
+                    session_source = session.get("source") if session else "USER"
+                except Exception as db_err:
+                    log.error("orchestrator.fetch_session_source_failed", session_id=session_id, error=str(db_err))
+                    session_source = "USER"
+
+            if session_source == "USER":
+                # Run guardrails for new turns
+                guardrails_to_run = self._guardrails
+                if guardrails_to_run is None:
+                    from agentix.core.guardrails.security_topic import SecurityTopicGuardrail
+                    guardrails_to_run = [SecurityTopicGuardrail(llm=self._llm)]
+
+                from agentix.core.guardrails.engine import GuardrailEngine
+                engine = GuardrailEngine(guardrails_to_run)
+                guardrail_result = await engine.run(session_id, user_message)
+
+                if not guardrail_result.passed:
+                    refusal = guardrail_result.refusal_message or "Request blocked by guardrails."
+                    log.info("orchestrator.guardrail_blocked", reason=guardrail_result.reason)
+
+                    if self._db_repo:
+                        try:
+                            await self._db_repo.add_event(
+                                session_id=session_id,
+                                event_type="error",
+                                actor="system",
+                                content=f"Guardrail block: {guardrail_result.reason}",
+                            )
+                        except Exception as db_ex:
+                            log.error("orchestrator.postgres_guardrail_log_failed", error=str(db_ex))
+
+                    await self._memory.append(session_id, user_message, refusal)
+                    yield ReActStep(StepType.ANSWER, refusal)
+                    return
+
         if draft_history:
+
             is_positive = user_message.lower().strip() in (
                 "yes", "confirm", "evet", "onay", "y", "approve", "ok", "tamam", "go", "proceed"
             )

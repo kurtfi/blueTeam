@@ -346,21 +346,28 @@ async def start_session_background_run(
                 # Publish to all clients
                 await task_manager.publish_step(session_id, step_dict)
             
-            # If the stream finished and we have no pending confirmation, mark COMPLETED
+            # If the stream finished and we have no pending confirmation, mark COMPLETED (only for SIEM/automated sessions)
             if not has_confirm:
-                verdict = parse_verdict(final_answer)
-                
-                await postgres_session_repo.update_status(
-                    session_id=session_id,
-                    status="COMPLETED",
-                    verdict=verdict,
-                )
-                await postgres_session_repo.add_event(
-                    session_id=session_id,
-                    event_type="status_change",
-                    actor="system",
-                    content=f"Session status updated to COMPLETED with verdict {verdict}",
-                )
+                try:
+                    session = await postgres_session_repo.get_session(session_id)
+                    session_source = session.get("source") if session else "USER"
+                except Exception as db_err:
+                    logger.error("api.fetch_session_source_failed", session_id=session_id, error=str(db_err))
+                    session_source = "USER"  # Default safely to USER
+
+                if session_source != "USER":
+                    verdict = parse_verdict(final_answer)
+                    await postgres_session_repo.update_status(
+                        session_id=session_id,
+                        status="COMPLETED",
+                        verdict=verdict,
+                    )
+                    await postgres_session_repo.add_event(
+                        session_id=session_id,
+                        event_type="status_change",
+                        actor="system",
+                        content=f"Session status updated to COMPLETED with verdict {verdict}",
+                    )
         except Exception as e:
             logger.exception("orchestrator.background.error", session_id=session_id)
             await task_manager.publish_step(session_id, {"error": str(e)})
