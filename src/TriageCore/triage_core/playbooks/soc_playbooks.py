@@ -53,7 +53,7 @@ class PlaybookLoader:
                     loaded_count += 1
                     logger.debug("playbook_loader.loaded", playbook_id=playbook.id, path=entry.path)
                 except Exception as e:
-                    logger.error("playbook_loader.failed_to_load", path=entry.path, error=str(e))
+                    logger.critical("playbook_loader.failed_to_load", path=entry.path, error=str(e), alert=True, playbook_failure=True)
         
         logger.info("playbook_loader.completed", loaded_count=loaded_count, directory=str(directory))
 

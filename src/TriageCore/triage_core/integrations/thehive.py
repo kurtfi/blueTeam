@@ -49,7 +49,7 @@ class TheHiveProvider(ICaseManagementProvider):
                 case_id = data.get("_id") or data.get("id") or data.get("caseId", "UNKNOWN")
                 return f"Case successfully created. Case ID: {case_id}"
         except Exception as e:
-            logger.error("thehive.create.error", error=str(e))
+            logger.critical("thehive.create.error", error=str(e), alert=True, case_mgmt_failure=True)
             return f"Error creating case: {str(e)}"
 
     async def add_case_note(self, case_id: str, note: str, task_title: str = "Investigation Note") -> str:
@@ -81,7 +81,7 @@ class TheHiveProvider(ICaseManagementProvider):
                 task_id = resp.json().get("_id", "?")
                 return f"Note successfully added. Task ID: {task_id}"
         except Exception as e:
-            logger.error("thehive.note.error", error=str(e))
+            logger.critical("thehive.note.error", error=str(e), alert=True, case_mgmt_failure=True)
             return f"Error adding note: {str(e)}"
 
     # TheHive 5 valid case status values
@@ -180,7 +180,7 @@ class TheHiveProvider(ICaseManagementProvider):
                 resp.raise_for_status()
                 return f"Case {case_id} status updated to '{mapped_status}' (requested: '{status}')."
         except Exception as e:
-            logger.error("thehive.status.error", error=str(e), payload=payload)
+            logger.critical("thehive.status.error", error=str(e), payload=payload, alert=True, case_mgmt_failure=True)
             return f"Error updating case status: {str(e)}"
 
     async def create_alert(self, title: str = "", description: str = "", source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: list[str] | None = None, observables: list[dict[str, Any]] | None = None) -> str:
@@ -270,5 +270,5 @@ class TheHiveProvider(ICaseManagementProvider):
                 alert_id = data.get("_id", data.get("id", "UNKNOWN"))
                 return f"Alert successfully created. Alert ID: {alert_id}"
         except Exception as e:
-            logger.error("thehive.alert.error", error=str(e))
+            logger.critical("thehive.alert.error", error=str(e), alert=True, case_mgmt_failure=True)
             return f"Error creating alert: {str(e)}"

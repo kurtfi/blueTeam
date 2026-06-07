@@ -52,7 +52,7 @@ class WazuhProvider(ISiemProvider, IEndpointProvider):
                     
                 return f"Found {len(results)} events:\n" + "\n".join(results)
         except Exception as e:
-            logger.error("wazuh.query.error", error=str(e))
+            logger.critical("wazuh.query.error", error=str(e), alert=True, siem_failure=True)
             return f"SIEM query failed: {str(e)}"
 
     async def get_endpoint_info(self, agent_id: str) -> str:
@@ -103,7 +103,7 @@ class WazuhProvider(ISiemProvider, IEndpointProvider):
                     f"  Last Seen: {last_seen}"
                 )
         except Exception as e:
-            logger.error("wazuh.agent.info.error", error=str(e))
+            logger.critical("wazuh.agent.info.error", error=str(e), alert=True, endpoint_failure=True)
             return f"Error getting endpoint info: {str(e)}"
 
     async def isolate_endpoint(self, agent_id: str) -> str:
@@ -116,8 +116,14 @@ class WazuhProvider(ISiemProvider, IEndpointProvider):
         wazuh_verify_ssl = os.getenv("WAZUH_API_VERIFY_SSL", "false").lower() in ("true", "1", "yes")
         
         try:
+            timeout_val = 10.0
+            try:
+                timeout_val = float(os.getenv("WAZUH_API_TIMEOUT", "10.0"))
+            except ValueError:
+                pass
+
             async with httpx.AsyncClient(verify=wazuh_verify_ssl) as client:
-                auth_resp = await client.get(f"{wazuh_url}/security/user/authenticate", auth=(wazuh_user, wazuh_pass))
+                auth_resp = await client.get(f"{wazuh_url}/security/user/authenticate", auth=(wazuh_user, wazuh_pass), timeout=timeout_val)
                 auth_resp.raise_for_status()
                 token = auth_resp.json().get("data", {}).get("token")
                 
@@ -128,10 +134,10 @@ class WazuhProvider(ISiemProvider, IEndpointProvider):
                     "custom": False,
                     "agents_list": [agent_id]
                 }
-                resp = await client.put(f"{wazuh_url}/active-response", json=payload, headers=headers)
+                resp = await client.put(f"{wazuh_url}/active-response", json=payload, headers=headers, timeout=timeout_val)
                 resp.raise_for_status()
                 
                 return f"Endpoint {agent_id} successfully isolated. Response: {json.dumps(resp.json())}"
         except Exception as e:
-            logger.error("wazuh.ar.error", error=str(e))
+            logger.critical("wazuh.ar.error", error=str(e), alert=True, containment_failure=True)
             return f"Error isolating endpoint: {str(e)}"

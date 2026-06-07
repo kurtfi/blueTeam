@@ -122,5 +122,5 @@ class CortexProvider(IEnrichmentProvider):
                 return f"Cortex Analysis Timeout | Job ID: {job_id} | Final Status: {status or 'Unknown'}"
                 
         except Exception as e:
-            logger.error("cortex.analysis.error", error=str(e))
+            logger.critical("cortex.analysis.error", error=str(e), alert=True, enrichment_failure=True)
             return f"Error during Cortex analysis: {str(e)}"
