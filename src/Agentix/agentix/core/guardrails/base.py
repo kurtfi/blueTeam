@@ -9,6 +9,6 @@ class GuardrailResult:
 
 class BaseGuardrail(ABC):
     @abstractmethod
-    async def validate(self, session_id: str, message: str) -> GuardrailResult:
+    async def validate(self, session_id: str, message: str, session_source: str = "USER") -> GuardrailResult:
         """Run validation on the user message."""
         pass

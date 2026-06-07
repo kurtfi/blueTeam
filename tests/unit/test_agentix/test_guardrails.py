@@ -15,34 +15,48 @@ from agentix.registry.catalog import ToolCatalog
 from agentix.core.orchestrator import Orchestrator
 
 from agentix.core.guardrails.base import BaseGuardrail, GuardrailResult
-from agentix.core.guardrails.engine import GuardrailEngine
+from agentix.core.guardrails.manager import GuardrailManager
+from agentix.core.guardrails.factory import GuardrailFactory
 from agentix.core.guardrails.security_topic import SecurityTopicGuardrail
 from agentix.core.llm import LLMClient
 
 
 class DummyPassGuardrail(BaseGuardrail):
-    async def validate(self, session_id: str, message: str) -> GuardrailResult:
+    async def validate(self, session_id: str, message: str, session_source: str = "USER") -> GuardrailResult:
         return GuardrailResult(passed=True)
 
 
 class DummyBlockGuardrail(BaseGuardrail):
-    async def validate(self, session_id: str, message: str) -> GuardrailResult:
+    async def validate(self, session_id: str, message: str, session_source: str = "USER") -> GuardrailResult:
+        if session_source != "USER":
+            return GuardrailResult(passed=True)
         return GuardrailResult(passed=False, reason="Blocked by dummy guardrail", refusal_message="Refused by dummy.")
 
 
 @pytest.mark.asyncio
-async def test_guardrail_engine_execution():
+async def test_guardrail_manager_execution():
     # 1. Test passing chain
-    engine_pass = GuardrailEngine([DummyPassGuardrail(), DummyPassGuardrail()])
-    res_pass = await engine_pass.run("session_123", "Hello")
+    manager_pass = GuardrailManager([DummyPassGuardrail(), DummyPassGuardrail()])
+    res_pass = await manager_pass.verify("session_123", "Hello", "USER")
     assert res_pass.passed is True
 
     # 2. Test blocking chain
-    engine_block = GuardrailEngine([DummyPassGuardrail(), DummyBlockGuardrail(), DummyPassGuardrail()])
-    res_block = await engine_block.run("session_123", "Hello")
+    manager_block = GuardrailManager([DummyPassGuardrail(), DummyBlockGuardrail(), DummyPassGuardrail()])
+    res_block = await manager_block.verify("session_123", "Hello", "USER")
     assert res_block.passed is False
     assert res_block.reason == "Blocked by dummy guardrail"
     assert res_block.refusal_message == "Refused by dummy."
+
+    # 3. Test dynamic registration
+    manager_dynamic = GuardrailManager()
+    manager_dynamic.register(DummyPassGuardrail())
+    manager_dynamic.register(DummyBlockGuardrail())
+    res_dyn = await manager_dynamic.verify("session_123", "Hello", "USER")
+    assert res_dyn.passed is False
+    
+    # 4. Test bypass when session_source is not USER
+    res_bypass = await manager_block.verify("session_123", "Hello", "SIEM")
+    assert res_bypass.passed is True
 
 
 @pytest.mark.asyncio
@@ -51,7 +65,7 @@ async def test_security_topic_guardrail_pass():
     mock_llm.chat.return_value = {"content": "PASS"}
 
     guardrail = SecurityTopicGuardrail(llm=mock_llm)
-    res = await guardrail.validate("session_123", "Can you help me block an IP?")
+    res = await guardrail.validate("session_123", "Can you help me block an IP?", "USER")
     
     assert res.passed is True
     mock_llm.chat.assert_called_once()
@@ -63,7 +77,7 @@ async def test_security_topic_guardrail_block():
     mock_llm.chat.return_value = {"content": "BLOCK: Üzgünüm, sadece siber güvenlik konularına cevap verebilirim."}
 
     guardrail = SecurityTopicGuardrail(llm=mock_llm)
-    res = await guardrail.validate("session_123", "Bana çikolatalı pasta tarifi ver.")
+    res = await guardrail.validate("session_123", "Bana çikolatalı pasta tarifi ver.", "USER")
     
     assert res.passed is False
     assert res.reason == "Out-of-scope query"
@@ -85,7 +99,7 @@ async def test_orchestrator_integration_blocks_and_logs():
 
     catalog = ToolCatalog()
     
-    # Instantiate orchestrator with a DummyBlockGuardrail
+    # Instantiate orchestrator with a GuardrailManager containing a DummyBlockGuardrail
     orchestrator = Orchestrator(
         llm=mock_llm,
         catalog=catalog,
@@ -93,7 +107,7 @@ async def test_orchestrator_integration_blocks_and_logs():
         db_repo=mock_db,
         max_iterations=5,
         rag_enabled=False,
-        guardrails=[DummyBlockGuardrail()]
+        guardrail_manager=GuardrailManager([DummyBlockGuardrail()])
     )
 
     steps = []
@@ -153,7 +167,7 @@ async def test_orchestrator_integration_passes_normally():
         db_repo=mock_db,
         max_iterations=1,
         rag_enabled=False,
-        guardrails=[DummyPassGuardrail()]
+        guardrail_manager=GuardrailManager([DummyPassGuardrail()])
     )
 
     steps = []
@@ -198,7 +212,7 @@ async def test_orchestrator_integration_siem_bypasses_guardrail():
         db_repo=mock_db,
         max_iterations=1,
         rag_enabled=False,
-        guardrails=[DummyBlockGuardrail()]
+        guardrail_manager=GuardrailManager([DummyBlockGuardrail()])
     )
 
     steps = []

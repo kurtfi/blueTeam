@@ -21,8 +21,9 @@ BLOCK: <Polite refusal message in the same language as the user's query explaini
 
 class SecurityTopicGuardrail(BaseGuardrail):
     """
-    Guardrail that checks if the incoming user message is relevant to siber security / IT operations.
+    Guardrail that checks if the incoming user message is relevant to cybersecurity / IT operations.
     Rejects general out-of-scope questions.
+    Only checks sessions where source == 'USER'.
     """
 
     def __init__(self, llm: LLMClient | None = None) -> None:
@@ -32,13 +33,22 @@ class SecurityTopicGuardrail(BaseGuardrail):
             cache_enabled=True,
         )
 
-    async def validate(self, session_id: str, message: str) -> GuardrailResult:
+    def _build_messages(self, user_message: str) -> list[dict[str, str]]:
+        """Separate prompt formatting from execution logic (SRP)."""
+        return [
+            {"role": "system", "content": _GUARDRAIL_SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ]
+
+    async def validate(self, session_id: str, message: str, session_source: str = "USER") -> GuardrailResult:
         log = logger.bind(session_id=session_id)
         
-        messages = [
-            {"role": "system", "content": _GUARDRAIL_SYSTEM_PROMPT},
-            {"role": "user", "content": message},
-        ]
+        # Guardrail only applies to USER chat sessions. Bypassed for SIEM webhooks.
+        if session_source != "USER":
+            log.debug("guardrail.bypass", session_source=session_source)
+            return GuardrailResult(passed=True)
+
+        messages = self._build_messages(message)
         
         try:
             response = await self._llm.chat(messages)
