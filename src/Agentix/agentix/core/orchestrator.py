@@ -18,7 +18,6 @@ Design principles encoded here:
 """
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
@@ -31,15 +30,15 @@ from agentic_common.settings import settings
 from agentic_common.workspace import SessionWorkspace
 
 from agentix.core.context.manager import ContextManager
+from agentix.core.guardrails.base import GuardrailResult
+from agentix.core.guardrails.manager import GuardrailManager
+from agentix.core.hitl_coordinator import HitlCoordinator
 from agentix.core.llm import LLMClient
 from agentix.core.observability import obs
 from agentix.core.rag import ContextEnrichmentService
 from agentix.core.react import ReActStep, ReActTrace, StepType
 from agentix.core.tool_executor import ToolExecutionEngine
-from agentix.core.hitl_coordinator import HitlCoordinator
 from agentix.registry.catalog import ToolCatalog
-from agentix.core.guardrails.manager import GuardrailManager
-from agentix.core.guardrails.base import GuardrailResult
 
 if TYPE_CHECKING:
     from agentix.agents.schema import AgentConfig

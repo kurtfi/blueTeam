@@ -1,6 +1,9 @@
+from enum import Enum, auto
+
+import structlog
+
 from agentix.core.guardrails.base import BaseGuardrail, GuardrailResult
 from agentix.core.llm import LLMClient
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -19,7 +22,6 @@ If it is NOT related to security operations, IT infrastructure, or greetings (e.
 BLOCK: <Polite refusal message in the same language as the user's query explaining that you can only help with security operations and log/threat analysis>
 """
 
-from enum import Enum, auto
 
 class GuardrailDecision(Enum):
     PASS = auto()

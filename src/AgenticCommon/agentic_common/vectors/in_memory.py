@@ -3,6 +3,7 @@ Simple in-memory vector store using cosine similarity.
 """
 from __future__ import annotations
 
+import asyncio
 import math
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -23,6 +24,7 @@ class InMemoryVectorStore(BaseVectorStore):
     def __init__(self, embedding_provider: BaseEmbeddingProvider | None = None) -> None:
         self._embeddings = embedding_provider or EmbeddingFactory.create_provider()
         self._collections: dict[str, list[dict[str, Any]]] = {}
+        self._lock = asyncio.Lock()
 
     async def upsert(
         self,
@@ -31,28 +33,29 @@ class InMemoryVectorStore(BaseVectorStore):
         ids: list[str] | None = None,
         collection: str = "default",
     ) -> list[str]:
-        if collection not in self._collections:
-            self._collections[collection] = []
+        async with self._lock:
+            if collection not in self._collections:
+                self._collections[collection] = []
 
-        vectors = await self._embeddings.embed_documents(texts)
-        new_ids = ids or [str(uuid.uuid4()) for _ in range(len(texts))]
-        new_metadata = metadata or [{} for _ in range(len(texts))]
+            vectors = await self._embeddings.embed_documents(texts)
+            new_ids = ids or [str(uuid.uuid4()) for _ in range(len(texts))]
+            new_metadata = metadata or [{} for _ in range(len(texts))]
 
-        for i, text in enumerate(texts):
-            doc = {
-                "id": new_ids[i],
-                "text": text,
-                "vector": vectors[i],
-                "metadata": new_metadata[i],
-            }
-            # Simple replace if ID exists
-            existing_idx = next((idx for idx, d in enumerate(self._collections[collection]) if d["id"] == doc["id"]), -1)
-            if existing_idx != -1:
-                self._collections[collection][existing_idx] = doc
-            else:
-                self._collections[collection].append(doc)
+            for i, text in enumerate(texts):
+                doc = {
+                    "id": new_ids[i],
+                    "text": text,
+                    "vector": vectors[i],
+                    "metadata": new_metadata[i],
+                }
+                # Simple replace if ID exists
+                existing_idx = next((idx for idx, d in enumerate(self._collections[collection]) if d["id"] == doc["id"]), -1)
+                if existing_idx != -1:
+                    self._collections[collection][existing_idx] = doc
+                else:
+                    self._collections[collection].append(doc)
 
-        return new_ids
+            return new_ids
 
     async def search(
         self,
@@ -135,9 +138,10 @@ class InMemoryVectorStore(BaseVectorStore):
         return results
 
     async def delete(self, ids: list[str], collection: str = "default") -> None:
-        if collection not in self._collections:
-            return
-        self._collections[collection] = [d for d in self._collections[collection] if d["id"] not in ids]
+        async with self._lock:
+            if collection not in self._collections:
+                return
+            self._collections[collection] = [d for d in self._collections[collection] if d["id"] not in ids]
 
     def _cosine_similarity(self, v1: list[float], v2: list[float]) -> float:
         """Compute cosine similarity between two vectors."""

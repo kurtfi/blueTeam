@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from agentic_common.memory.postgres_session import PostgresSessionRepository
@@ -133,3 +133,25 @@ async def test_add_event():
     assert args[2] == "thought"
     assert args[3] == "agent"
     assert args[4] == "I am thinking"
+
+
+@pytest.mark.asyncio
+@patch("asyncpg.create_pool")
+@patch("agentic_common.memory.postgres_session.logger")
+async def test_get_pool_retry_behavior(mock_logger, mock_create_pool):
+    repo = PostgresSessionRepository()
+    mock_create_pool.side_effect = Exception("DB Connection Refused")
+    
+    with patch("asyncio.sleep", AsyncMock()) as mock_sleep:
+        with pytest.raises(Exception, match="DB Connection Refused"):
+            await repo.get_pool()
+        
+        assert mock_create_pool.call_count == 3
+        assert mock_sleep.call_count == 2
+        mock_logger.critical.assert_called_once_with(
+            "postgres_session.connection_failed_final",
+            error="DB Connection Refused",
+            alert=True,
+            db_failure=True,
+        )
+

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-import yaml
-import structlog
 
+import structlog
+import yaml
 from triage_core.playbooks.base import (
     ApprovalGate,
     Playbook,
@@ -42,7 +42,7 @@ class PlaybookLoader:
         for entry in os.scandir(directory):
             if entry.is_file() and entry.name.endswith((".yaml", ".yml")):
                 try:
-                    with open(entry.path, "r", encoding="utf-8") as f:
+                    with open(entry.path, encoding="utf-8") as f:
                         data = yaml.safe_load(f)
                     
                     if not data:

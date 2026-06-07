@@ -127,7 +127,7 @@ class SessionWorkspace:
         base = self.root / subdirectory
         resolved = (base / relative_path).resolve()
 
-        if not str(resolved).startswith(str(self.root.resolve())):
+        if not resolved.is_relative_to(self.root.resolve()):
             raise PermissionError(
                 f"Access denied: path '{relative_path}' is outside the allowed workspace boundary."
             )
@@ -135,7 +135,10 @@ class SessionWorkspace:
 
     def contains(self, absolute_path: str | Path) -> bool:
         """Return True if *absolute_path* resides inside this session workspace."""
-        return str(Path(absolute_path).resolve()).startswith(str(self.root.resolve()))
+        try:
+            return Path(absolute_path).resolve().is_relative_to(self.root.resolve())
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
     # Access control

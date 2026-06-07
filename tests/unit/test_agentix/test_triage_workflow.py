@@ -22,7 +22,7 @@ async def test_process_siem_alert_success():
     
     with patch("agentix.core.triage_workflow.asyncio.sleep", new_callable=AsyncMock) as mock_sleep, \
          patch("agentix.core.triage_workflow.AgentFactory.create") as mock_factory, \
-         patch("agentix.core.triage_workflow.postgres_session_repo") as mock_repo:
+         patch("agentix.core.triage_workflow.postgres_session_repo"):
         
         # Mock Orchestrator and run_stream
         orchestrator_mock = MagicMock()

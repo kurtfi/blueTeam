@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from unittest.mock import ANY, AsyncMock, MagicMock, patch, mock_open
 import pytest
-import httpx
 
 from triage_core.integrations.wazuh import WazuhProvider
 from triage_core.integrations.thehive import TheHiveProvider

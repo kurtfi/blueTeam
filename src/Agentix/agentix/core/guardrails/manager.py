@@ -1,5 +1,6 @@
 from agentix.core.guardrails.base import BaseGuardrail, GuardrailResult
 
+
 class GuardrailManager:
     """
     Manages and executes a pipeline of guardrails.

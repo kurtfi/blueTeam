@@ -6,7 +6,7 @@ root_dir = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(root_dir / "src" / "Agentix"))
 sys.path.insert(0, str(root_dir / "src" / "AgenticCommon"))
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from agentic_common.memory.redis_store import RedisSessionStore
@@ -16,7 +16,6 @@ from agentix.core.orchestrator import Orchestrator
 
 from agentix.core.guardrails.base import BaseGuardrail, GuardrailResult
 from agentix.core.guardrails.manager import GuardrailManager
-from agentix.core.guardrails.factory import GuardrailFactory
 from agentix.core.guardrails.security_topic import SecurityTopicGuardrail
 from agentix.core.llm import LLMClient
 

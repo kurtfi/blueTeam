@@ -29,7 +29,31 @@ class PostgresSessionRepository:
             # strip +asyncpg for asyncpg library DSN compatibility
             dsn = settings.agentix_postgres_url.replace("+asyncpg", "")
             logger.info("postgres_session.connecting_db", dsn_masked=dsn.split("@")[-1])
-            self._pool = await asyncpg.create_pool(dsn=dsn)
+            
+            import asyncio
+            max_retries = 3
+            backoff = 1.0
+            for attempt in range(1, max_retries + 1):
+                try:
+                    self._pool = await asyncpg.create_pool(dsn=dsn)
+                    break
+                except Exception as e:
+                    if attempt == max_retries:
+                        logger.critical(
+                            "postgres_session.connection_failed_final",
+                            error=str(e),
+                            alert=True,
+                            db_failure=True,
+                        )
+                        raise
+                    logger.warning(
+                        "postgres_session.connection_failed_retry",
+                        error=str(e),
+                        attempt=attempt,
+                        next_retry_in=backoff,
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
         return self._pool
 
     async def run_migrations(self) -> None:

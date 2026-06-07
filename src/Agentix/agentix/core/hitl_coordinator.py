@@ -2,7 +2,9 @@ import asyncio
 import json
 import time
 from typing import Any
+
 import structlog
+
 from agentix.core.react import ReActStep, StepType
 
 logger = structlog.get_logger(__name__)

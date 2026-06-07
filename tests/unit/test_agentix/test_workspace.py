@@ -112,6 +112,26 @@ async def test_resolve_path_traversal_blocked(workspace_root: Path, session_id: 
 
 
 @pytest.mark.asyncio
+async def test_resolve_path_prefix_traversal_blocked(workspace_root: Path):
+    from agentic_common.workspace import SessionWorkspace
+
+    # session-1 is a string prefix of session-10
+    ws_a = SessionWorkspace(session_id="session-1")
+    await ws_a.initialize()
+
+    ws_b = SessionWorkspace(session_id="session-10")
+    await ws_b.initialize()
+
+    # Attempt to traverse from session-1 to session-10
+    with pytest.raises(PermissionError, match="outside the allowed workspace boundary"):
+        ws_a.resolve_path("../../session-10/malicious.txt", subdirectory="outputs")
+
+    # Verify contains checks are also structurally locked
+    target_path = ws_b.root / "outputs" / "malicious.txt"
+    assert ws_a.contains(target_path) is False
+
+
+@pytest.mark.asyncio
 async def test_contains_checks_path_membership(workspace_root: Path, session_id: str):
     from agentic_common.workspace import SessionWorkspace
 

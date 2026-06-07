@@ -61,7 +61,7 @@ class PostgresVectorStore(BaseVectorStore):
                 """)
                 await conn.execute(f"CREATE INDEX IF NOT EXISTS {self._table_name}_collection_idx ON {self._table_name} (collection)")
                 await conn.execute(f"CREATE INDEX IF NOT EXISTS {self._table_name}_tsvector_idx ON {self._table_name} USING GIN (content_tsvector)")
-                await conn.execute(f"CREATE INDEX IF NOT EXISTS {self._table_name}_embedding_idx ON {self._table_name} USING ivfflat (embedding vector_cosine_ops)")
+                await conn.execute(f"CREATE INDEX IF NOT EXISTS {self._table_name}_embedding_idx ON {self._table_name} USING hnsw (embedding vector_cosine_ops)")
 
     async def upsert(
         self,

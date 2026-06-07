@@ -2,6 +2,7 @@ from agentix.core.guardrails.manager import GuardrailManager
 from agentix.core.guardrails.security_topic import SecurityTopicGuardrail
 from agentix.core.llm import LLMClient
 
+
 class GuardrailFactory:
     """
     Factory class to construct GuardrailManager instances.
