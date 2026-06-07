@@ -110,7 +110,7 @@ async def startup_event():
         await postgres_session_repo.run_migrations()
         logger.info("Database migrations run successfully.")
     except Exception as e:
-        logger.error("Failed to run database migrations", error=str(e))
+        logger.critical("Failed to run database migrations", error=str(e), alert=True, db_failure=True)
         
     app.state.task_manager = SessionTaskManager()
     app.state.catalog = ToolCatalog()
@@ -238,7 +238,7 @@ async def create_session(
             owner_id=user_id,
         )
     except Exception as e:
-        logger.error("session.postgres_creation_failed", session_id=new_uuid, error=str(e))
+        logger.critical("session.postgres_creation_failed", session_id=new_uuid, error=str(e), alert=True, db_failure=True)
         raise HTTPException(status_code=500, detail=f"Failed to persist session in Database: {str(e)}")
 
     # Register the session in the Redis store
@@ -352,7 +352,7 @@ async def start_session_background_run(
                     session = await postgres_session_repo.get_session(session_id)
                     session_source = session.get("source") if session else "USER"
                 except Exception as db_err:
-                    logger.error("api.fetch_session_source_failed", session_id=session_id, error=str(db_err))
+                    logger.critical("api.fetch_session_source_failed", session_id=session_id, error=str(db_err), alert=True, db_failure=True)
                     session_source = "USER"  # Default safely to USER
 
                 if session_source != "USER":

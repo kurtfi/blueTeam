@@ -18,6 +18,8 @@ class ToolExecutionEngine:
         self._memory = memory
         self._preference_store = preference_store
         self._workspace = workspace
+        self._fs_locks: dict[str, asyncio.Lock] = {}
+        self._engine_lock = asyncio.Lock()
 
     async def execute_tools_parallel(
         self,
@@ -87,6 +89,29 @@ class ToolExecutionEngine:
         tool = tool_map.get(tool_name)
         if tool is None:
             return ToolResult(success=False, error=f"Tool '{tool_name}' not found.")
+
+        # Determine if this tool modifies files in the sandbox workspace.
+        # Check standard file modification keywords in the tool name.
+        is_modifying_fs = any(
+            kw in tool_name.lower() for kw in ["write", "delete", "create", "append", "edit", "move", "remove", "save"]
+        )
+
+        session_id = context.get("session_id") if context else None
+
+        if is_modifying_fs and session_id:
+            # Concurrency-safe lock retrieval/creation for the session workspace
+            async with self._engine_lock:
+                if session_id not in self._fs_locks:
+                    self._fs_locks[session_id] = asyncio.Lock()
+                lock = self._fs_locks[session_id]
+
+            # Serialize workspace file modification tool calls for this session
+            async with lock:
+                return await track_tool_call(
+                    tool_name,
+                    tool.execute(context=context, **tool_args),
+                    parent=parent,
+                )
 
         return await track_tool_call(
             tool_name,

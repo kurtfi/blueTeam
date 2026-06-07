@@ -141,7 +141,7 @@ async def handle_siem_alert(
             content=f"Triage workflow initiated for alert: {rule_desc}",
         )
     except Exception as e:
-        logger.error("webhooks.postgres_creation_failed", session_id=session_id, error=str(e))
+        logger.critical("webhooks.postgres_creation_failed", session_id=session_id, error=str(e), alert=True, db_failure=True)
         # Proceed with background triage even if DB fails, or we can reject.
         # It's better to log and proceed in async webhook to avoid losing alerts.
 

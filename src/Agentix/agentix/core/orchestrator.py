@@ -39,6 +39,7 @@ from agentix.core.tool_executor import ToolExecutionEngine
 from agentix.core.hitl_coordinator import HitlCoordinator
 from agentix.registry.catalog import ToolCatalog
 from agentix.core.guardrails.manager import GuardrailManager
+from agentix.core.guardrails.base import GuardrailResult
 
 if TYPE_CHECKING:
     from agentix.agents.schema import AgentConfig
@@ -175,7 +176,7 @@ class Orchestrator:
                     content=user_message,
                 )
         except Exception as e:
-            log.error("orchestrator.postgres_user_msg_log_failed", error=str(e))
+            log.critical("orchestrator.postgres_user_msg_log_failed", error=str(e), alert=True, db_failure=True)
 
     async def _check_session_guardrails(
         self, session_id: str, user_message: str, log: Any
@@ -188,9 +189,9 @@ class Orchestrator:
         if self._db_repo:
             try:
                 session = await self._db_repo.get_session(session_id)
-                session_source = session.get("source") if session else "USER"
+                session_source = str(session.get("source")) if (session and session.get("source")) else "USER"
             except Exception as db_err:
-                log.error("orchestrator.fetch_session_source_failed", session_id=session_id, error=str(db_err))
+                log.critical("orchestrator.fetch_session_source_failed", session_id=session_id, error=str(db_err), alert=True, db_failure=True)
 
         guardrail_result = await self._run_guardrails(session_id, user_message, session_source)
         if guardrail_result.passed:
@@ -208,7 +209,7 @@ class Orchestrator:
                     content=f"Guardrail block: {guardrail_result.reason}",
                 )
             except Exception as db_ex:
-                log.error("orchestrator.postgres_guardrail_log_failed", error=str(db_ex))
+                log.critical("orchestrator.postgres_guardrail_log_failed", error=str(db_ex), alert=True, db_failure=True)
 
         await self._memory.append(session_id, user_message, refusal)
         return False, refusal
@@ -234,7 +235,7 @@ class Orchestrator:
                     content="User approved the pending tool execution.",
                 )
             except Exception as e:
-                log.error("orchestrator.postgres_hitl_approved_log_failed", error=str(e))
+                log.critical("orchestrator.postgres_hitl_approved_log_failed", error=str(e), alert=True, db_failure=True)
 
         await self._memory.set_metadata(session_id, "draft_history", None)
 
@@ -260,7 +261,7 @@ class Orchestrator:
                     content="User rejected the pending tool execution. Workflow cancelled.",
                 )
             except Exception as e:
-                log.error("orchestrator.postgres_hitl_rejected_log_failed", error=str(e))
+                log.critical("orchestrator.postgres_hitl_rejected_log_failed", error=str(e), alert=True, db_failure=True)
 
         await self._memory.set_metadata(session_id, "draft_history", None)
         await self._memory.append(session_id, user_message, "Action cancelled by user.")
@@ -412,7 +413,7 @@ class Orchestrator:
                 try:
                     await self._db_repo.update_stats(session_id, langfuse_trace_id=str(trace.id))
                 except Exception as e:
-                    log.error("orchestrator.update_trace_id_failed", error=str(e))
+                    log.critical("orchestrator.update_trace_id_failed", error=str(e), alert=True, db_failure=True)
 
         final_answer = ""
         iterations = 0
@@ -500,7 +501,7 @@ class Orchestrator:
         log.info("orchestrator.run_stream.done", iterations=iterations)
 
         # 7. Flush Langfuse traces to ensure they are sent before the request ends.
-        obs.flush()
+        await obs.flush()
 
     async def _process_tool_calls_stream(
         self,
@@ -560,7 +561,7 @@ class Orchestrator:
             try:
                 await self._db_repo.increment_stats(session_id, tool_calls=len(tool_calls))
             except Exception as e:
-                log.error("orchestrator.postgres_increment_tool_calls_failed", error=str(e))
+                log.critical("orchestrator.postgres_increment_tool_calls_failed", error=str(e), alert=True, db_failure=True)
 
         observation_results = await self._tool_executor.execute_tools_parallel(
             tool_calls=tool_calls,

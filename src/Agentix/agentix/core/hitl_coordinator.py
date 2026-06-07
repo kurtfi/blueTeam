@@ -70,7 +70,7 @@ class HitlCoordinator:
                     metadata={"tool_name": tool_name, "tool_args": tool_args}
                 )
             except Exception as e:
-                log.error("hitl_coordinator.db_logging_failed", error=str(e))
+                log.critical("hitl_coordinator.db_logging_failed", error=str(e), alert=True, db_failure=True)
 
         # 3. Create the notification and confirmation ReActSteps
         steps = []

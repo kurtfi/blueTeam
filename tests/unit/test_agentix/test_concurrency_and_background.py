@@ -66,3 +66,47 @@ async def test_session_task_manager():
 
     await manager.remove_task("session_123")
     assert "session_123" not in manager.tasks
+
+
+@pytest.mark.asyncio
+async def test_tool_executor_fs_locks():
+    from agentix.core.tool_executor import ToolExecutionEngine
+    from agentic_common.base_tool import BaseTool, ToolResult
+
+    execution_order = []
+
+    class SlowModifyingTool(BaseTool):
+        name = "write_secure_file"
+        description = "Write a file safely"
+        category = "system"
+        parameters = {}
+
+        async def execute(self, **kwargs):
+            execution_order.append("start_modify")
+            await asyncio.sleep(0.05)
+            execution_order.append("end_modify")
+            return ToolResult(success=True, output="File written")
+
+    engine = ToolExecutionEngine()
+    tool_map = {
+        "write_secure_file": SlowModifyingTool(),
+    }
+
+    tool_calls = [
+        {"id": "call_1", "function": {"name": "write_secure_file", "arguments": "{}"}},
+        {"id": "call_2", "function": {"name": "write_secure_file", "arguments": "{}"}},
+    ]
+
+    results = await engine.execute_tools_parallel(
+        tool_calls=tool_calls,
+        tool_map=tool_map,
+        session_id="session_test",
+    )
+
+    assert len(results) == 2
+    assert results[0].success is True
+    assert results[1].success is True
+
+    # Since they are both file-modifying, they must be serialized:
+    # First must start and end before the second starts.
+    assert execution_order == ["start_modify", "end_modify", "start_modify", "end_modify"]

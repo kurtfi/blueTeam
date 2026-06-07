@@ -5,6 +5,7 @@ Provides a singleton Langfuse client and context-aware tracing utilities.
 """
 from __future__ import annotations
 
+import asyncio
 import functools
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -58,12 +59,12 @@ class ObservabilityManager:
             metadata=kwargs
         )
 
-    def flush(self) -> None:
+    async def flush(self) -> None:
         """
-        Ensure all traces are sent to the server.
+        Ensure all traces are sent to the server in a non-blocking thread.
         """
         if self._client:
-            self._client.flush()
+            await asyncio.to_thread(self._client.flush)
 
 # Global singleton
 obs = ObservabilityManager()
