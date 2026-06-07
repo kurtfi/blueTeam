@@ -45,6 +45,7 @@ def simulate_t1048():
         print(f"  \u2717 Only {success_count}/{len(log_entries)} entries written")
         return False
 
+
 if __name__ == "__main__":
     ensure_log_file()
     if simulate_t1048():

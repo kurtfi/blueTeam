@@ -42,7 +42,7 @@ debug_enabled = False
 pwd = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 # Log path
-LOG_FILE = f'{pwd}/logs/integrations.log'
+LOG_FILE = f"{pwd}/logs/integrations.log"
 
 # Argument indices (Wazuh integration convention)
 ALERT_INDEX = 1
@@ -55,21 +55,19 @@ def main(args):
     try:
         bad_arguments = False
         if len(args) >= 4:
-            msg = '{} {} {} {} {}'.format(
-                args[1], args[2], args[3],
-                args[4] if len(args) > 4 else '',
-                args[5] if len(args) > 5 else ''
+            msg = "{} {} {} {} {}".format(
+                args[1], args[2], args[3], args[4] if len(args) > 4 else "", args[5] if len(args) > 5 else ""
             )
-            debug_enabled = len(args) > 4 and args[4] == 'debug'
+            debug_enabled = len(args) > 4 and args[4] == "debug"
         else:
-            msg = '# ERROR: Wrong arguments'
+            msg = "# ERROR: Wrong arguments"
             bad_arguments = True
 
-        with open(LOG_FILE, 'a') as f:
-            f.write(msg + '\n')
+        with open(LOG_FILE, "a") as f:
+            f.write(msg + "\n")
 
         if bad_arguments:
-            debug(f'# ERROR: Exiting, bad arguments. Inputted: {args}')
+            debug(f"# ERROR: Exiting, bad arguments. Inputted: {args}")
             sys.exit(ERR_BAD_ARGUMENTS)
 
         process_args(args)
@@ -81,7 +79,7 @@ def main(args):
 
 def process_args(args):
     """Core function: reads alert, builds payload, sends to Agentix Gateway."""
-    debug('# Running Agentix custom integration script')
+    debug("# Running Agentix custom integration script")
 
     alert_file_location = args[ALERT_INDEX]
     api_key = args[APIKEY_INDEX]
@@ -96,20 +94,20 @@ def process_args(args):
     if not msg:
         return
 
-    debug(f'# Sending message to Agentix Gateway: {webhook}')
+    debug(f"# Sending message to Agentix Gateway: {webhook}")
     send_msg(msg, webhook, api_key)
 
 
 def debug(msg):
     if debug_enabled:
         print(msg)
-        with open(LOG_FILE, 'a') as f:
-            f.write(msg + '\n')
+        with open(LOG_FILE, "a") as f:
+            f.write(msg + "\n")
 
 
 def generate_msg(alert):
     """Generate the JSON payload compatible with Agentix webhook handler."""
-    level = alert.get('rule', {}).get('level', 0)
+    level = alert.get("rule", {}).get("level", 0)
 
     if level <= 4:
         severity = 1
@@ -119,14 +117,14 @@ def generate_msg(alert):
         severity = 3
 
     msg = {
-        'severity': severity,
-        'pretext': 'WAZUH Alert',
-        'title': alert.get('rule', {}).get('description', 'N/A'),
-        'text': alert.get('full_log', ''),
-        'rule_id': alert.get('rule', {}).get('id', ''),
-        'timestamp': alert.get('timestamp', ''),
-        'id': alert.get('id', ''),
-        'all_fields': alert,
+        "severity": severity,
+        "pretext": "WAZUH Alert",
+        "title": alert.get("rule", {}).get("description", "N/A"),
+        "text": alert.get("full_log", ""),
+        "rule_id": alert.get("rule", {}).get("id", ""),
+        "timestamp": alert.get("timestamp", ""),
+        "id": alert.get("id", ""),
+        "all_fields": alert,
     }
 
     return json.dumps(msg)
@@ -135,15 +133,15 @@ def generate_msg(alert):
 def send_msg(msg, url, api_key):
     """Send the alert payload to Agentix Gateway with X-Internal-Api-Key auth."""
     headers = {
-        'Content-Type': 'application/json',
-        'Accept-Charset': 'UTF-8',
-        'X-Internal-Api-Key': api_key,
+        "Content-Type": "application/json",
+        "Accept-Charset": "UTF-8",
+        "X-Internal-Api-Key": api_key,
     }
     try:
         res = requests.post(url, data=msg, headers=headers, timeout=10)
-        debug(f'# Response: status={res.status_code} body={res.text[:200]}')
+        debug(f"# Response: status={res.status_code} body={res.text[:200]}")
     except Exception as e:
-        debug(f'# Error sending to Agentix: {e}')
+        debug(f"# Error sending to Agentix: {e}")
 
 
 def get_json_alert(file_location):
@@ -154,9 +152,9 @@ def get_json_alert(file_location):
         debug(f"# JSON file for alert {file_location} doesn't exist")
         sys.exit(ERR_FILE_NOT_FOUND)
     except json.decoder.JSONDecodeError as e:
-        debug(f'Failed getting JSON alert. Error: {e}')
+        debug(f"Failed getting JSON alert. Error: {e}")
         sys.exit(ERR_INVALID_JSON)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(sys.argv)

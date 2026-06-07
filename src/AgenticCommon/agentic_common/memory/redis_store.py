@@ -1,6 +1,7 @@
 """
 RedisSessionStore — Redis-backed conversation history and session metadata.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,11 +22,11 @@ class RedisSessionStore:
     async def exists(self, session_id: str) -> bool:
         history_key = f"session:{session_id}:history"
         meta_key = f"session:{session_id}:metadata"
-        return await self._redis.exists(history_key, meta_key) > 0 # type: ignore[misc]
+        return await self._redis.exists(history_key, meta_key) > 0  # type: ignore[misc]
 
     async def get_history(self, session_id: str) -> list[dict]:
         key = f"session:{session_id}:history"
-        items = await self._redis.lrange(key, 0, -1) # type: ignore[misc]
+        items = await self._redis.lrange(key, 0, -1)  # type: ignore[misc]
         return [json.loads(item) for item in items]
 
     async def append(
@@ -35,10 +36,10 @@ class RedisSessionStore:
         assistant_message: str,
     ) -> None:
         key = f"session:{session_id}:history"
-        
+
         user_msg = json.dumps({"role": "user", "content": user_message})
         asst_msg = json.dumps({"role": "assistant", "content": assistant_message})
-        
+
         async with self._redis.pipeline(transaction=True) as pipe:
             pipe.rpush(key, user_msg)
             pipe.rpush(key, asst_msg)
@@ -53,25 +54,25 @@ class RedisSessionStore:
     async def get_metadata(self, session_id: str, k: str | None = None) -> Any:
         key = f"session:{session_id}:metadata"
         if k:
-            val = await self._redis.hget(key, k) # type: ignore[misc]
+            val = await self._redis.hget(key, k)  # type: ignore[misc]
             return json.loads(val) if val else None
 
-        data = await self._redis.hgetall(key) # type: ignore[misc]
+        data = await self._redis.hgetall(key)  # type: ignore[misc]
         return {k: json.loads(v) for k, v in data.items()}
 
     async def set_metadata(self, session_id: str, k: str, value: Any) -> None:
         key = f"session:{session_id}:metadata"
-        await self._redis.hset(key, k, json.dumps(value)) # type: ignore[misc]
-        await self._redis.expire(key, self._ttl) # type: ignore[misc]
+        await self._redis.hset(key, k, json.dumps(value))  # type: ignore[misc]
+        await self._redis.expire(key, self._ttl)  # type: ignore[misc]
 
     async def acquire_lock(self, session_id: str, expire_seconds: int = 120) -> bool:
         lock_key = f"session:{session_id}:lock"
-        res = await self._redis.set(lock_key, "1", ex=expire_seconds, nx=True) # type: ignore[misc]
+        res = await self._redis.set(lock_key, "1", ex=expire_seconds, nx=True)  # type: ignore[misc]
         return bool(res)
 
     async def release_lock(self, session_id: str) -> None:
         lock_key = f"session:{session_id}:lock"
-        await self._redis.delete(lock_key) # type: ignore[misc]
+        await self._redis.delete(lock_key)  # type: ignore[misc]
 
     async def close(self) -> None:
         await self._redis.aclose()

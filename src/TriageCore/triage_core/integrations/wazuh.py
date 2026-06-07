@@ -7,6 +7,7 @@ from triage_core.integrations.base import IEndpointProvider, ISiemProvider
 
 logger = structlog.get_logger(__name__)
 
+
 class WazuhProvider(ISiemProvider, IEndpointProvider):
     async def query_logs(self, query: str, time_range: str = "last 1 hour") -> str:
         logger.info("provider.wazuh.query_logs", query=query, time_range=time_range)
@@ -16,40 +17,33 @@ class WazuhProvider(ISiemProvider, IEndpointProvider):
         if not es_user or not es_pass:
             return "SIEM query failed: ELASTICSEARCH_USER or ELASTICSEARCH_PASSWORD not configured."
         verify_ssl = os.getenv("WAZUH_API_VERIFY_SSL", "false").lower() in ("true", "1", "yes")
-        
+
         try:
             async with httpx.AsyncClient(verify=verify_ssl) as client:
                 # Escape Lucene special characters except fields (:), wildcards (*, ?), and phrases (")
-                escape_chars = r'+-=&|><!(){}[]^~\\/'
-                safe_query = ''.join(['\\' + c if c in escape_chars else c for c in query])
-                
+                escape_chars = r"+-=&|><!(){}[]^~\\/"
+                safe_query = "".join(["\\" + c if c in escape_chars else c for c in query])
+
                 payload = {
-                    "query": {
-                        "query_string": {
-                            "query": safe_query
-                        }
-                    },
+                    "query": {"query_string": {"query": safe_query}},
                     "size": 10,
-                    "sort": [{"@timestamp": {"order": "desc"}}]
+                    "sort": [{"@timestamp": {"order": "desc"}}],
                 }
                 # Wazuh alerts index format
                 resp = await client.post(
-                    f"{es_url}/wazuh-alerts-*/_search",
-                    json=payload,
-                    auth=(es_user, es_pass),
-                    timeout=15.0
+                    f"{es_url}/wazuh-alerts-*/_search", json=payload, auth=(es_user, es_pass), timeout=15.0
                 )
                 resp.raise_for_status()
                 hits = resp.json().get("hits", {}).get("hits", [])
                 if not hits:
                     return f"No events found for query '{query}' in {time_range}."
-                
+
                 results = []
                 for hit in hits:
                     src = hit.get("_source", {})
                     rule = src.get("rule", {}).get("description", "Unknown Rule")
                     results.append(f"[{src.get('@timestamp')}] Rule: {rule} | Data: {json.dumps(src.get('data', {}))}")
-                    
+
                 return f"Found {len(results)} events:\n" + "\n".join(results)
         except Exception as e:
             logger.critical("wazuh.query.error", error=str(e), alert=True, siem_failure=True)
@@ -114,7 +108,7 @@ class WazuhProvider(ISiemProvider, IEndpointProvider):
         if not wazuh_user or not wazuh_pass:
             return "Error isolating endpoint: WAZUH_API_USER or WAZUH_API_PASSWORD not configured."
         wazuh_verify_ssl = os.getenv("WAZUH_API_VERIFY_SSL", "false").lower() in ("true", "1", "yes")
-        
+
         try:
             timeout_val = 10.0
             try:
@@ -123,20 +117,20 @@ class WazuhProvider(ISiemProvider, IEndpointProvider):
                 pass
 
             async with httpx.AsyncClient(verify=wazuh_verify_ssl) as client:
-                auth_resp = await client.get(f"{wazuh_url}/security/user/authenticate", auth=(wazuh_user, wazuh_pass), timeout=timeout_val)
+                auth_resp = await client.get(
+                    f"{wazuh_url}/security/user/authenticate", auth=(wazuh_user, wazuh_pass), timeout=timeout_val
+                )
                 auth_resp.raise_for_status()
                 token = auth_resp.json().get("data", {}).get("token")
-                
+
                 headers = {"Authorization": f"Bearer {token}"}
-                
-                payload = {
-                    "command": "host-deny",
-                    "custom": False,
-                    "agents_list": [agent_id]
-                }
-                resp = await client.put(f"{wazuh_url}/active-response", json=payload, headers=headers, timeout=timeout_val)
+
+                payload = {"command": "host-deny", "custom": False, "agents_list": [agent_id]}
+                resp = await client.put(
+                    f"{wazuh_url}/active-response", json=payload, headers=headers, timeout=timeout_val
+                )
                 resp.raise_for_status()
-                
+
                 return f"Endpoint {agent_id} successfully isolated. Response: {json.dumps(resp.json())}"
         except Exception as e:
             logger.critical("wazuh.ar.error", error=str(e), alert=True, containment_failure=True)

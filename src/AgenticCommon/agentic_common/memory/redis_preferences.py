@@ -1,6 +1,7 @@
 """
 RedisPreferenceStore — persistent user preference management via Redis.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,21 +20,21 @@ class RedisPreferenceStore:
 
     async def get(self, user_id: str, key: str, default: Any = None) -> Any:
         redis_key = f"user:{user_id}:preferences"
-        val = await self._redis.hget(redis_key, key) # type: ignore[misc]
+        val = await self._redis.hget(redis_key, key)  # type: ignore[misc]
         return json.loads(val) if val is not None else default
 
     async def get_all(self, user_id: str) -> dict[str, Any]:
         redis_key = f"user:{user_id}:preferences"
-        data = await self._redis.hgetall(redis_key) # type: ignore[misc]
+        data = await self._redis.hgetall(redis_key)  # type: ignore[misc]
         return {k: json.loads(v) for k, v in data.items()}
 
     async def set(self, user_id: str, key: str, value: Any) -> None:
         redis_key = f"user:{user_id}:preferences"
-        await self._redis.hset(redis_key, key, json.dumps(value)) # type: ignore[misc]
+        await self._redis.hset(redis_key, key, json.dumps(value))  # type: ignore[misc]
 
     async def delete(self, user_id: str, key: str) -> None:
         redis_key = f"user:{user_id}:preferences"
-        await self._redis.hdel(redis_key, key) # type: ignore[misc]
+        await self._redis.hdel(redis_key, key)  # type: ignore[misc]
 
     async def clear_user(self, user_id: str) -> None:
         redis_key = f"user:{user_id}:preferences"

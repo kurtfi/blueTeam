@@ -14,6 +14,7 @@ Design decisions:
   - Falls back to None (generic orchestrator) if confidence < threshold or
     if the LLM call fails for any reason.
 """
+
 from __future__ import annotations
 
 import json
@@ -67,7 +68,7 @@ class AgentRouter:
             model=model,
             temperature=0.0,
             max_tokens=128,
-            cache_enabled=True,   # Same message → same route (idempotent)
+            cache_enabled=True,  # Same message → same route (idempotent)
         )
         # Cache the agent list string so we don't rebuild it every call.
         self._agent_list_cache: str | None = None

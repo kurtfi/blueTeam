@@ -17,40 +17,31 @@ logger = structlog.get_logger(__name__)
 # JWT settings
 JWT_SECRET = os.getenv("GATEWAY_JWT_SECRET", "dev-jwt-secret-key-1234567890-change-in-production")
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(
-    os.getenv("GATEWAY_ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
-)  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("GATEWAY_ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 hours
 
 # Credentials configuration
 DEFAULT_USERNAME = os.getenv("GATEWAY_USERNAME", "admin")
 DEFAULT_PASSWORD = os.getenv("GATEWAY_PASSWORD", "admin123")
 
+
 def hash_password(password: str, salt: bytes | None = None) -> str:
     """Hash a password securely using PBKDF2 (SHA256)."""
     if salt is None:
         salt = os.urandom(16)
-    key = hashlib.pbkdf2_hmac(
-        'sha256',
-        password.encode('utf-8'),
-        salt,
-        100000
-    )
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100000)
     return salt.hex() + ":" + key.hex()
+
 
 def verify_password(stored_password: str, provided_password: str) -> bool:
     """Verify a hashed password against a provided plain text password."""
     try:
         salt_hex, key_hex = stored_password.split(":")
         salt = bytes.fromhex(salt_hex)
-        key = hashlib.pbkdf2_hmac(
-            'sha256',
-            provided_password.encode('utf-8'),
-            salt,
-            100000
-        )
+        key = hashlib.pbkdf2_hmac("sha256", provided_password.encode("utf-8"), salt, 100000)
         return key.hex() == key_hex
     except Exception:
         return False
+
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create a signed JWT access token."""
@@ -63,8 +54,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
+
 class AuthStore:
     """Handles PostgreSQL user authentication storage operations."""
+
     def __init__(self):
         self._pool = None
         self._table_name = "agentix_users"
@@ -96,11 +89,11 @@ class AuthStore:
                 """)
                 # Check if default user exists
                 user_exists = await conn.fetchval(
-                    f"SELECT EXISTS(SELECT 1 FROM {self._table_name} WHERE username = $1)",
-                    DEFAULT_USERNAME
+                    f"SELECT EXISTS(SELECT 1 FROM {self._table_name} WHERE username = $1)", DEFAULT_USERNAME
                 )
                 if not user_exists:
                     import uuid
+
                     user_id = uuid.uuid4()
                     pw_hash = hash_password(DEFAULT_PASSWORD)
                     await conn.execute(
@@ -113,7 +106,7 @@ class AuthStore:
                         f"{DEFAULT_USERNAME}@agentix.ai",
                         "admin",
                         "[]",
-                        datetime.now()
+                        datetime.now(),
                     )
                     logger.info("auth_store.default_user_seeded", username=DEFAULT_USERNAME)
 
@@ -124,7 +117,7 @@ class AuthStore:
             row = await conn.fetchrow(
                 f"SELECT id, username, password_hash, email, role, permissions "
                 f"FROM {self._table_name} WHERE username = $1",
-                username
+                username,
             )
             if row:
                 return dict(row)
@@ -135,14 +128,15 @@ class AuthStore:
             await self._pool.close()
             self._pool = None
 
+
 # Singleton instance of AuthStore
 auth_store = AuthStore()
 
 security = HTTPBearer(auto_error=False)
 
+
 async def verify_jwt_token(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Security(security)
+    request: Request, credentials: HTTPAuthorizationCredentials | None = Security(security)
 ) -> dict[str, Any]:
     """
     FastAPI Dependency to verify the local JWT token.
@@ -150,22 +144,22 @@ async def verify_jwt_token(
     then falls back to the Authorization Bearer header.
     """
     token = None
-    
+
     # 1. Try to read from cookie
     if request.cookies:
         token = request.cookies.get("agentix_access_token")
-        
+
     # 2. Try to read from Authorization header if not in cookies
     if not token and credentials:
         token = credentials.credentials
-        
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated. Invalid or missing credentials.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     try:
         decoded_token = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return decoded_token
@@ -184,6 +178,7 @@ async def verify_jwt_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+
 async def get_current_user(claims: dict[str, Any] = Security(verify_jwt_token)) -> dict[str, Any]:
     """
     Extracts the user info from the verified claims.
@@ -194,10 +189,10 @@ async def get_current_user(claims: dict[str, Any] = Security(verify_jwt_token)) 
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User ID not found in token",
         )
-    
+
     return {
         "uid": uid,
         "email": claims.get("email"),
         "role": claims.get("role", "user"),
-        "permissions": claims.get("permissions", [])
+        "permissions": claims.get("permissions", []),
     }

@@ -19,13 +19,13 @@ def create_mock_pool(conn_mock):
 async def test_create_session():
     conn_mock = AsyncMock()
     pool_mock = create_mock_pool(conn_mock)
-    
+
     repo = PostgresSessionRepository(pool=pool_mock)
-    
+
     session_id = str(uuid.uuid4())
     display_name = "Test SSH Alert"
     source = "SIEM"
-    
+
     res = await repo.create_session(
         session_id=session_id,
         display_name=display_name,
@@ -33,7 +33,7 @@ async def test_create_session():
         siem_rule_id="100002",
         source_ip="10.10.10.99",
     )
-    
+
     assert res == session_id
     conn_mock.execute.assert_called_once()
     args, _ = conn_mock.execute.call_args
@@ -47,12 +47,12 @@ async def test_create_session():
 async def test_update_status():
     conn_mock = AsyncMock()
     pool_mock = create_mock_pool(conn_mock)
-    
+
     repo = PostgresSessionRepository(pool=pool_mock)
     session_id = str(uuid.uuid4())
-    
+
     await repo.update_status(session_id, "COMPLETED", "TRUE_POSITIVE")
-    
+
     conn_mock.execute.assert_called_once()
     args, _ = conn_mock.execute.call_args
     assert "UPDATE sessions" in args[0]
@@ -66,12 +66,12 @@ async def test_update_status():
 async def test_increment_stats():
     conn_mock = AsyncMock()
     pool_mock = create_mock_pool(conn_mock)
-    
+
     repo = PostgresSessionRepository(pool=pool_mock)
     session_id = str(uuid.uuid4())
-    
+
     await repo.increment_stats(session_id, message_count=2, tool_calls=5, hitl_count=1)
-    
+
     conn_mock.execute.assert_called_once()
     args, _ = conn_mock.execute.call_args
     assert "UPDATE sessions" in args[0]
@@ -86,10 +86,10 @@ async def test_increment_stats():
 async def test_get_session():
     conn_mock = AsyncMock()
     pool_mock = create_mock_pool(conn_mock)
-    
+
     repo = PostgresSessionRepository(pool=pool_mock)
     session_id = str(uuid.uuid4())
-    
+
     # Mock row returned by fetchrow
     mock_row = {
         "id": uuid.UUID(session_id),
@@ -100,9 +100,9 @@ async def test_get_session():
         "alert_payload": None,
     }
     conn_mock.fetchrow.return_value = mock_row
-    
+
     res = await repo.get_session(session_id)
-    
+
     assert res is not None
     assert res["id"] == session_id
     assert res["display_name"] == "Test Chat"
@@ -114,10 +114,10 @@ async def test_get_session():
 async def test_add_event():
     conn_mock = AsyncMock()
     pool_mock = create_mock_pool(conn_mock)
-    
+
     repo = PostgresSessionRepository(pool=pool_mock)
     session_id = str(uuid.uuid4())
-    
+
     await repo.add_event(
         session_id=session_id,
         event_type="thought",
@@ -125,7 +125,7 @@ async def test_add_event():
         content="I am thinking",
         metadata={"step": 1},
     )
-    
+
     conn_mock.execute.assert_called_once()
     args, _ = conn_mock.execute.call_args
     assert "INSERT INTO session_events" in args[0]
@@ -141,11 +141,11 @@ async def test_add_event():
 async def test_get_pool_retry_behavior(mock_logger, mock_create_pool):
     repo = PostgresSessionRepository()
     mock_create_pool.side_effect = Exception("DB Connection Refused")
-    
+
     with patch("asyncio.sleep", AsyncMock()) as mock_sleep:
         with pytest.raises(Exception, match="DB Connection Refused"):
             await repo.get_pool()
-        
+
         assert mock_create_pool.call_count == 3
         assert mock_sleep.call_count == 2
         mock_logger.critical.assert_called_once_with(
@@ -154,4 +154,3 @@ async def test_get_pool_retry_behavior(mock_logger, mock_create_pool):
             alert=True,
             db_failure=True,
         )
-

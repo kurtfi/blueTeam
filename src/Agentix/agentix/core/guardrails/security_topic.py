@@ -40,9 +40,9 @@ class GuardrailResponseParser:
     Parses LLM chat responses to extract guardrail decisions.
     Conforms to SRP by separating raw LLM text parsing from the guardrail validation logic.
     """
-    
+
     DEFAULT_REFUSAL = "I can only assist with cybersecurity and security operations."
-    
+
     @classmethod
     def parse(cls, content: str) -> ParsedResponse:
         """
@@ -53,18 +53,15 @@ class GuardrailResponseParser:
         """
         normalized = content.strip()
         upper_content = normalized.upper()
-        
+
         if upper_content.startswith("PASS"):
             return ParsedResponse(decision=GuardrailDecision.PASS)
-            
+
         if upper_content.startswith("BLOCK"):
             parts = normalized.split(":", 1)
             refusal_message = parts[1].strip() if len(parts) > 1 else cls.DEFAULT_REFUSAL
-            return ParsedResponse(
-                decision=GuardrailDecision.BLOCK,
-                refusal_message=refusal_message
-            )
-            
+            return ParsedResponse(decision=GuardrailDecision.BLOCK, refusal_message=refusal_message)
+
         return ParsedResponse(decision=GuardrailDecision.UNKNOWN)
 
 
@@ -92,25 +89,25 @@ class SecurityTopicGuardrail(BaseGuardrail):
     async def _validate(self, session_id: str, message: str) -> GuardrailResult:
         log = logger.bind(session_id=session_id)
         messages = self._build_messages(message)
-        
+
         try:
             response = await self._llm.chat(messages)
             content = response.get("content", "").strip()
-            
+
             parsed = GuardrailResponseParser.parse(content)
-            
+
             if parsed.decision == GuardrailDecision.PASS:
                 return GuardrailResult(passed=True)
-            
+
             if parsed.decision == GuardrailDecision.BLOCK:
                 reason = "Out-of-scope query"
                 log.info("guardrail.blocked_query", query=message[:120], reason=reason)
                 return GuardrailResult(passed=False, reason=reason, refusal_message=parsed.refusal_message)
-            
+
             # Fallback pass if LLM output format is unexpected
             log.warning("guardrail.unexpected_output", content=content)
             return GuardrailResult(passed=True)
-            
+
         except Exception as e:
             log.error("guardrail.validation_error", error=str(e))
             # Safe default: fail-open on network/llm errors to avoid blocking the system

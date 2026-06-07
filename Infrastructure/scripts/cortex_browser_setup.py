@@ -7,35 +7,36 @@ CORTEX_URL = os.getenv("CORTEX_URL", "http://localhost:9001")
 ADMIN_USER = "admin"
 ADMIN_PASS = os.getenv("CORTEX_ADMIN_PASSWORD", "secret")
 
+
 def main():
     print("=== Cortex Browser-Based Setup ===")
     print(f"Target URL: {CORTEX_URL}")
     print(f"Admin User: {ADMIN_USER}")
-    
+
     with sync_playwright() as p:
         print("Launching headless browser...")
         browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
-        
+
         try:
             print("Navigating to Cortex...")
             page.goto(f"{CORTEX_URL}/index.html#!/login")
             page.wait_for_load_state("domcontentloaded")
             page.wait_for_timeout(2000)
-            
+
             print("Filling login form...")
             # Cortex 3 login page typically has placeholders or inputs
             page.locator("input[placeholder='Login']").fill(ADMIN_USER)
             page.locator("input[placeholder='Password']").fill(ADMIN_PASS)
-            
+
             print("Submitting login...")
             page.locator("button:has-text('Sign in')").click()
             page.wait_for_load_state("domcontentloaded")
             page.wait_for_timeout(3000)
-            
+
             print(f"Current URL after login attempt: {page.url}")
-            
+
             # JS execution script to use AngularJS injector
             js_code = """
             async () => {
@@ -90,21 +91,21 @@ def main():
                 }
             }
             """
-            
+
             print("Executing Angular automation in browser page context...")
             result = page.evaluate(js_code)
-            
+
             print("\nBrowser Console Logs:")
             for log_line in result.get("log", []):
                 print("  " + log_line)
-                
+
             if result.get("success"):
                 api_key = result.get("apiKey")
                 print(f"\n✓ Successfully generated API key: {api_key}")
             else:
                 print(f"\n✗ Setup failed: {result.get('error')}")
                 sys.exit(1)
-                
+
         except Exception as e:
             print(f"Error during browser automation: {e}")
             page.screenshot(path="cortex_browser_error.png")
@@ -113,5 +114,6 @@ def main():
         finally:
             browser.close()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

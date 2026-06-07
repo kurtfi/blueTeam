@@ -99,10 +99,7 @@ class DummySiemProvider(ISiemProvider):
 
         lines = [f"Found {len(hits)} event(s):"]
         for h in hits:
-            lines.append(
-                f"[{h['@timestamp']}] Rule: {h['rule']['description']} "
-                f"| Data: {json.dumps(h['data'])}"
-            )
+            lines.append(f"[{h['@timestamp']}] Rule: {h['rule']['description']} | Data: {json.dumps(h['data'])}")
         return "\n".join(lines)
 
 
@@ -277,6 +274,7 @@ class DummyEnrichmentProvider(IEnrichmentProvider):
 # Dummy Firewall Provider
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class DummyFirewallProvider(IFirewallProvider):
     async def block_ip(self, ip_address: str) -> str:
         logger.info("provider.firewall.block_ip", ip_address=ip_address)
@@ -300,6 +298,7 @@ class DummyFirewallProvider(IFirewallProvider):
 # ─────────────────────────────────────────────────────────────────────────────
 # Dummy IAM Provider
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class DummyIamProvider(IIamProvider):
     async def get_user_info(self, username: str) -> str:
@@ -344,9 +343,8 @@ class DummyIamProvider(IIamProvider):
 # Dummy SOAR Provider
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class DummySoarProvider(ISoarProvider):
-    async def trigger_workflow(
-        self, workflow_id: str, data: dict | None = None, webhook_url: str = ""
-    ) -> str:
+    async def trigger_workflow(self, workflow_id: str, data: dict | None = None, webhook_url: str = "") -> str:
         logger.info("provider.soar.trigger_workflow", workflow_id=workflow_id, data=data)
         return f"SOAR workflow '{workflow_id}' triggered successfully (Dummy SOAR Provider)."

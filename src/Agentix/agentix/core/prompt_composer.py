@@ -1,6 +1,7 @@
 """
 System Prompt Composer — compiling final system prompts with dynamic context elements.
 """
+
 from __future__ import annotations
 
 from agentic_common.base_tool import BaseTool
@@ -49,8 +50,7 @@ class SystemPromptComposer:
 
         # Inject Dynamic Playbooks Catalog (only if agent has playbook tools)
         has_playbook_tools = available_tools and any(
-            t.name in ("trigger_playbook", "list_playbooks", "find_playbook_for_alert")
-            for t in available_tools
+            t.name in ("trigger_playbook", "list_playbooks", "find_playbook_for_alert") for t in available_tools
         )
         if playbooks_str and has_playbook_tools:
             prompt += f"\n\n### Available Playbooks (Dynamic)\n{playbooks_str}\n"

@@ -8,6 +8,7 @@ Safety layers
 3. Hard-coded maximum timeout cap of 60 s.
 4. stdout/stderr capped at 64 KiB each.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -18,8 +19,8 @@ from agentic_common.settings import settings
 
 logger = structlog.get_logger(__name__)
 
-_MAX_TIMEOUT = 60          # Hard cap in seconds.
-_MAX_OUTPUT  = 64 * 1024   # 64 KiB per stream.
+_MAX_TIMEOUT = 60  # Hard cap in seconds.
+_MAX_OUTPUT = 64 * 1024  # 64 KiB per stream.
 
 
 async def run_command(command: str, timeout: int = 30) -> ToolResult:
@@ -45,10 +46,11 @@ async def run_command(command: str, timeout: int = 30) -> ToolResult:
 
     try:
         import shlex
+
         args = shlex.split(command)
         if not args:
             return ToolResult(success=False, error="Empty command.")
-            
+
         proc = await asyncio.create_subprocess_exec(
             args[0],
             *args[1:],
@@ -56,9 +58,7 @@ async def run_command(command: str, timeout: int = 30) -> ToolResult:
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                proc.communicate(), timeout=effective_timeout
-            )
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=effective_timeout)
         except TimeoutError:
             proc.kill()
             await proc.communicate()

@@ -16,6 +16,7 @@ class HitlCoordinator:
     generating justifications via LLM, sending notification cards to Teams,
     and recording status/events in the session database.
     """
+
     def __init__(self, llm: Any, db_repo: Any, memory: Any) -> None:
         self._llm = llm
         self._db_repo = db_repo
@@ -49,8 +50,8 @@ class HitlCoordinator:
                         "why this specific action is necessary, and its potential impact. "
                         "The user should be able to make an informed decision directly from this message without needing to inspect session logs. "
                         "Your response must consist ONLY of the justification text. Do not include any greeting or conversational filler."
-                    )
-                }
+                    ),
+                },
             ]
             summary_response = await self._llm.chat(summary_prompt)
             generated_text = summary_response.get("content", "").strip()
@@ -69,34 +70,40 @@ class HitlCoordinator:
                     event_type="hitl_request",
                     actor="agent",
                     content=hitl_message,
-                    metadata={"tool_name": tool_name, "tool_args": tool_args}
+                    metadata={"tool_name": tool_name, "tool_args": tool_args},
                 )
             except Exception as e:
                 log.critical("hitl_coordinator.db_logging_failed", error=str(e), alert=True, db_failure=True)
 
         # 3. Create the notification and confirmation ReActSteps
         steps = []
-        steps.append(ReActStep(
-            StepType.OBSERVE,
-            content=f"[Teams Integration] Dispatching approval request card to Microsoft Teams #soc-alerts channel for tool '{tool_name}'...\n\nApproval Justification:\n{hitl_message}",
-            tool_name="microsoft_teams",
-        ))
+        steps.append(
+            ReActStep(
+                StepType.OBSERVE,
+                content=f"[Teams Integration] Dispatching approval request card to Microsoft Teams #soc-alerts channel for tool '{tool_name}'...\n\nApproval Justification:\n{hitl_message}",
+                tool_name="microsoft_teams",
+            )
+        )
 
         # Delay is always standard in production code. Tests can mock asyncio.sleep.
         await asyncio.sleep(1.5)
 
         msg_id = f"msg_{int(time.time())}"
-        steps.append(ReActStep(
-            StepType.OBSERVE,
-            content=f"[Teams Integration] Adaptive Card sent successfully! (Message ID: {msg_id}). Waiting for operator response...",
-            tool_name="microsoft_teams",
-        ))
+        steps.append(
+            ReActStep(
+                StepType.OBSERVE,
+                content=f"[Teams Integration] Adaptive Card sent successfully! (Message ID: {msg_id}). Waiting for operator response...",
+                tool_name="microsoft_teams",
+            )
+        )
 
-        steps.append(ReActStep(
-            StepType.CONFIRM,
-            content=hitl_message,
-            tool_name=tool_name,
-            tool_input=tool_args,
-        ))
+        steps.append(
+            ReActStep(
+                StepType.CONFIRM,
+                content=hitl_message,
+                tool_name=tool_name,
+                tool_input=tool_args,
+            )
+        )
 
         return hitl_message, steps

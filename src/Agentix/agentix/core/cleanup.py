@@ -10,6 +10,7 @@ Cleanup Strategy
     - ``outputs/`` is **preserved**.
 - Full destroy only happens if ``agentix_session_destroy_on_expire`` is enabled.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,6 +29,7 @@ class WorkspaceExpiryPolicy:
     Evaluates workspace metadata to determine if cleanup action is needed.
     Isolates policy evaluation from file system side-effects (SRP).
     """
+
     def __init__(self, ttl_hours: float, destroy_enabled: bool) -> None:
         self.ttl_hours = ttl_hours
         self.destroy_enabled = destroy_enabled
@@ -56,7 +58,7 @@ class WorkspaceExpiryPolicy:
             age_since_cleanup = 0.0
             if cleaned_at:
                 age_since_cleanup = (now - datetime.fromisoformat(cleaned_at)).total_seconds() / 3600
-            
+
             if age_since_cleanup >= self.ttl_hours:
                 return "DESTROY"
 

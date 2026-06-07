@@ -9,6 +9,7 @@ from agentix.core.providers.base import BaseLLMProvider
 
 logger = structlog.get_logger(__name__)
 
+
 class OpenAIProvider(BaseLLMProvider):
     """Async wrapper around OpenAI Chat Completions."""
 

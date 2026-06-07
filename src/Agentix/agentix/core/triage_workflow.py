@@ -116,10 +116,16 @@ IMPORTANT NOTE (SIEM QUERIES):
                         "tool_name": step.tool_name,
                         "tool_input": step.tool_input,
                         "tool_output": step.tool_output,
-                    }
+                    },
                 )
             except Exception as ex:
-                logger.critical("triage_workflow.event_log_failed", session_id=session_id, error=str(ex), alert=True, db_failure=True)
+                logger.critical(
+                    "triage_workflow.event_log_failed",
+                    session_id=session_id,
+                    error=str(ex),
+                    alert=True,
+                    db_failure=True,
+                )
 
             if step.step_type == StepType.ANSWER:
                 final_answer = step.content
@@ -153,7 +159,13 @@ IMPORTANT NOTE (SIEM QUERIES):
                 content=f"Workflow failed with error: {str(e)}",
             )
         except Exception as db_ex:
-            logger.critical("triage_workflow.db_fail_log_failed", session_id=session_id, error=str(db_ex), alert=True, db_failure=True)
+            logger.critical(
+                "triage_workflow.db_fail_log_failed",
+                session_id=session_id,
+                error=str(db_ex),
+                alert=True,
+                db_failure=True,
+            )
     finally:
         if hasattr(redis_store, "close"):
             await redis_store.close()

@@ -29,7 +29,7 @@ def mock_registry():
         mock_reg.get_firewall_provider.return_value = mock_firewall_provider
         mock_reg.get_iam_provider.return_value = mock_iam_provider
         mock_reg.get_soar_provider.return_value = mock_soar_provider
-        
+
         yield {
             "case": mock_case_provider,
             "enrichment": mock_enrichment_provider,
@@ -40,12 +40,14 @@ def mock_registry():
             "soar": mock_soar_provider,
         }
 
+
 @pytest.mark.asyncio
 async def test_create_case(mock_registry):
     mock_registry["case"].create_case.return_value = "Case ID: 123"
     result = await create_case("Title", "Desc", 3, ["tag1"])
     assert result == "Case ID: 123"
     mock_registry["case"].create_case.assert_called_once_with("Title", "Desc", 3, ["tag1"])
+
 
 @pytest.mark.asyncio
 async def test_query_siem_logs(mock_registry):
@@ -54,6 +56,7 @@ async def test_query_siem_logs(mock_registry):
     assert result == "Logs found"
     mock_registry["siem"].query_logs.assert_called_once_with("rule:123", "last 1h")
 
+
 @pytest.mark.asyncio
 async def test_get_ip_reputation(mock_registry):
     mock_registry["enrichment"].get_ip_reputation.return_value = "IP Clean"
@@ -61,12 +64,14 @@ async def test_get_ip_reputation(mock_registry):
     assert result == "IP Clean"
     mock_registry["enrichment"].get_ip_reputation.assert_called_once_with("1.1.1.1")
 
+
 @pytest.mark.asyncio
 async def test_isolate_endpoint(mock_registry):
     mock_registry["endpoint"].isolate_endpoint.return_value = "Isolated"
     result = await isolate_endpoint("001")
     assert result == "Isolated"
     mock_registry["endpoint"].isolate_endpoint.assert_called_once_with("001")
+
 
 @pytest.mark.asyncio
 async def test_trigger_soar_workflow(mock_registry):

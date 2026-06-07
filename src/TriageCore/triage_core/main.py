@@ -1,6 +1,7 @@
 """
 FastMCP Server Entry Point for TriageCore.
 """
+
 import importlib
 import os
 
@@ -53,8 +54,9 @@ if __name__ == "__main__":
     port = int(os.getenv("FASTMCP_PORT", "8081"))
 
     from typing import Literal, cast
+
     transport_type = cast(Literal["stdio", "sse", "http", "streamable-http"], transport)
-    
+
     logger.info("mcp_server.starting", server="TriageCore", transport=transport, port=port)
     if transport_type == "sse":
         mcp.run(transport=transport_type, port=port, host="0.0.0.0")  # type: ignore[call-arg]

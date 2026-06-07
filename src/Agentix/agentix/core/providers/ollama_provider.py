@@ -11,6 +11,7 @@ from agentix.core.providers.base import BaseLLMProvider
 
 logger = structlog.get_logger(__name__)
 
+
 class OllamaProvider(BaseLLMProvider):
     """Async wrapper around Ollama."""
 
@@ -34,17 +35,17 @@ class OllamaProvider(BaseLLMProvider):
         tools: list[dict] | None = None,
         tool_choice: str | dict = "auto",
     ) -> dict[str, Any]:
-        
+
         # Convert messages if they contain system prompts in a weird state, usually ollama is fine
         # We also need to map tool_calls.function.arguments back to dict for the Ollama client
         formatted_messages = []
         for msg in messages:
-            msg_copy = dict(msg) # type: ignore
+            msg_copy = dict(msg)  # type: ignore
             tool_calls = msg_copy.get("tool_calls")
             if msg_copy.get("role") == "assistant" and tool_calls and isinstance(tool_calls, list):
                 formatted_tool_calls = []
                 for tc_raw in tool_calls:
-                    tc_copy = dict(tc_raw) # type: ignore
+                    tc_copy = dict(tc_raw)  # type: ignore
                     if "function" in tc_copy and "arguments" in tc_copy["function"]:
                         func_copy = dict(tc_copy["function"])
                         args = func_copy.get("arguments")
@@ -66,17 +67,17 @@ class OllamaProvider(BaseLLMProvider):
             # goes into 'content' rather than a separate 'thinking' field.
             "think": False,
         }
-        
+
         # Ollama supports the OpenAI tool schema natively
         if tools:
             kwargs["tools"] = tools
 
         logger.debug("llm.request.ollama", model=self.model, message_count=len(messages))
         response = await self._client.chat(**kwargs)
-        
+
         # We need to adapt the Ollama response to look exactly like the OpenAI dict format
         message = response.get("message", {})
-        
+
         # Ensure tool_calls match OpenAI structure
         tool_calls = message.get("tool_calls") or []
         formatted_tool_calls = []
@@ -87,11 +88,11 @@ class OllamaProvider(BaseLLMProvider):
             if isinstance(args, dict):
                 cleaned_args = {}
                 for k, v in args.items():
-                    if isinstance(v, str) and (v.strip().startswith('[') or v.strip().startswith('{')):
+                    if isinstance(v, str) and (v.strip().startswith("[") or v.strip().startswith("{")):
                         # Ollama sometimes formats lists as sets {"value"} instead of ["value"]
                         clean_v = v.strip()
-                        if clean_v.startswith('{') and clean_v.endswith('}') and ':' not in clean_v:
-                            clean_v = '[' + clean_v[1:-1] + ']'
+                        if clean_v.startswith("{") and clean_v.endswith("}") and ":" not in clean_v:
+                            clean_v = "[" + clean_v[1:-1] + "]"
                         try:
                             cleaned_args[k] = json.loads(clean_v)
                         except Exception:
@@ -101,19 +102,16 @@ class OllamaProvider(BaseLLMProvider):
                 args_str = json.dumps(cleaned_args)
             else:
                 args_str = str(args)
-                
+
             formatted_tc = {
                 "id": f"call_{uuid.uuid4().hex[:12]}",  # Ollama doesn't always provide an ID
                 "type": "function",
-                "function": {
-                    "name": function_data.get("name", ""),
-                    "arguments": args_str
-                }
+                "function": {"name": function_data.get("name", ""), "arguments": args_str},
             }
             formatted_tool_calls.append(formatted_tc)
-            
+
         return {
             "role": message.get("role", "assistant"),
             "content": message.get("content", ""),
-            "tool_calls": formatted_tool_calls if formatted_tool_calls else None
+            "tool_calls": formatted_tool_calls if formatted_tool_calls else None,
         }

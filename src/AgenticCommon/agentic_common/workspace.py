@@ -16,6 +16,7 @@ On expiration / manual destroy:
   - ``temp/`` and ``downloads/`` are **deleted**.
   - ``outputs/`` is **preserved** for audit trail / later retrieval.
 """
+
 from __future__ import annotations
 
 import json
@@ -128,9 +129,7 @@ class SessionWorkspace:
         resolved = (base / relative_path).resolve()
 
         if not resolved.is_relative_to(self.root.resolve()):
-            raise PermissionError(
-                f"Access denied: path '{relative_path}' is outside the allowed workspace boundary."
-            )
+            raise PermissionError(f"Access denied: path '{relative_path}' is outside the allowed workspace boundary.")
         return resolved
 
     def contains(self, absolute_path: str | Path) -> bool:
@@ -187,8 +186,7 @@ class SessionWorkspace:
         current = self.get_usage_bytes()
         if current + additional_bytes > self._quota_bytes:
             raise PermissionError(
-                f"Session workspace quota exceeded: "
-                f"{current + additional_bytes} / {self._quota_bytes} bytes."
+                f"Session workspace quota exceeded: {current + additional_bytes} / {self._quota_bytes} bytes."
             )
 
     # ------------------------------------------------------------------

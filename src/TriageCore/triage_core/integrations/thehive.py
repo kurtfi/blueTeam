@@ -7,16 +7,15 @@ from triage_core.integrations.base import ICaseManagementProvider
 
 logger = structlog.get_logger(__name__)
 
+
 class TheHiveProvider(ICaseManagementProvider):
     def _get_headers(self, api_key: str) -> dict:
         org = os.getenv("THEHIVE_ORGANISATION", "asdg")
-        return {
-            "Authorization": f"Bearer {api_key}",
-            "X-Organisation": org,
-            "Content-Type": "application/json"
-        }
+        return {"Authorization": f"Bearer {api_key}", "X-Organisation": org, "Content-Type": "application/json"}
 
-    async def create_case(self, title: str = "", description: str = "", severity: int = 2, tags: list[str] | None = None) -> str:
+    async def create_case(
+        self, title: str = "", description: str = "", severity: int = 2, tags: list[str] | None = None
+    ) -> str:
         tags = tags or []
         if not title and not description:
             return "Error: Both title and description cannot be empty."
@@ -26,21 +25,16 @@ class TheHiveProvider(ICaseManagementProvider):
             description = title
 
         logger.info("provider.thehive.create_case", title=title, severity=severity)
-        
+
         thehive_url = os.getenv("THEHIVE_URL", "http://thehive:9000")
         api_key = os.getenv("THEHIVE_API_KEY", "")
-        
+
         if not api_key:
             return "Error: THEHIVE_API_KEY environment variable is not set."
-            
+
         headers = self._get_headers(api_key)
-        payload = {
-            "title": title,
-            "description": description,
-            "severity": severity,
-            "tags": tags
-        }
-        
+        payload = {"title": title, "description": description, "severity": severity, "tags": tags}
+
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.post(f"{thehive_url}/api/v1/case", json=payload, headers=headers, timeout=10.0)
@@ -141,7 +135,9 @@ class TheHiveProvider(ICaseManagementProvider):
             return status
         return "Indeterminate"  # safe fallback
 
-    async def update_case_status(self, case_id: str, status: str, resolution_type: str = "TruePositive", summary: str = "") -> str:
+    async def update_case_status(
+        self, case_id: str, status: str, resolution_type: str = "TruePositive", summary: str = ""
+    ) -> str:
         logger.info("provider.thehive.update_case_status", case_id=case_id, status=status)
         if not case_id or str(case_id).strip().upper() in ("N/A", "UNKNOWN", "NONE", "NULL"):
             return f"Error: Invalid Case ID '{case_id}'. Please make sure you have successfully created a case using the 'create_case' tool first, and use the Case ID returned by it."
@@ -183,7 +179,16 @@ class TheHiveProvider(ICaseManagementProvider):
             logger.critical("thehive.status.error", error=str(e), payload=payload, alert=True, case_mgmt_failure=True)
             return f"Error updating case status: {str(e)}"
 
-    async def create_alert(self, title: str = "", description: str = "", source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: list[str] | None = None, observables: list[dict[str, Any]] | None = None) -> str:
+    async def create_alert(
+        self,
+        title: str = "",
+        description: str = "",
+        source: str = "Agentix",
+        source_ref: str = "",
+        severity: int = 2,
+        tags: list[str] | None = None,
+        observables: list[dict[str, Any]] | None = None,
+    ) -> str:
         if not title and not description:
             return "Error: Both title and description cannot be empty."
         if not title:
@@ -226,7 +231,7 @@ class TheHiveProvider(ICaseManagementProvider):
                         data_type = "hash"
                     else:
                         data_type = "other"
-                
+
                 # Normalize common types
                 data_type = str(data_type).lower()
                 if data_type in ("ip_address", "ipaddress"):
@@ -242,19 +247,15 @@ class TheHiveProvider(ICaseManagementProvider):
                         if key in obs:
                             data_val = obs[key]
                             break
-                
+
                 if data_type and data_val:
-                    normalized_obs = {
-                        "type": data_type,
-                        "dataType": data_type,
-                        "data": str(data_val)
-                    }
+                    normalized_obs = {"type": data_type, "dataType": data_type, "data": str(data_val)}
                     # Copy other fields if present (message, tags, tlp, pap)
                     for k in ("message", "tags", "tlp", "pap"):
                         if k in obs:
                             normalized_obs[k] = obs[k]
                     normalized_observables.append(normalized_obs)
-            
+
             payload["observables"] = normalized_observables
 
         try:

@@ -1,6 +1,7 @@
 """
 PostgreSQL vector store implementation using pgvector and asyncpg.
 """
+
 from __future__ import annotations
 
 import json
@@ -32,8 +33,7 @@ class PostgresVectorStore(BaseVectorStore):
         if self._pool is None:
             # Connect and register pgvector
             self._pool = await asyncpg.create_pool(
-                dsn=settings.agentix_postgres_url.replace("+asyncpg", ""),
-                init=self._init_connection
+                dsn=settings.agentix_postgres_url.replace("+asyncpg", ""), init=self._init_connection
             )
             # Ensure extension and table exist
             await self._setup_db()
@@ -59,9 +59,15 @@ class PostgresVectorStore(BaseVectorStore):
                         content_tsvector tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
                     )
                 """)
-                await conn.execute(f"CREATE INDEX IF NOT EXISTS {self._table_name}_collection_idx ON {self._table_name} (collection)")
-                await conn.execute(f"CREATE INDEX IF NOT EXISTS {self._table_name}_tsvector_idx ON {self._table_name} USING GIN (content_tsvector)")
-                await conn.execute(f"CREATE INDEX IF NOT EXISTS {self._table_name}_embedding_idx ON {self._table_name} USING hnsw (embedding vector_cosine_ops)")
+                await conn.execute(
+                    f"CREATE INDEX IF NOT EXISTS {self._table_name}_collection_idx ON {self._table_name} (collection)"
+                )
+                await conn.execute(
+                    f"CREATE INDEX IF NOT EXISTS {self._table_name}_tsvector_idx ON {self._table_name} USING GIN (content_tsvector)"
+                )
+                await conn.execute(
+                    f"CREATE INDEX IF NOT EXISTS {self._table_name}_embedding_idx ON {self._table_name} USING hnsw (embedding vector_cosine_ops)"
+                )
 
     async def upsert(
         self,
@@ -77,23 +83,20 @@ class PostgresVectorStore(BaseVectorStore):
 
         data = []
         for i in range(len(texts)):
-            data.append((
-                uuid.UUID(doc_ids[i]),
-                collection,
-                texts[i],
-                json.dumps(doc_metadata[i]),
-                vectors[i]
-            ))
+            data.append((uuid.UUID(doc_ids[i]), collection, texts[i], json.dumps(doc_metadata[i]), vectors[i]))
 
         async with pool.acquire() as conn:
-            await conn.executemany(f"""
+            await conn.executemany(
+                f"""
                 INSERT INTO {self._table_name} (id, collection, content, metadata, embedding)
                 VALUES ($1, $2, $3, $4, $5)
                 ON CONFLICT (id) DO UPDATE SET
                     content = EXCLUDED.content,
                     metadata = EXCLUDED.metadata,
                     embedding = EXCLUDED.embedding
-            """, data)
+            """,
+                data,
+            )
 
         return doc_ids
 
@@ -103,7 +106,7 @@ class PostgresVectorStore(BaseVectorStore):
         top_k: int = 5,
         collection: str = "default",
         filter: dict[str, Any] | None = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> list[VectorSearchResult]:
         alpha: float = kwargs.get("alpha", 0.5)
         pool = await self._get_pool()
@@ -111,7 +114,7 @@ class PostgresVectorStore(BaseVectorStore):
 
         where_clause = "WHERE collection = $2"
         params = [query_vector, collection, top_k, query, alpha]
-        
+
         if filter:
             where_clause += " AND metadata @> $6"
             params.append(json.dumps(filter))
@@ -119,7 +122,8 @@ class PostgresVectorStore(BaseVectorStore):
         async with pool.acquire() as conn:
             # Hybrid search using a weighted combination of Vector Similarity and Text Rank (BM25-like)
             # alpha=1.0 is pure vector, alpha=0.0 is pure text.
-            rows = await conn.fetch(f"""
+            rows = await conn.fetch(
+                f"""
                 WITH vector_matches AS (
                     SELECT id, 1 - (embedding <=> $1) as score
                     FROM {self._table_name}
@@ -144,16 +148,20 @@ class PostgresVectorStore(BaseVectorStore):
                 JOIN {self._table_name} p ON p.id = COALESCE(v.id, t.id)
                 ORDER BY score DESC
                 LIMIT $3
-            """, *params)
+            """,
+                *params,
+            )
 
         results: list[VectorSearchResult] = []
         for row in rows:
-            results.append({
-                "id": str(row["id"]),
-                "text": row["content"],
-                "metadata": json.loads(row["metadata"]),
-                "score": float(row["score"]),
-            })
+            results.append(
+                {
+                    "id": str(row["id"]),
+                    "text": row["content"],
+                    "metadata": json.loads(row["metadata"]),
+                    "score": float(row["score"]),
+                }
+            )
 
         return results
 
@@ -161,7 +169,9 @@ class PostgresVectorStore(BaseVectorStore):
         pool = await self._get_pool()
         uuid_ids = [uuid.UUID(i) for i in ids]
         async with pool.acquire() as conn:
-            await conn.execute(f"DELETE FROM {self._table_name} WHERE id = ANY($1) AND collection = $2", uuid_ids, collection)
+            await conn.execute(
+                f"DELETE FROM {self._table_name} WHERE id = ANY($1) AND collection = $2", uuid_ids, collection
+            )
 
     async def close(self) -> None:
         if self._pool:

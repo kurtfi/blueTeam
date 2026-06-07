@@ -7,6 +7,7 @@ services that possess the shared secret) can call the Core API endpoints.
 In development mode (no key configured), all requests are allowed with a
 warning log.
 """
+
 from __future__ import annotations
 
 import structlog
@@ -20,20 +21,20 @@ logger = structlog.get_logger(__name__)
 _HEADER_NAME = "X-Internal-Api-Key"
 
 # Paths that do NOT require internal auth (health checks, docs, etc.)
-_EXEMPT_PATHS: frozenset[str] = frozenset({
-    "/health",
-    "/docs",
-    "/openapi.json",
-    "/redoc",
-})
+_EXEMPT_PATHS: frozenset[str] = frozenset(
+    {
+        "/health",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+    }
+)
 
 
 class InternalApiKeyMiddleware(BaseHTTPMiddleware):
     """Reject requests that lack a valid internal API key."""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Skip auth for exempt paths and webhooks (which handle their own HMAC auth)
         if request.url.path in _EXEMPT_PATHS or request.url.path.startswith("/v1/webhooks"):
             return await call_next(request)

@@ -8,6 +8,7 @@ class GuardrailResult:
     reason: str | None = None
     refusal_message: str | None = None
 
+
 class BaseGuardrail(ABC):
     def should_run(self, session_source: str) -> bool:
         """

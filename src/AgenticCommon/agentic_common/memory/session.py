@@ -1,6 +1,7 @@
 """
 SessionStore — in-memory conversation history and session metadata.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -30,9 +31,7 @@ class SessionStore:
         if session_id not in self._history:
             self._history[session_id] = []
         self._history[session_id].append({"role": "user", "content": user_message})
-        self._history[session_id].append(
-            {"role": "assistant", "content": assistant_message}
-        )
+        self._history[session_id].append({"role": "assistant", "content": assistant_message})
 
     async def clear(self, session_id: str) -> None:
         self._history.pop(session_id, None)

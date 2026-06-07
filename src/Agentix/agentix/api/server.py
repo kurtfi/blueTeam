@@ -4,6 +4,7 @@ FastAPI Server for the Agentix platform.
 Provides UUID-based session initialization and an SSE streaming endpoint
 for interacting with the Agentix Orchestrator in real-time.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -33,11 +34,13 @@ from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
 
+
 class SessionTaskManager:
     """
     Manages active agent execution tasks and client subscriber queues.
     This protects agent runs from client disconnects (cancellations).
     """
+
     def __init__(self) -> None:
         self.tasks: dict[str, asyncio.Task] = {}
         self.queues: dict[str, list[asyncio.Queue]] = {}
@@ -81,6 +84,7 @@ class SessionTaskManager:
                 return True
             return False
 
+
 # Initialize FastAPI App
 app = FastAPI(
     title="Agentix AI Service",
@@ -91,34 +95,38 @@ app = FastAPI(
 # Internal API Key Authentication
 app.add_middleware(InternalApiKeyMiddleware)
 
+
 # Dependency functions
 async def get_redis_store(request: Request) -> RedisSessionStore:
     return request.app.state.redis_store
 
+
 async def get_catalog(request: Request) -> ToolCatalog:
     return request.app.state.catalog
+
 
 async def get_pref_store(request: Request) -> RedisPreferenceStore:
     return request.app.state.pref_store
 
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting up Agentix Service...")
-    
+
     # Run database migrations
     try:
         await postgres_session_repo.run_migrations()
         logger.info("Database migrations run successfully.")
     except Exception as e:
         logger.critical("Failed to run database migrations", error=str(e), alert=True, db_failure=True)
-        
+
     app.state.task_manager = SessionTaskManager()
     app.state.catalog = ToolCatalog()
     app.state.redis_store = RedisSessionStore(redis_url=settings.redis_url)
     app.state.pref_store = RedisPreferenceStore(redis_url=settings.redis_url)
     app.state.deduplicator = AlertDeduplicator(redis_url=settings.redis_url, window_seconds=120)
     app.state.mcp_stack = AsyncExitStack()
-    
+
     # 2. Initialize SOC MCP Server Connection with retry logic
     max_retries = 15
     retry_delay = 5  # seconds
@@ -127,12 +135,14 @@ async def startup_event():
             logger.info("Connecting to SOC MCP Server...", attempt=attempt, url=settings.agentix_triage_core_url)
             # Recreate stack for this attempt to ensure clean state
             app.state.mcp_stack = AsyncExitStack()
-            
+
             soc_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_triage_core_url))
             soc_read, soc_write = soc_transport
-            app.state.triage_core_session = await app.state.mcp_stack.enter_async_context(ClientSession(soc_read, soc_write))
+            app.state.triage_core_session = await app.state.mcp_stack.enter_async_context(
+                ClientSession(soc_read, soc_write)
+            )
             await app.state.triage_core_session.initialize()
-            
+
             # Sync TriageCore Tools into our Catalog
             await app.state.catalog.register_mcp_client(app.state.triage_core_session)
 
@@ -140,6 +150,7 @@ async def startup_event():
             try:
                 result = await app.state.triage_core_session.call_tool("list_playbooks")
                 from agentix.tools.mcp_adapter import MCPToolAdapter
+
                 playbooks_str = MCPToolAdapter._parse_result(result)
                 app.state.catalog.cached_playbooks = playbooks_str
                 logger.info("Successfully fetched and cached playbooks from TriageCore.")
@@ -151,7 +162,12 @@ async def startup_event():
         except Exception as e:
             # Clean up the stack of this failed attempt
             await app.state.mcp_stack.aclose()
-            logger.warning("Failed to connect to SOC MCP server, retrying...", attempt=attempt, max_retries=max_retries, error=str(e))
+            logger.warning(
+                "Failed to connect to SOC MCP server, retrying...",
+                attempt=attempt,
+                max_retries=max_retries,
+                error=str(e),
+            )
             if attempt == max_retries:
                 logger.error("Failed to connect to SOC MCP server after maximum retries", error=str(e))
                 app.state.triage_core_session = None
@@ -161,19 +177,19 @@ async def startup_event():
     # 3. Share catalog with background triage workflows
     try:
         from agentix.core.triage_workflow import set_shared_catalog
+
         set_shared_catalog(app.state.catalog)
     except Exception as e:
         logger.error("Failed to share catalog with triage workflows", error=str(e))
 
     # 3. Start periodic workspace cleanup background task
     if settings.agentix_session_cleanup_on_expire:
-        app.state.cleanup_task = asyncio.create_task(
-            run_periodic_cleanup(interval_seconds=3600)
-        )
+        app.state.cleanup_task = asyncio.create_task(run_periodic_cleanup(interval_seconds=3600))
         logger.info("Session workspace cleanup task started.")
     else:
         app.state.cleanup_task = None
-        
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Shutting down Agentix Service and closing connections...")
@@ -195,15 +211,19 @@ async def shutdown_event():
         await app.state.deduplicator.aclose()
     await postgres_session_repo.close()
 
+
 # --- Request Models ---
+
 
 class StreamRequest(BaseModel):
     session_id: str
     message: str
     agent: str | None = None  # Optional agent name (e.g. 'researcher')
 
+
 class CreateSessionRequest(BaseModel):
     user_id: str = "anonymous"
+
 
 class SessionResponse(BaseModel):
     session_id: str
@@ -215,10 +235,10 @@ class SessionResponse(BaseModel):
 
 app.include_router(webhooks.router)
 
+
 @app.post("/v1/session", response_model=SessionResponse)
 async def create_session(
-    req: CreateSessionRequest | None = None,
-    redis_store: RedisSessionStore = Depends(get_redis_store)
+    req: CreateSessionRequest | None = None, redis_store: RedisSessionStore = Depends(get_redis_store)
 ):
     """
     Initialize a new session and receive a unique UUID.
@@ -238,7 +258,9 @@ async def create_session(
             owner_id=user_id,
         )
     except Exception as e:
-        logger.critical("session.postgres_creation_failed", session_id=new_uuid, error=str(e), alert=True, db_failure=True)
+        logger.critical(
+            "session.postgres_creation_failed", session_id=new_uuid, error=str(e), alert=True, db_failure=True
+        )
         raise HTTPException(status_code=500, detail=f"Failed to persist session in Database: {str(e)}")
 
     # Register the session in the Redis store
@@ -251,13 +273,14 @@ async def create_session(
         workspace = SessionWorkspace(session_id=new_uuid, owner_id=user_id)
         await workspace.initialize()
         workspace_enabled = True
-    
+
     logger.info("session.created", session_id=new_uuid, owner=user_id)
     return SessionResponse(
         session_id=new_uuid,
         message="Session created successfully. Use this ID for /chat/stream",
         workspace_enabled=workspace_enabled,
     )
+
 
 async def start_session_background_run(
     session_id: str,
@@ -289,6 +312,7 @@ async def start_session_background_run(
             if active_agent:
                 try:
                     from agentix.agents.factory import AgentFactory
+
                     orchestrator = AgentFactory.create(
                         agent_name=active_agent.lower(),
                         catalog=catalog,
@@ -297,14 +321,11 @@ async def start_session_background_run(
                     orchestrator._preference_store = pref_store
                 except Exception as e:
                     logger.error("api.agent_loading_failed", agent=active_agent, error=str(e))
-                    orchestrator = Orchestrator(
-                        catalog=catalog,
-                        memory=redis_store,
-                        preference_store=pref_store
-                    )
+                    orchestrator = Orchestrator(catalog=catalog, memory=redis_store, preference_store=pref_store)
             else:
                 try:
                     from agentix.agents.factory import AgentFactory
+
                     orchestrator = await AgentFactory.create_auto(
                         message=message,
                         catalog=catalog,
@@ -313,22 +334,15 @@ async def start_session_background_run(
                     orchestrator._preference_store = pref_store
                 except Exception as e:
                     logger.error("api.auto_agent_failed", error=str(e))
-                    orchestrator = Orchestrator(
-                        catalog=catalog,
-                        memory=redis_store,
-                        preference_store=pref_store
-                    )
+                    orchestrator = Orchestrator(catalog=catalog, memory=redis_store, preference_store=pref_store)
 
             from agentix.core.react import StepType
-            
+
             final_answer = None
             has_confirm = False
-            
+
             # Consume the async generator from the orchestrator
-            async for step in orchestrator.run_stream(
-                session_id=session_id,
-                user_message=message
-            ):
+            async for step in orchestrator.run_stream(session_id=session_id, user_message=message):
                 if step.step_type == StepType.CONFIRM:
                     has_confirm = True
                 if step.step_type == StepType.ANSWER:
@@ -342,7 +356,7 @@ async def start_session_background_run(
                     "tool_input": step.tool_input,
                     "tool_output": step.tool_output,
                 }
-                
+
                 # Publish to all clients
                 await task_manager.publish_step(session_id, step_dict)
 
@@ -366,18 +380,26 @@ async def start_session_background_run(
                             "tool_name": step.tool_name,
                             "tool_input": step.tool_input,
                             "tool_output": step.tool_output,
-                        }
+                        },
                     )
                 except Exception as ex:
-                    logger.critical("api.event_log_failed", session_id=session_id, error=str(ex), alert=True, db_failure=True)
-            
+                    logger.critical(
+                        "api.event_log_failed", session_id=session_id, error=str(ex), alert=True, db_failure=True
+                    )
+
             # If the stream finished and we have no pending confirmation, mark COMPLETED (only for SIEM/automated sessions)
             if not has_confirm:
                 try:
                     session = await postgres_session_repo.get_session(session_id)
                     session_source = session.get("source") if session else "USER"
                 except Exception as db_err:
-                    logger.critical("api.fetch_session_source_failed", session_id=session_id, error=str(db_err), alert=True, db_failure=True)
+                    logger.critical(
+                        "api.fetch_session_source_failed",
+                        session_id=session_id,
+                        error=str(db_err),
+                        alert=True,
+                        db_failure=True,
+                    )
                     session_source = "USER"  # Default safely to USER
 
                 if session_source != "USER":
@@ -409,12 +431,13 @@ async def start_session_background_run(
     await task_manager.register_task(session_id, task)
     return True
 
+
 @app.post("/v1/chat/stream")
 async def chat_stream(
     req: StreamRequest,
     redis_store: RedisSessionStore = Depends(get_redis_store),
     catalog: ToolCatalog = Depends(get_catalog),
-    pref_store: RedisPreferenceStore = Depends(get_pref_store)
+    pref_store: RedisPreferenceStore = Depends(get_pref_store),
 ):
     """
     Stream the ReAct reasoning loop (Thoughts, Observations, Answers)
@@ -443,7 +466,7 @@ async def chat_stream(
             agent=req.agent,
             redis_store=redis_store,
             catalog=catalog,
-            pref_store=pref_store
+            pref_store=pref_store,
         )
         if not started:
             await task_manager.remove_queue(session_id, client_queue)
@@ -465,17 +488,15 @@ async def chat_stream(
         finally:
             await task_manager.remove_queue(session_id, client_queue)
 
-    return StreamingResponse(
-        _stream_generator(),
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(_stream_generator(), media_type="text/event-stream")
+
 
 @app.post("/v1/sessions/{session_id}/approve")
 async def approve_session(
     session_id: str,
     redis_store: RedisSessionStore = Depends(get_redis_store),
     catalog: ToolCatalog = Depends(get_catalog),
-    pref_store: RedisPreferenceStore = Depends(get_pref_store)
+    pref_store: RedisPreferenceStore = Depends(get_pref_store),
 ):
     """
     REST API endpoint to approve the pending action of a session.
@@ -484,32 +505,33 @@ async def approve_session(
     session = await postgres_session_repo.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
-        
+
     if session.get("status") != "WAITING_APPROVAL":
         raise HTTPException(
             status_code=400,
-            detail=f"Session '{session_id}' is not awaiting approval. Current status: {session.get('status')}"
+            detail=f"Session '{session_id}' is not awaiting approval. Current status: {session.get('status')}",
         )
-        
+
     started = await start_session_background_run(
         session_id=session_id,
         message="yes",
         agent=session.get("agent_name"),
         redis_store=redis_store,
         catalog=catalog,
-        pref_store=pref_store
+        pref_store=pref_store,
     )
     if not started:
         raise HTTPException(status_code=409, detail="Session is already executing another action.")
-        
+
     return {"status": "success", "message": "Approval processed. Session execution resumed in background."}
+
 
 @app.post("/v1/sessions/{session_id}/reject")
 async def reject_session(
     session_id: str,
     redis_store: RedisSessionStore = Depends(get_redis_store),
     catalog: ToolCatalog = Depends(get_catalog),
-    pref_store: RedisPreferenceStore = Depends(get_pref_store)
+    pref_store: RedisPreferenceStore = Depends(get_pref_store),
 ):
     """
     REST API endpoint to reject the pending action of a session.
@@ -518,32 +540,29 @@ async def reject_session(
     session = await postgres_session_repo.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
-        
+
     if session.get("status") != "WAITING_APPROVAL":
         raise HTTPException(
             status_code=400,
-            detail=f"Session '{session_id}' is not awaiting approval. Current status: {session.get('status')}"
+            detail=f"Session '{session_id}' is not awaiting approval. Current status: {session.get('status')}",
         )
-        
+
     started = await start_session_background_run(
         session_id=session_id,
         message="no",
         agent=session.get("agent_name"),
         redis_store=redis_store,
         catalog=catalog,
-        pref_store=pref_store
+        pref_store=pref_store,
     )
     if not started:
         raise HTTPException(status_code=409, detail="Session is already executing another action.")
-        
+
     return {"status": "success", "message": "Rejection processed. Session execution resumed in background."}
 
 
 @app.delete("/v1/session/{session_id}")
-async def destroy_session(
-    session_id: str,
-    redis_store: RedisSessionStore = Depends(get_redis_store)
-):
+async def destroy_session(session_id: str, redis_store: RedisSessionStore = Depends(get_redis_store)):
     """
     Clean up a session's workspace (temp + downloads) and optionally destroy it entirely.
     """
@@ -567,10 +586,7 @@ async def destroy_session(
 
 
 @app.get("/v1/session/{session_id}/workspace")
-async def get_workspace_info(
-    session_id: str,
-    redis_store: RedisSessionStore = Depends(get_redis_store)
-):
+async def get_workspace_info(session_id: str, redis_store: RedisSessionStore = Depends(get_redis_store)):
     """
     Return workspace usage statistics for a session.
     """
@@ -588,10 +604,7 @@ async def get_workspace_info(
 
 
 @app.get("/v1/session/{session_id}/owner")
-async def get_session_owner(
-    session_id: str,
-    redis_store: RedisSessionStore = Depends(get_redis_store)
-):
+async def get_session_owner(session_id: str, redis_store: RedisSessionStore = Depends(get_redis_store)):
     """
     Return the owner_id for a given session.
     Used by the Gateway to verify session ownership (IDOR prevention).
@@ -613,9 +626,11 @@ async def get_cached_playbooks(catalog: ToolCatalog = Depends(get_catalog)) -> d
 
 # --- Sessions Persistance Endpoints ---
 
+
 class UpdateSessionRequest(BaseModel):
     status: str | None = None
     verdict: str | None = None
+
 
 @app.get("/v1/sessions")
 async def list_sessions(
@@ -646,12 +661,14 @@ async def list_sessions(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/v1/sessions/stats")
 async def get_session_stats():
     try:
         return await postgres_session_repo.get_session_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/v1/sessions/{session_id}")
 async def get_session(session_id: str):
@@ -665,39 +682,42 @@ async def get_session(session_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.patch("/v1/sessions/{session_id}")
 async def update_session(session_id: str, req: UpdateSessionRequest):
     try:
         session = await postgres_session_repo.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
-        
+
         if req.status:
             valid_statuses = {"ACTIVE", "WAITING_APPROVAL", "COMPLETED", "FAILED", "ARCHIVED"}
             if req.status.upper() not in valid_statuses:
                 raise HTTPException(status_code=400, detail=f"Invalid status: {req.status}")
-            
+
             verdict_val = None
             if req.verdict:
                 valid_verdicts = {"TRUE_POSITIVE", "FALSE_POSITIVE", "UNDETERMINED"}
                 if req.verdict.upper() not in valid_verdicts:
                     raise HTTPException(status_code=400, detail=f"Invalid verdict: {req.verdict}")
                 verdict_val = req.verdict.upper()
-                
+
             await postgres_session_repo.update_status(session_id, req.status.upper(), verdict_val)
-            
+
             await postgres_session_repo.add_event(
                 session_id=session_id,
                 event_type="status_change",
                 actor="system",
-                content=f"Session status updated to {req.status.upper()}" + (f" with verdict {verdict_val}" if verdict_val else ""),
+                content=f"Session status updated to {req.status.upper()}"
+                + (f" with verdict {verdict_val}" if verdict_val else ""),
             )
-            
+
         return {"status": "success"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/v1/sessions/{session_id}/events")
 async def get_session_events(session_id: str, limit: int = 100):
@@ -710,4 +730,3 @@ async def get_session_events(session_id: str, limit: int = 100):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

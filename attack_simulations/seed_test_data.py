@@ -138,6 +138,7 @@ ALERTS = [
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def create_index(client: httpx.Client) -> None:
     """Create the demo index if it does not exist."""
     r = client.put(

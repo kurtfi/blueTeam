@@ -1,6 +1,7 @@
 """
 Tool Execution Telemetry — lightweight observability for every tool call.
 """
+
 from __future__ import annotations
 
 import time
@@ -19,13 +20,14 @@ logger = structlog.get_logger(__name__)
 # In-process metrics store (lightweight, no external dependency)
 # ---------------------------------------------------------------------------
 
+
 class _ToolMetrics:
     """Accumulates per-tool counters and latency totals in memory."""
 
     def __init__(self) -> None:
-        self._calls:    dict[str, int]   = defaultdict(int)
-        self._errors:   dict[str, int]   = defaultdict(int)
-        self._latency:  dict[str, float] = defaultdict(float)  # total seconds
+        self._calls: dict[str, int] = defaultdict(int)
+        self._errors: dict[str, int] = defaultdict(int)
+        self._latency: dict[str, float] = defaultdict(float)  # total seconds
 
     def record(self, tool_name: str, success: bool, latency_s: float) -> None:
         self._calls[tool_name] += 1
@@ -40,8 +42,8 @@ class _ToolMetrics:
             avg_ms = (self._latency[name] / calls * 1000) if calls else 0.0
             errors = self._errors.get(name, 0)
             result[name] = {
-                "calls":        calls,
-                "errors":       errors,
+                "calls": calls,
+                "errors": errors,
                 "success_rate": round((calls - errors) / calls, 4) if calls else 1.0,
                 "avg_latency_ms": round(avg_ms, 2),
                 "total_latency_s": round(self._latency[name], 4),
@@ -56,6 +58,7 @@ tool_metrics = _ToolMetrics()
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 async def track_tool_call(
     tool_name: str,

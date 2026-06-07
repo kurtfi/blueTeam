@@ -15,17 +15,21 @@ logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/web", tags=["Web API"])
 
+
 class LoginRequest(BaseModel):
     username: str
     password: str
+
 
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
     agent: str | None = None
 
+
 class ChatResponse(BaseModel):
     session_id: str
+
 
 @router.post("/login", summary="Log in to receive an access token")
 async def login(req: LoginRequest, response: Response) -> dict[str, str]:
@@ -50,12 +54,14 @@ async def login(req: LoginRequest, response: Response) -> dict[str, str]:
             permissions = []
 
     # Generate JWT
-    token = create_access_token(data={
-        "uid": user["username"],
-        "email": user["email"],
-        "role": user["role"],
-        "permissions": permissions,
-    })
+    token = create_access_token(
+        data={
+            "uid": user["username"],
+            "email": user["email"],
+            "role": user["role"],
+            "permissions": permissions,
+        }
+    )
 
     # Set HttpOnly cookie
     response.set_cookie(
@@ -154,14 +160,16 @@ async def list_agents(
             try:
                 with open(f, encoding="utf-8") as stream:
                     config = yaml.safe_load(stream)
-                    agents.append({
-                        "id": f.stem,
-                        "name": config.get("name"),
-                        "role": config.get("role"),
-                        "tools": config.get("tool_filters", {}).get("names", []),
-                        "model": config.get("llm", {}).get("model", ""),
-                        "temperature": config.get("llm", {}).get("temperature", 0.0),
-                    })
+                    agents.append(
+                        {
+                            "id": f.stem,
+                            "name": config.get("name"),
+                            "role": config.get("role"),
+                            "tools": config.get("tool_filters", {}).get("names", []),
+                            "model": config.get("llm", {}).get("model", ""),
+                            "temperature": config.get("llm", {}).get("temperature", 0.0),
+                        }
+                    )
             except Exception as e:
                 logger.warning(
                     "gateway.routers.web.parse_agent_failed",
@@ -177,5 +185,6 @@ async def list_playbooks_endpoint(
 ) -> dict[str, str]:
     """Return the cached playbooks markdown string."""
     from gateway.services.agentix_client import get_playbooks
+
     md_content = await get_playbooks()
     return {"markdown": md_content}

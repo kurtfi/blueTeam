@@ -5,6 +5,7 @@ Cycle:
   Think  →  Act (tool call)  →  Observe (tool result)  →  repeat
            until final answer or max_iterations reached.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

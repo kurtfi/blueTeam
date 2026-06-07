@@ -1,6 +1,7 @@
 """
 Factory to instantiate the appropriate vector store provider.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -30,6 +31,7 @@ class VectorStoreFactory:
         else:
             logger.warning("vectors.factory.unknown_provider", provider=provider, fallback="inmemory")
             return InMemoryVectorStore()
+
 
 # Global instance for singleton-like usage if needed
 vector_store = VectorStoreFactory.create_provider()

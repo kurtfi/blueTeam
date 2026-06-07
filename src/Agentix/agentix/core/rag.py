@@ -1,6 +1,7 @@
 """
 Context Enrichment Service (RAG) for retrieving knowledge from vector stores.
 """
+
 from typing import Any
 
 _RAG_CONTEXT_HEADER = """<retrieved_context>
@@ -17,8 +18,10 @@ class ContextEnrichmentService:
     """
     Responsible for retrieving context from vector stores.
     """
-    
-    def __init__(self, config: Any = None, vector_store: Any | None = None, rag_top_k: int = 5, rag_enabled: bool = True):
+
+    def __init__(
+        self, config: Any = None, vector_store: Any | None = None, rag_top_k: int = 5, rag_enabled: bool = True
+    ):
         self._config = config
         self._vector_store = vector_store
         self._rag_top_k = rag_top_k
@@ -36,6 +39,7 @@ class ContextEnrichmentService:
         if self._vector_store is None:
             try:
                 from agentic_common.vectors.factory import vector_store
+
                 self._vector_store = vector_store
             except Exception as e:
                 log.warning("orchestrator.rag.vector_store_unavailable", error=str(e))
@@ -44,9 +48,9 @@ class ContextEnrichmentService:
         try:
             # Cross-session retrieval: filter by user_id
             results = await self._vector_store.search(
-                query=user_message, 
+                query=user_message,
                 top_k=self._rag_top_k,
-                filter={"user_id": user_id} if user_id != "anonymous" else None
+                filter={"user_id": user_id} if user_id != "anonymous" else None,
             )
         except Exception as e:
             log.warning("orchestrator.rag.search_failed", error=str(e))

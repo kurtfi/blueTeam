@@ -116,10 +116,7 @@ async def list_sessions_endpoint(
             limit=limit,
             offset=offset,
         )
-        return {
-            "sessions": res["sessions"],
-            "total_count": res["total_count"]
-        }
+        return {"sessions": res["sessions"], "total_count": res["total_count"]}
     except Exception as e:
         logger.error("gateway.routers.sessions.list_failed", uid=user_id, error=str(e))
         raise HTTPException(
@@ -231,14 +228,14 @@ async def update_session_endpoint(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to modify this session.",
             )
-            
+
         # SIEM sessions can only be modified by admins (e.g. HITL approves)
         if sess.get("source") == "SIEM" and role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin roles can interact with automated SIEM triage sessions.",
             )
-            
+
         return await agentix_client.update_session_status(
             session_id=session_id,
             status=req.status,
@@ -274,14 +271,14 @@ async def approve_session_endpoint(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to modify this session.",
             )
-            
+
         # SIEM sessions can only be modified by admins
         if sess.get("source") == "SIEM" and role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin roles can interact with automated SIEM triage sessions.",
             )
-            
+
         return await agentix_client.approve_session(session_id)
     except HTTPException:
         raise
@@ -313,14 +310,14 @@ async def reject_session_endpoint(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to modify this session.",
             )
-            
+
         # SIEM sessions can only be modified by admins
         if sess.get("source") == "SIEM" and role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin roles can interact with automated SIEM triage sessions.",
             )
-            
+
         return await agentix_client.reject_session(session_id)
     except HTTPException:
         raise

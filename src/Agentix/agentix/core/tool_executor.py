@@ -1,6 +1,7 @@
 """
 Tool Execution Engine for orchestrating parallel tool invocations.
 """
+
 import asyncio
 import json
 from typing import Any
@@ -11,9 +12,10 @@ from agentic_common.telemetry import track_tool_call
 
 class ToolExecutionEngine:
     """
-    Engine responsible for handling tool executions in parallel, 
+    Engine responsible for handling tool executions in parallel,
     dealing with timeouts, error handling, and formatting outputs.
     """
+
     def __init__(self, memory: Any = None, preference_store: Any = None, workspace: Any = None):
         self._memory = memory
         self._preference_store = preference_store
@@ -37,7 +39,7 @@ class ToolExecutionEngine:
         """
         active_workspace = workspace if workspace is not None else self._workspace
         workspace_path = str(active_workspace.root) if active_workspace else None
-        
+
         # Get user_id for tools (from metadata)
         metadata = await self._memory.get_metadata(session_id) if self._memory else {}
         user_id = metadata.get("owner_id", "anonymous")

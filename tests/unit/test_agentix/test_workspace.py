@@ -11,6 +11,7 @@ Covers:
  - Full destroy
  - Class-level helpers (from_session_id, list_sessions)
 """
+
 from __future__ import annotations
 
 import os
@@ -31,6 +32,7 @@ def workspace_root(tmp_path: Path):
 
     # Patch the settings at module level so _workspace_root() uses our temp dir.
     from agentic_common import settings as settings_mod
+
     original_root = settings_mod.settings.agentix_session_workspace_root
     settings_mod.settings.agentix_session_workspace_root = str(sessions_dir)
     original_quota = settings_mod.settings.agentix_session_quota_mb
@@ -221,9 +223,7 @@ async def test_get_usage_reports_correct(workspace_root: Path, session_id: str):
 
 
 @pytest.mark.asyncio
-async def test_cleanup_deletes_temp_and_downloads_keeps_outputs(
-    workspace_root: Path, session_id: str
-):
+async def test_cleanup_deletes_temp_and_downloads_keeps_outputs(workspace_root: Path, session_id: str):
     from agentic_common.workspace import SessionWorkspace
 
     ws = SessionWorkspace(session_id=session_id)

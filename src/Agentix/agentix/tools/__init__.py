@@ -2,6 +2,7 @@
 Agentix tool implementations.
 Tools are now powered by the FastMCP engine.
 """
+
 from fastmcp import FastMCP
 
 # The single FastMCP application instance — all tools register against this.

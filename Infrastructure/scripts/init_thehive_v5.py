@@ -13,6 +13,7 @@ ANALYST_LOGIN = "analyst@thehive.local"
 ANALYST_NAME = "SOC Analyst"
 ORG_NAME = "asdg"
 
+
 def get_admin_headers(client: httpx.Client) -> dict:
     """Logs in as admin and returns session token headers."""
     print(f"  → Trying session login as {THEHIVE_ADMIN_USER}...")
@@ -39,6 +40,7 @@ def get_admin_headers(client: httpx.Client) -> dict:
     print("  ✓ Admin session established.")
     return {"Cookie": session_token, "Content-Type": "application/json"}
 
+
 def ensure_organisation(client: httpx.Client, admin_headers: dict) -> str:
     """Ensures the organization exists in TheHive. Returns org ID/name."""
     print(f"\n[Org] Checking organisation '{ORG_NAME}'...")
@@ -49,7 +51,7 @@ def ensure_organisation(client: httpx.Client, admin_headers: dict) -> str:
             if org.get("name") == ORG_NAME:
                 print(f"  → Organisation '{ORG_NAME}' already exists.")
                 return ORG_NAME
-                
+
     # Create organisation
     print(f"  → Creating organisation '{ORG_NAME}'...")
     create_resp = client.post(
@@ -64,10 +66,11 @@ def ensure_organisation(client: httpx.Client, admin_headers: dict) -> str:
         print(f"  ✗ Failed to create organisation: {create_resp.status_code} – {create_resp.text}")
         sys.exit(1)
 
+
 def create_or_update_user(client: httpx.Client, admin_headers: dict) -> str:
     """Creates or updates the analyst user with the correct organization mapping."""
     print(f"\n[User] Ensuring user '{ANALYST_LOGIN}' exists...")
-    
+
     # 1. Check if user exists
     resp = client.get(f"{THEHIVE_URL}/api/user", headers=admin_headers)
     users = resp.json() if resp.status_code == 200 else []
@@ -76,16 +79,11 @@ def create_or_update_user(client: httpx.Client, admin_headers: dict) -> str:
         if u.get("login") == ANALYST_LOGIN:
             user_exists = True
             break
-            
+
     if not user_exists:
         # Create user
         print("  → Creating analyst user...")
-        create_payload = {
-            "login": ANALYST_LOGIN,
-            "name": ANALYST_NAME,
-            "status": "Ok",
-            "password": "secret"
-        }
+        create_payload = {"login": ANALYST_LOGIN, "name": ANALYST_NAME, "status": "Ok", "password": "secret"}
         create_resp = client.post(
             f"{THEHIVE_URL}/api/user",
             json=create_payload,
@@ -100,9 +98,7 @@ def create_or_update_user(client: httpx.Client, admin_headers: dict) -> str:
 
     # 2. Make sure user is unlocked/active and set password
     client.patch(
-        f"{THEHIVE_URL}/api/user/{ANALYST_LOGIN}",
-        json={"status": "Ok", "password": "secret"},
-        headers=admin_headers
+        f"{THEHIVE_URL}/api/user/{ANALYST_LOGIN}", json={"status": "Ok", "password": "secret"}, headers=admin_headers
     )
 
     # 3. Map user to both organizations via PUT /api/v1/user/{userId}/organisations
@@ -110,13 +106,11 @@ def create_or_update_user(client: httpx.Client, admin_headers: dict) -> str:
     org_payload = {
         "organisations": [
             {"organisation": "admin", "profile": "read-only"},
-            {"organisation": "asdg", "profile": "org-admin"}
+            {"organisation": "asdg", "profile": "org-admin"},
         ]
     }
     org_resp = client.put(
-        f"{THEHIVE_URL}/api/v1/user/{ANALYST_LOGIN}/organisations",
-        json=org_payload,
-        headers=admin_headers
+        f"{THEHIVE_URL}/api/v1/user/{ANALYST_LOGIN}/organisations", json=org_payload, headers=admin_headers
     )
     if org_resp.status_code == 200:
         print("  ✓ Organisation mapping updated successfully.")
@@ -126,20 +120,15 @@ def create_or_update_user(client: httpx.Client, admin_headers: dict) -> str:
 
     # 4. Set default organisation to 'asdg' via PATCH
     print("  → Setting default organisation to 'asdg'...")
-    patch_payload = {
-        "defaultOrganisation": "asdg"
-    }
-    patch_resp = client.patch(
-        f"{THEHIVE_URL}/api/user/{ANALYST_LOGIN}",
-        json=patch_payload,
-        headers=admin_headers
-    )
+    patch_payload = {"defaultOrganisation": "asdg"}
+    patch_resp = client.patch(f"{THEHIVE_URL}/api/user/{ANALYST_LOGIN}", json=patch_payload, headers=admin_headers)
     if patch_resp.status_code == 200:
         print("  ✓ Default organisation set to 'asdg'.")
     else:
         print(f"  ✗ Failed to set default organisation: {patch_resp.status_code} – {patch_resp.text}")
 
     return ANALYST_LOGIN
+
 
 def renew_analyst_key(client: httpx.Client, admin_headers: dict, user_id: str) -> str:
     """Renews/generates the API key for the analyst user."""
@@ -160,17 +149,19 @@ def renew_analyst_key(client: httpx.Client, admin_headers: dict, user_id: str) -
         print(f"  ✗ Failed to generate API key: {renew_resp.status_code} – {renew_resp.text}")
         sys.exit(1)
 
+
 def main():
     print("=== TheHive v5 Advanced Initialization ===")
     print(f"Target: {THEHIVE_URL}")
-    
+
     with httpx.Client(timeout=15.0) as client:
         admin_headers = get_admin_headers(client)
         ensure_organisation(client, admin_headers)
         user_id = create_or_update_user(client, admin_headers)
         renew_analyst_key(client, admin_headers, user_id)
-        
+
     print("\n=== Initialization Complete ===")
+
 
 if __name__ == "__main__":
     main()

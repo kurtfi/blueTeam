@@ -48,6 +48,7 @@ def simulate_t1548_001():
         print("  \u2713 Root shell execution log entry written")
     return True
 
+
 if __name__ == "__main__":
     ensure_log_file()
     if simulate_t1548_001():

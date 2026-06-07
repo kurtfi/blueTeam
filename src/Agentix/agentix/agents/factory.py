@@ -1,6 +1,7 @@
 """
 Agent Factory - provides pre-configured Orchestrator instances.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,21 +23,21 @@ class AgentFactory:
     ) -> Orchestrator:
         """
         Create an Orchestrator instance configured as the named agent.
-        
+
         Args:
             agent_name: Name of the agent config (e.g. 'researcher').
             catalog: Optional shared tool catalog.
             memory: Optional shared session memory.
         """
         config = AgentLoader.load_by_name(agent_name)
-        
+
         # Configure LLM if overrides exist in YAML
         llm = LLMClient(
             model=config.llm.model,
             temperature=config.llm.temperature,
             max_tokens=config.llm.max_tokens,
         )
-        
+
         return Orchestrator(
             llm=llm,
             catalog=catalog,
@@ -51,13 +52,13 @@ class AgentFactory:
     ) -> Orchestrator:
         """Create an agent from an arbitrary YAML file path."""
         config = AgentLoader.load_from_yaml(yaml_path)
-        
+
         llm = LLMClient(
             model=config.llm.model,
             temperature=config.llm.temperature,
             max_tokens=config.llm.max_tokens,
         )
-        
+
         return Orchestrator(
             llm=llm,
             catalog=catalog,
@@ -75,10 +76,10 @@ class AgentFactory:
         Falls back to a generic Orchestrator if no strong match is found.
         """
         from agentix.agents.router import AgentRouter
-        
+
         router = AgentRouter()
         best_agent = await router.route(message)
-        
+
         if best_agent:
             return AgentFactory.create(
                 agent_name=best_agent,

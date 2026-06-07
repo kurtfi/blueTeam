@@ -5,6 +5,7 @@ Storage: Redis — persistent and distributed across worker instances.
 - Uses settings.redis_url connection string
 - Race-condition free atomic check-and-set
 """
+
 from __future__ import annotations
 
 import redis.asyncio as redis
@@ -12,6 +13,7 @@ import structlog
 from agentic_common.settings import settings
 
 logger = structlog.get_logger(__name__)
+
 
 class AlertKeyExtractor:
     """
@@ -23,22 +25,23 @@ class AlertKeyExtractor:
     def extract_rule_id(payload: dict) -> str:
         """Finds rule.id in the alert payload."""
         all_fields = payload.get("all_fields", {})
-        rule_id = (payload.get("rule_id") 
-                   or payload.get("rule", {}).get("id")
-                   or all_fields.get("rule", {}).get("id")
-                   or "")
+        rule_id = (
+            payload.get("rule_id") or payload.get("rule", {}).get("id") or all_fields.get("rule", {}).get("id") or ""
+        )
         return str(rule_id).strip()
 
     @staticmethod
     def extract_src_ip(payload: dict) -> str:
         """Finds source IP in the alert payload."""
         all_fields = payload.get("all_fields", {})
-        src_ip = (payload.get("srcip")
-                  or payload.get("data", {}).get("srcip")
-                  or all_fields.get("data", {}).get("srcip")
-                  or all_fields.get("agent", {}).get("ip")
-                  or payload.get("agent", {}).get("ip")
-                  or "")
+        src_ip = (
+            payload.get("srcip")
+            or payload.get("data", {}).get("srcip")
+            or all_fields.get("data", {}).get("srcip")
+            or all_fields.get("agent", {}).get("ip")
+            or payload.get("agent", {}).get("ip")
+            or ""
+        )
         return str(src_ip).strip()
 
     @classmethod
@@ -71,7 +74,7 @@ class AlertDeduplicator:
         Returns (is_duplicate, existing_session_id).
         """
         rule_id = AlertKeyExtractor.extract_rule_id(payload)
-                      
+
         logger.debug("alert_dedup.checking", rule_id=rule_id, session_id=session_id)
         if rule_id in self._bypass_rules:
             logger.debug("alert_dedup.bypass_rule", rule_id=rule_id)
@@ -84,7 +87,7 @@ class AlertDeduplicator:
 
         redis_key = f"dedup:alert:{key}"
         logger.debug("alert_dedup.redis_key", redis_key=redis_key)
-        
+
         # Atomically check-and-set if not exists with a TTL
         success = await self._redis.set(redis_key, session_id, nx=True, ex=self._window)
         logger.debug("alert_dedup.set_nx_result", success=success)

@@ -19,7 +19,7 @@ async def test_langfuse():
     print(f"Enabled: {settings.langfuse_enabled}")
     print(f"Host: {settings.langfuse_host}")
     print(f"Public Key: {settings.langfuse_public_key[:8]}...")
-    
+
     trace = obs.trace(name="test_trace", session_id="test_session")
     if trace:
         print("Trace created successfully.")
@@ -30,6 +30,7 @@ async def test_langfuse():
         print("Data flushed to Langfuse.")
     else:
         print("Failed to create trace. Is Langfuse enabled and keys set?")
+
 
 if __name__ == "__main__":
     asyncio.run(test_langfuse())

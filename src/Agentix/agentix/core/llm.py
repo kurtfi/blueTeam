@@ -1,7 +1,8 @@
 """
-Abstract Factory and Client wrapper for routing requests to 
+Abstract Factory and Client wrapper for routing requests to
 various LLM providers (Ollama, OpenAI, Gemini).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -20,13 +21,13 @@ from agentix.core.providers.openai_provider import OpenAIProvider
 
 logger = structlog.get_logger(__name__)
 
-_LLM_CACHE_MAX_SIZE: int = 1000   # max number of cached responses per LLMClient instance
-_LLM_CACHE_TTL: int = 300          # seconds — routing decisions are valid for 5 minutes
+_LLM_CACHE_MAX_SIZE: int = 1000  # max number of cached responses per LLMClient instance
+_LLM_CACHE_TTL: int = 300  # seconds — routing decisions are valid for 5 minutes
 
 
 class LLMProviderFactory:
     """Factory to instantiate the appropriate LLM provider."""
-    
+
     @staticmethod
     def create_provider(
         provider_name: str | None = None,
@@ -35,7 +36,7 @@ class LLMProviderFactory:
         max_tokens: int = 4096,
     ) -> BaseLLMProvider:
         provider = provider_name or settings.agentix_llm_provider
-        
+
         if provider == "openai":
             return OpenAIProvider(model, temperature, max_tokens)
         elif provider == "gemini":
@@ -57,12 +58,8 @@ class LLMClient:
         max_tokens: int = 4096,
         cache_enabled: bool = True,
     ) -> None:
-        self._provider = LLMProviderFactory.create_provider(
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
-        self.model = getattr(self._provider, "model", model) 
+        self._provider = LLMProviderFactory.create_provider(model=model, temperature=temperature, max_tokens=max_tokens)
+        self.model = getattr(self._provider, "model", model)
         self.temperature = temperature
         self.cache_enabled = cache_enabled
         # Cache stores (timestamp, response) tuples to support TTL eviction
@@ -80,7 +77,7 @@ class LLMClient:
             "messages": messages,
             "tools": tools,
             "tool_choice": tool_choice,
-            "temperature": self.temperature
+            "temperature": self.temperature,
         }
         # Deep serialize to handle the complex types in messages/tools
         raw = json.dumps(request_obj, sort_keys=True, default=str)
@@ -131,4 +128,3 @@ class LLMClient:
             logger.debug("llm.cache.miss", model=self.model)
 
         return response
-

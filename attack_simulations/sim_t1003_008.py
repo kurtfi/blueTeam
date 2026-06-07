@@ -34,6 +34,7 @@ def simulate_t1003_008():
         print(f"  \u2717 Failed to write log: {err}")
         return False
 
+
 if __name__ == "__main__":
     ensure_log_file()
     if simulate_t1003_008():

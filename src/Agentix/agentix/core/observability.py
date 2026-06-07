@@ -3,6 +3,7 @@ Langfuse — LLM Observability & Tracing for Agentix.
 
 Provides a singleton Langfuse client and context-aware tracing utilities.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,10 +20,12 @@ logger = structlog.get_logger(__name__)
 # Type variable for the function return type
 R = TypeVar("R")
 
+
 class ObservabilityManager:
     """
     Singleton manager for Langfuse tracing.
     """
+
     _instance: ObservabilityManager | None = None
     _client: Langfuse | None = None
 
@@ -51,13 +54,8 @@ class ObservabilityManager:
         """
         if not self._client:
             return None
-        
-        return self._client.trace(
-            name=name,
-            session_id=session_id,
-            user_id=user_id,
-            metadata=kwargs
-        )
+
+        return self._client.trace(name=name, session_id=session_id, user_id=user_id, metadata=kwargs)
 
     async def flush(self) -> None:
         """
@@ -66,13 +64,16 @@ class ObservabilityManager:
         if self._client:
             await asyncio.to_thread(self._client.flush)
 
+
 # Global singleton
 obs = ObservabilityManager()
+
 
 def trace_it(name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator to wrap a function call in a Langfuse span.
     """
+
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -83,4 +84,5 @@ def trace_it(name: str | None = None) -> Callable[[Callable[..., Any]], Callable
             return await func(*args, **kwargs)
 
         return async_wrapper
+
     return decorator

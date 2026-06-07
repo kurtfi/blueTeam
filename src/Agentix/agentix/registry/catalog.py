@@ -4,6 +4,7 @@ ToolCatalog — dynamic tool registry and intent-based selection.
 Tools are registered at startup and selected per-request based on
 semantic similarity between the user's message and each tool's description.
 """
+
 from __future__ import annotations
 
 import json
@@ -57,9 +58,7 @@ class ToolCatalog:
         self._local_embeddings: dict[str, list[float]] = {}
         self._embed_provider = EmbeddingFactory.create_provider()
         # Redis client — shared across all ToolCatalog instances in the same process
-        self._redis: aioredis.Redis = aioredis.from_url(
-            settings.redis_url, decode_responses=True
-        )
+        self._redis: aioredis.Redis = aioredis.from_url(settings.redis_url, decode_responses=True)
         self.cached_playbooks: str | None = None
 
     # ------------------------------------------------------------------
@@ -83,11 +82,11 @@ class ToolCatalog:
         into the Agentix ToolCatalog using the MCPToolAdapter.
         """
         from agentix.tools.mcp_adapter import MCPToolAdapter
-        
+
         result = await client.list_tools()
         # Handle both ListToolsResult (standard MCP) and direct list (FastMCP internal)
         mcp_tools = getattr(result, "tools", result)
-        
+
         for t in mcp_tools:
             # mcp.types.Tool has name, description, inputSchema
             adapter = MCPToolAdapter(
@@ -97,7 +96,6 @@ class ToolCatalog:
                 client=client,
             )
             self.register(adapter)
-
 
     def unregister(self, name: str) -> None:
         self._tools.pop(name, None)

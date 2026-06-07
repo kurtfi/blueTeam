@@ -443,6 +443,7 @@ TEMPLATES = [
 # Helpers
 # ─────────────────────────────────────────────────────────────
 
+
 def get_admin_headers(client: httpx.Client) -> dict:
     """Returns admin auth headers. Prefers API key, falls back to session cookie."""
     # Try admin API key first (most reliable)
@@ -535,16 +536,30 @@ def grant_analyst_template_permission(client: httpx.Client, admin_headers: dict)
     soc_profile_exists = any(p.get("name") == "soc-analyst" for p in profiles)
 
     soc_permissions = [
-        "manageCase/create", "manageCase/update", "manageCase/delete",
-        "manageCase/merge", "manageCase/reopen",
-        "manageAlert/create", "manageAlert/update", "manageAlert/delete",
-        "manageAlert/import", "manageAlert/reopen",
-        "manageObservable", "manageTask", "manageComment",
-        "manageCaseReport", "manageDashboard", "manageAnalyse",
-        "manageProcedure", "managePage", "manageShare",
-        "manageAction", "manageKnowledgeBase",
-        "manageCustomEvent", "accessTheHiveFS",
-        "manageCaseTemplate",           # ← key permission for template creation
+        "manageCase/create",
+        "manageCase/update",
+        "manageCase/delete",
+        "manageCase/merge",
+        "manageCase/reopen",
+        "manageAlert/create",
+        "manageAlert/update",
+        "manageAlert/delete",
+        "manageAlert/import",
+        "manageAlert/reopen",
+        "manageObservable",
+        "manageTask",
+        "manageComment",
+        "manageCaseReport",
+        "manageDashboard",
+        "manageAnalyse",
+        "manageProcedure",
+        "managePage",
+        "manageShare",
+        "manageAction",
+        "manageKnowledgeBase",
+        "manageCustomEvent",
+        "accessTheHiveFS",
+        "manageCaseTemplate",  # ← key permission for template creation
     ]
 
     if not soc_profile_exists:
@@ -566,6 +581,7 @@ def grant_analyst_template_permission(client: httpx.Client, admin_headers: dict)
 # Main
 # ─────────────────────────────────────────────────────────────
 
+
 def main():
     if not THEHIVE_API_KEY:
         print("Error: THEHIVE_API_KEY environment variable is not set.")
@@ -577,9 +593,7 @@ def main():
     with httpx.Client(timeout=15.0) as client:
         # ── Step 1: Verify analyst connectivity ──────────────
         print("[Auth] Verifying analyst API key...")
-        analyst_resp = client.get(
-            f"{THEHIVE_URL}/api/v1/user/current", headers=ANALYST_API_HEADERS
-        )
+        analyst_resp = client.get(f"{THEHIVE_URL}/api/v1/user/current", headers=ANALYST_API_HEADERS)
         if analyst_resp.status_code != 200:
             print(f"  ✗ Analyst authentication failed: {analyst_resp.status_code}")
             sys.exit(1)

@@ -1,6 +1,7 @@
 """
 Embedding providers to generate vector representations of text.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

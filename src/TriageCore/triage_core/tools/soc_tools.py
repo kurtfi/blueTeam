@@ -10,6 +10,7 @@ logger = structlog.get_logger(__name__)
 # Playbook Tools
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @mcp.tool()
 async def trigger_playbook(
     playbook_id: str,
@@ -66,11 +67,13 @@ async def trigger_playbook(
         )
         result = pb_registry.trigger(playbook_id, ctx)
         import json
+
         return json.dumps(result.to_dict(), ensure_ascii=False)
 
     except KeyError as e:
         try:
             from triage_core.playbooks import registry as pb_registry
+
             available = ", ".join(p["id"] for p in pb_registry.list_all())
             return f"Playbook not found: {e}\nAvailable playbooks: {available}"
         except Exception:
@@ -86,13 +89,11 @@ async def list_playbooks(filter_mitre: str = "", filter_severity: str = "") -> s
     logger.info("tool.list_playbooks", filter_mitre=filter_mitre, filter_severity=filter_severity)
     try:
         from triage_core.playbooks import registry as pb_registry
+
         playbooks = pb_registry.list_all()
 
         if filter_mitre:
-            playbooks = [
-                p for p in playbooks
-                if any(filter_mitre.upper() in mid.upper() for mid in p["mitre_ids"])
-            ]
+            playbooks = [p for p in playbooks if any(filter_mitre.upper() in mid.upper() for mid in p["mitre_ids"])]
         if filter_severity:
             playbooks = [p for p in playbooks if p["severity"] == filter_severity.lower()]
 
@@ -122,6 +123,7 @@ async def find_playbook_for_alert(
     logger.info("tool.find_playbook_for_alert", rule_id=rule_id, mitre_ids=mitre_ids)
     try:
         from triage_core.playbooks import registry as pb_registry
+
         candidates = pb_registry.find_for_alert(rule_id=rule_id, mitre_ids=mitre_ids or [])
 
         if not candidates:
@@ -132,23 +134,18 @@ async def find_playbook_for_alert(
 
         lines = [f"Suitable playbooks ({len(candidates)} found):\n"]
         for pb in candidates:
-            lines.append(
-                f"  → **{pb.id}**: {pb.name} "
-                f"[{pb.severity.value.upper()}] "
-                f"MITRE: {', '.join(pb.mitre_ids)}"
-            )
-        lines.append(
-            f"\nTo trigger the playbook: "
-            f"trigger_playbook(playbook_id='{candidates[0].id}', ...)"
-        )
+            lines.append(f"  → **{pb.id}**: {pb.name} [{pb.severity.value.upper()}] MITRE: {', '.join(pb.mitre_ids)}")
+        lines.append(f"\nTo trigger the playbook: trigger_playbook(playbook_id='{candidates[0].id}', ...)")
         return "\n".join(lines)
     except Exception as e:
         logger.error("playbook.find.error", error=str(e))
         return f"Playbook search error: {str(e)}"
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Case Management Tools
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 async def create_case(title: str = "", description: str = "", severity: int = 2, tags: list[str] | None = None) -> str:
@@ -159,6 +156,7 @@ async def create_case(title: str = "", description: str = "", severity: int = 2,
     provider = registry.get_case_management_provider()
     return await provider.create_case(title, description, severity, tags)
 
+
 @mcp.tool()
 async def add_case_note(case_id: str, note: str, task_title: str = "Investigation Note") -> str:
     """Adds a note/task to an existing case.
@@ -168,8 +166,11 @@ async def add_case_note(case_id: str, note: str, task_title: str = "Investigatio
     provider = registry.get_case_management_provider()
     return await provider.add_case_note(case_id, note, task_title)
 
+
 @mcp.tool()
-async def update_case_status(case_id: str, status: str, resolution_type: str = "TruePositive", summary: str = "") -> str:
+async def update_case_status(
+    case_id: str, status: str, resolution_type: str = "TruePositive", summary: str = ""
+) -> str:
     """Updates the status of an existing case.
     IMPORTANT: You MUST first create a case using 'create_case' and use the exact Case ID returned (e.g. ~12345).
     Valid status values: FalsePositive, TruePositive, Indeterminate, InProgress, New, Duplicated, Other.
@@ -180,15 +181,26 @@ async def update_case_status(case_id: str, status: str, resolution_type: str = "
     provider = registry.get_case_management_provider()
     return await provider.update_case_status(case_id, status, resolution_type, summary)
 
+
 @mcp.tool()
-async def create_alert(title: str = "", description: str = "", source: str = "Agentix", source_ref: str = "", severity: int = 2, tags: list[str] | None = None, observables: list[dict[str, Any]] | None = None) -> str:
+async def create_alert(
+    title: str = "",
+    description: str = "",
+    source: str = "Agentix",
+    source_ref: str = "",
+    severity: int = 2,
+    tags: list[str] | None = None,
+    observables: list[dict[str, Any]] | None = None,
+) -> str:
     """Creates an alert for triage in the Case Management system."""
     provider = registry.get_case_management_provider()
     return await provider.create_alert(title, description, source, source_ref, severity, tags, observables)
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Enrichment Tools
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 async def get_ip_reputation(ip_address: str) -> str:
@@ -196,11 +208,13 @@ async def get_ip_reputation(ip_address: str) -> str:
     provider = registry.get_enrichment_provider()
     return await provider.get_ip_reputation(ip_address)
 
+
 @mcp.tool()
 async def get_file_reputation(file_hash: str) -> str:
     """Queries file hash reputation."""
     provider = registry.get_enrichment_provider()
     return await provider.get_file_reputation(file_hash)
+
 
 @mcp.tool()
 async def get_domain_url_reputation(url_or_domain: str) -> str:
@@ -208,9 +222,11 @@ async def get_domain_url_reputation(url_or_domain: str) -> str:
     provider = registry.get_enrichment_provider()
     return await provider.get_domain_url_reputation(url_or_domain)
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # IAM / AD Tools
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 async def get_ad_user_info(username: str) -> str:
@@ -218,15 +234,18 @@ async def get_ad_user_info(username: str) -> str:
     provider = registry.get_iam_provider()
     return await provider.get_user_info(username)
 
+
 @mcp.tool()
 async def disable_user_account(username: str) -> str:
     """Disables a compromised user account."""
     provider = registry.get_iam_provider()
     return await provider.disable_user_account(username)
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SIEM Tools
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 async def query_siem_logs(query: str, time_range: str = "last 1 hour") -> str:
@@ -234,9 +253,11 @@ async def query_siem_logs(query: str, time_range: str = "last 1 hour") -> str:
     provider = registry.get_siem_provider()
     return await provider.query_logs(query, time_range)
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoint & Containment Tools
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 async def get_endpoint_info(agent_id: str) -> str:
@@ -244,11 +265,13 @@ async def get_endpoint_info(agent_id: str) -> str:
     provider = registry.get_endpoint_provider()
     return await provider.get_endpoint_info(agent_id)
 
+
 @mcp.tool()
 async def isolate_endpoint(agent_id: str) -> str:
     """Isolates the endpoint from the network after detecting malicious activity."""
     provider = registry.get_endpoint_provider()
     return await provider.isolate_endpoint(agent_id)
+
 
 @mcp.tool()
 async def block_ip(ip_address: str) -> str:
@@ -256,9 +279,11 @@ async def block_ip(ip_address: str) -> str:
     provider = registry.get_firewall_provider()
     return await provider.block_ip(ip_address)
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SOAR Tools
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 async def trigger_soar_workflow(workflow_id: str, data: dict[str, Any] | None = None, webhook_url: str = "") -> str:

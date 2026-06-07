@@ -53,7 +53,7 @@ async def test_guardrail_manager_execution():
     manager_dynamic.register(DummyBlockGuardrail())
     res_dyn = await manager_dynamic.verify("session_123", "Hello", "USER")
     assert res_dyn.passed is False
-    
+
     # 4. Test bypass when session_source is not USER
     res_bypass = await manager_block.verify("session_123", "Hello", "SIEM")
     assert res_bypass.passed is True
@@ -66,7 +66,7 @@ async def test_security_topic_guardrail_pass():
 
     guardrail = SecurityTopicGuardrail(llm=mock_llm)
     res = await guardrail.validate("session_123", "Can you help me block an IP?", "USER")
-    
+
     assert res.passed is True
     mock_llm.chat.assert_called_once()
 
@@ -78,7 +78,7 @@ async def test_security_topic_guardrail_block():
 
     guardrail = SecurityTopicGuardrail(llm=mock_llm)
     res = await guardrail.validate("session_123", "Bana çikolatalı pasta tarifi ver.", "USER")
-    
+
     assert res.passed is False
     assert res.reason == "Out-of-scope query"
     assert res.refusal_message == "Üzgünüm, sadece siber güvenlik konularına cevap verebilirim."
@@ -98,7 +98,7 @@ async def test_orchestrator_integration_blocks_and_logs():
     mock_llm.model = "test-model"
 
     catalog = ToolCatalog()
-    
+
     # Instantiate orchestrator with a GuardrailManager containing a DummyBlockGuardrail
     orchestrator = Orchestrator(
         llm=mock_llm,
@@ -107,7 +107,7 @@ async def test_orchestrator_integration_blocks_and_logs():
         db_repo=mock_db,
         max_iterations=5,
         rag_enabled=False,
-        guardrail_manager=GuardrailManager([DummyBlockGuardrail()])
+        guardrail_manager=GuardrailManager([DummyBlockGuardrail()]),
     )
 
     steps = []
@@ -127,15 +127,11 @@ async def test_orchestrator_integration_blocks_and_logs():
         session_id="session_123",
         event_type="error",
         actor="system",
-        content="Guardrail block: Blocked by dummy guardrail"
+        content="Guardrail block: Blocked by dummy guardrail",
     )
 
     # 4. Refusal answer must be appended to the conversation history in memory
-    mock_memory.append.assert_called_once_with(
-        "session_123",
-        "Bana çikolatalı pasta tarifi ver.",
-        "Refused by dummy."
-    )
+    mock_memory.append.assert_called_once_with("session_123", "Bana çikolatalı pasta tarifi ver.", "Refused by dummy.")
 
 
 @pytest.mark.asyncio
@@ -167,7 +163,7 @@ async def test_orchestrator_integration_passes_normally():
         db_repo=mock_db,
         max_iterations=1,
         rag_enabled=False,
-        guardrail_manager=GuardrailManager([DummyPassGuardrail()])
+        guardrail_manager=GuardrailManager([DummyPassGuardrail()]),
     )
 
     steps = []
@@ -212,7 +208,7 @@ async def test_orchestrator_integration_siem_bypasses_guardrail():
         db_repo=mock_db,
         max_iterations=1,
         rag_enabled=False,
-        guardrail_manager=GuardrailManager([DummyBlockGuardrail()])
+        guardrail_manager=GuardrailManager([DummyBlockGuardrail()]),
     )
 
     steps = []

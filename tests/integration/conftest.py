@@ -10,6 +10,7 @@ can leak into the next.
 The ``clear_connector_caches`` fixture resets all caches after every test,
 ensuring complete isolation between test cases.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -28,30 +29,35 @@ async def clear_connector_caches():
     # Data connector caches
     try:
         from general_mcp.tools.data.connectors.data_server import _sql_engines
+
         _sql_engines.clear()
     except (ImportError, AttributeError):
         pass
 
     try:
         from general_mcp.tools.data.connectors import mongodb_connector
+
         mongodb_connector._clients.clear()
     except (ImportError, AttributeError):
         pass
 
     try:
         from general_mcp.tools.data.connectors import redis_connector
+
         redis_connector._clients.clear()
     except (ImportError, AttributeError):
         pass
 
     try:
         from general_mcp.tools.data.connectors import elasticsearch_connector
+
         elasticsearch_connector._clients.clear()
     except (ImportError, AttributeError):
         pass
 
     try:
         from general_mcp.tools.data.connectors import neo4j_connector
+
         neo4j_connector._drivers.clear()
     except (ImportError, AttributeError):
         pass

@@ -1,6 +1,7 @@
 """
 YAML loader for Agent configurations.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -38,5 +39,5 @@ class AgentLoader:
         config_dir = Path(__file__).parent / "configs"
         if not config_dir.exists():
             return []
-        
+
         return [f.stem for f in config_dir.glob("*.yaml")]

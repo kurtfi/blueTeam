@@ -1,6 +1,7 @@
 """
 Simple in-memory vector store using cosine similarity.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -49,7 +50,9 @@ class InMemoryVectorStore(BaseVectorStore):
                     "metadata": new_metadata[i],
                 }
                 # Simple replace if ID exists
-                existing_idx = next((idx for idx, d in enumerate(self._collections[collection]) if d["id"] == doc["id"]), -1)
+                existing_idx = next(
+                    (idx for idx, d in enumerate(self._collections[collection]) if d["id"] == doc["id"]), -1
+                )
                 if existing_idx != -1:
                     self._collections[collection][existing_idx] = doc
                 else:
@@ -63,7 +66,7 @@ class InMemoryVectorStore(BaseVectorStore):
         top_k: int = 5,
         collection: str = "default",
         filter: dict[str, Any] | None = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> list[VectorSearchResult]:
         alpha: float = kwargs.get("alpha", 0.5)
         if collection not in self._collections or not self._collections[collection]:
@@ -92,7 +95,7 @@ class InMemoryVectorStore(BaseVectorStore):
         for doc in docs:
             score = self._cosine_similarity(query_vector, doc["vector"])
             semantic_scored.append((doc["id"], score))
-        
+
         semantic_scored.sort(key=lambda x: x[1], reverse=True)
         semantic_rank = {doc_id: i + 1 for i, (doc_id, _) in enumerate(semantic_scored)}
 
@@ -103,7 +106,7 @@ class InMemoryVectorStore(BaseVectorStore):
             doc_words = set(doc["text"].lower().split())
             intersection = query_words.intersection(doc_words)
             keyword_scored.append((doc["id"], len(intersection) / max(len(query_words), 1)))
-        
+
         keyword_scored.sort(key=lambda x: x[1], reverse=True)
         keyword_rank = {doc_id: i + 1 for i, (doc_id, _) in enumerate(keyword_scored)}
 
@@ -112,11 +115,11 @@ class InMemoryVectorStore(BaseVectorStore):
         rrf_k = 60
         fused_scores: dict[str, float] = {}
         all_ids = set(semantic_rank.keys()) | set(keyword_rank.keys())
-        
+
         for doc_id in all_ids:
             s_rank = semantic_rank.get(doc_id, 1000)
             k_rank = keyword_rank.get(doc_id, 1000)
-            
+
             # alpha=1 -> pure semantic, alpha=0 -> pure keyword
             score = (alpha * (1.0 / (rrf_k + s_rank))) + ((1.0 - alpha) * (1.0 / (rrf_k + k_rank)))
             fused_scores[doc_id] = score
@@ -128,12 +131,14 @@ class InMemoryVectorStore(BaseVectorStore):
         results: list[VectorSearchResult] = []
         for doc_id in sorted_ids[:top_k]:
             doc = id_to_doc[doc_id]
-            results.append({
-                "id": doc["id"],
-                "text": doc["text"],
-                "metadata": doc["metadata"],
-                "score": fused_scores[doc_id],
-            })
+            results.append(
+                {
+                    "id": doc["id"],
+                    "text": doc["text"],
+                    "metadata": doc["metadata"],
+                    "score": fused_scores[doc_id],
+                }
+            )
 
         return results
 

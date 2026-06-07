@@ -15,6 +15,7 @@ Usage (from an MCP tool / agent):
     ctx = PlaybookContext(alert={"agent_id": "007", "src_ip": "10.0.0.1"})
     result = pb.render(ctx)
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -25,18 +26,19 @@ from typing import Any
 # Enums
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class StepStatus(StrEnum):
-    PENDING   = "pending"
-    APPROVED  = "approved"
-    SKIPPED   = "skipped"
+    PENDING = "pending"
+    APPROVED = "approved"
+    SKIPPED = "skipped"
     COMPLETED = "completed"
-    FAILED    = "failed"
+    FAILED = "failed"
 
 
 class Severity(StrEnum):
-    LOW      = "low"
-    MEDIUM   = "medium"
-    HIGH     = "high"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
     CRITICAL = "critical"
 
     @property
@@ -47,6 +49,7 @@ class Severity(StrEnum):
 # ─────────────────────────────────────────────────────────────────────────────
 # PlaybookContext – runtime state / alert data
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class PlaybookContext:
@@ -59,6 +62,7 @@ class PlaybookContext:
         observables: Dict of observables enriched during the run (ip→score, hash→score…)
         extra: Arbitrary extra context
     """
+
     alert: dict[str, Any] = field(default_factory=dict)
     case_id: str | None = None
     observables: dict[str, Any] = field(default_factory=dict)
@@ -93,6 +97,7 @@ class PlaybookContext:
 # PlaybookStep
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ApprovalGate:
     """
@@ -104,6 +109,7 @@ class ApprovalGate:
         message: What to ask the human operator
         requires_confirmation_for: Short description of the destructive action
     """
+
     message: str
     requires_confirmation_for: str
 
@@ -123,6 +129,7 @@ class PlaybookStep:
         approval_gate: If set, agent must request human approval before executing this step
         condition: Optional string expression evaluated against context (not enforced by base class)
     """
+
     order: int
     title: str
     description: str
@@ -135,7 +142,7 @@ class PlaybookStep:
     def _interpolate_string(self, text: str, ctx: PlaybookContext) -> str:
         """Interpolates ctx.path placeholders in a string."""
         import re
-        
+
         def repl(match):
             placeholder = match.group(0)
             path = match.group(1)
@@ -149,7 +156,7 @@ class PlaybookStep:
                 else:
                     return placeholder
             return str(val) if val is not None else ""
-            
+
         return re.sub(r"\bctx\.([a-zA-Z0-9_.]+)", repl, text)
 
     def is_destructive(self) -> bool:
@@ -204,7 +211,7 @@ class PlaybookStep:
 
         tool_str = f"  Tool: `{self.tool_hint}`" if self.tool_hint else ""
         params_line = f"\n  Parameters: {params_str}" if params_str else ""
-        
+
         title_resolved = self._interpolate_string(self.title, ctx)
         desc_resolved = self._interpolate_string(self.description, ctx)
 
@@ -220,16 +227,18 @@ class PlaybookStep:
 # PlaybookResult
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class PlaybookResult:
     """Returned to the SOC agent when a playbook is triggered."""
+
     playbook_id: str
     playbook_name: str
     mitre_ids: list[str]
     severity: str
-    instructions: str          # Full rendered markdown for the agent
+    instructions: str  # Full rendered markdown for the agent
     steps_count: int
-    approval_required_steps: list[str]   # titles of steps needing human approval
+    approval_required_steps: list[str]  # titles of steps needing human approval
     case_template: str | None = None  # Template name to use when creating the case
     soar_workflow_id: str | None = None
 
@@ -250,6 +259,7 @@ class PlaybookResult:
 # ─────────────────────────────────────────────────────────────────────────────
 # Playbook
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class Playbook:
     """
@@ -307,13 +317,9 @@ class Playbook:
             f"## Response Steps\n\n"
         )
 
-        step_instructions = "\n\n".join(
-            step.render_instruction(ctx) for step in self.steps
-        )
+        step_instructions = "\n\n".join(step.render_instruction(ctx) for step in self.steps)
 
-        approval_steps = [
-            step.title for step in self.steps if step.is_destructive()
-        ]
+        approval_steps = [step.title for step in self.steps if step.is_destructive()]
 
         footer = ""
         if self.case_template:
@@ -323,8 +329,7 @@ class Playbook:
         if approval_steps:
             footer += (
                 f"\n\n> ⚠️ **{len(approval_steps)} step(s) require human approval** "
-                f"before execution:\n"
-                + "\n".join(f"> - {t}" for t in approval_steps)
+                f"before execution:\n" + "\n".join(f"> - {t}" for t in approval_steps)
             )
 
         return PlaybookResult(

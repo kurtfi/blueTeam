@@ -4,6 +4,7 @@ SOC Playbook Definitions
 Dynamically loads and registers playbooks from YAML definition files.
 Conforms to OCP by allowing new playbooks to be added without modifying code.
 """
+
 from __future__ import annotations
 
 import os
@@ -44,17 +45,23 @@ class PlaybookLoader:
                 try:
                     with open(entry.path, encoding="utf-8") as f:
                         data = yaml.safe_load(f)
-                    
+
                     if not data:
                         continue
-                    
+
                     playbook = PlaybookLoader.parse_playbook(data)
                     registry.register(playbook)
                     loaded_count += 1
                     logger.debug("playbook_loader.loaded", playbook_id=playbook.id, path=entry.path)
                 except Exception as e:
-                    logger.critical("playbook_loader.failed_to_load", path=entry.path, error=str(e), alert=True, playbook_failure=True)
-        
+                    logger.critical(
+                        "playbook_loader.failed_to_load",
+                        path=entry.path,
+                        error=str(e),
+                        alert=True,
+                        playbook_failure=True,
+                    )
+
         logger.info("playbook_loader.completed", loaded_count=loaded_count, directory=str(directory))
 
     @staticmethod
@@ -77,8 +84,7 @@ class PlaybookLoader:
             gate_data = step_data.get("approval_gate")
             if gate_data:
                 approval_gate = ApprovalGate(
-                    message=gate_data["message"],
-                    requires_confirmation_for=gate_data["requires_confirmation_for"]
+                    message=gate_data["message"], requires_confirmation_for=gate_data["requires_confirmation_for"]
                 )
 
             step = PlaybookStep(

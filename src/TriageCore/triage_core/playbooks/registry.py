@@ -9,6 +9,7 @@ Usage:
     pb = registry.get("PB-001")
     candidates = registry.find_for_alert(rule_id="100002", mitre_ids=["T1003.008"])
 """
+
 from __future__ import annotations
 
 import threading
@@ -58,9 +59,7 @@ class PlaybookRegistry:
             return self._playbooks[playbook_id]
         except KeyError:
             available = ", ".join(self._playbooks.keys())
-            raise KeyError(
-                f"Playbook '{playbook_id}' not found. Available: {available}"
-            )
+            raise KeyError(f"Playbook '{playbook_id}' not found. Available: {available}")
 
     def list_all(self) -> list[dict]:
         """Returns a summary list of all registered playbooks."""
@@ -88,10 +87,7 @@ class PlaybookRegistry:
         Sorted by severity (critical first).
         """
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        matches = [
-            pb for pb in self._playbooks.values()
-            if pb.matches(rule_id=rule_id, mitre_ids=mitre_ids or [])
-        ]
+        matches = [pb for pb in self._playbooks.values() if pb.matches(rule_id=rule_id, mitre_ids=mitre_ids or [])]
         return sorted(matches, key=lambda p: severity_order.get(p.severity.value, 9))
 
     def trigger(self, playbook_id: str, ctx: PlaybookContext) -> PlaybookResult:

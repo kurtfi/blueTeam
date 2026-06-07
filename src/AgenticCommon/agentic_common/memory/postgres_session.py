@@ -1,6 +1,7 @@
 """
 PostgreSQL Session Repository for persisting SOC sessions and agent audit trail events.
 """
+
 from __future__ import annotations
 
 import json
@@ -29,8 +30,9 @@ class PostgresSessionRepository:
             # strip +asyncpg for asyncpg library DSN compatibility
             dsn = settings.agentix_postgres_url.replace("+asyncpg", "")
             logger.info("postgres_session.connecting_db", dsn_masked=dsn.split("@")[-1])
-            
+
             import asyncio
+
             max_retries = 3
             backoff = 1.0
             for attempt in range(1, max_retries + 1):
@@ -62,8 +64,9 @@ class PostgresSessionRepository:
         Reads SQL from migrations/001_create_sessions.sql relative to the repository.
         """
         import os
+
         pool = await self.get_pool()
-        
+
         # Resolve migration file path
         # Assuming run is from workspace or python environment, look at absolute paths.
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -71,7 +74,7 @@ class PostgresSessionRepository:
         # Let's search relative or absolute
         migration_file = os.path.join(current_dir, "../../../../migrations/001_create_sessions.sql")
         migration_file = os.path.abspath(migration_file)
-        
+
         if not os.path.exists(migration_file):
             logger.error("postgres_session.migration_file_not_found", path=migration_file)
             return
@@ -113,7 +116,7 @@ class PostgresSessionRepository:
         """
         pool = await self.get_pool()
         sess_id = uuid.UUID(session_id) if session_id else uuid.uuid4()
-        
+
         payload_json = json.dumps(alert_payload) if alert_payload is not None else None
 
         async with pool.acquire() as conn:
@@ -152,7 +155,7 @@ class PostgresSessionRepository:
         """
         pool = await self.get_pool()
         sess_uuid = uuid.UUID(session_id)
-        
+
         now = datetime.now(UTC)
         completed_at = now if status in ("COMPLETED", "FAILED", "ARCHIVED") else None
         deleted_at = now if status == "ARCHIVED" else None
@@ -215,15 +218,15 @@ class PostgresSessionRepository:
 
         updates = []
         params = [sess_uuid]
-        
+
         if message_count is not None:
             params.append(message_count)
             updates.append(f"message_count = ${len(params)}")
-            
+
         if tool_calls is not None:
             params.append(tool_calls)
             updates.append(f"tool_calls = ${len(params)}")
-            
+
         if hitl_count is not None:
             params.append(hitl_count)
             updates.append(f"hitl_count = ${len(params)}")
@@ -325,7 +328,9 @@ class PostgresSessionRepository:
         if search:
             params.append(f"%{search}%")
             param_idx = len(params)
-            where_clauses.append(f"(display_name ILIKE ${param_idx} OR source_ip ILIKE ${param_idx} OR siem_rule_id ILIKE ${param_idx})")
+            where_clauses.append(
+                f"(display_name ILIKE ${param_idx} OR source_ip ILIKE ${param_idx} OR siem_rule_id ILIKE ${param_idx})"
+            )
 
         where_str = ""
         if where_clauses:
@@ -374,7 +379,9 @@ class PostgresSessionRepository:
         if search:
             params.append(f"%{search}%")
             param_idx = len(params)
-            where_clauses.append(f"(display_name ILIKE ${param_idx} OR source_ip ILIKE ${param_idx} OR siem_rule_id ILIKE ${param_idx})")
+            where_clauses.append(
+                f"(display_name ILIKE ${param_idx} OR source_ip ILIKE ${param_idx} OR siem_rule_id ILIKE ${param_idx})"
+            )
 
         where_str = ""
         if where_clauses:
@@ -483,7 +490,7 @@ class PostgresSessionRepository:
                 WHERE deleted_at IS NULL AND status != 'ARCHIVED'
                 """
             )
-            
+
             # SIEM specific metrics
             verdicts = await conn.fetchrow(
                 """

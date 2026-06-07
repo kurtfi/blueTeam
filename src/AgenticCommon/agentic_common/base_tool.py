@@ -1,6 +1,7 @@
 """
 BaseTool — abstract base class for every Agentix tool.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

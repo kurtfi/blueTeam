@@ -8,6 +8,7 @@ Features
 - interrupt_before / interrupt_after hooks for LangGraph-style checkpointing.
 - Exponential-backoff retry on transient failures.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,7 +21,7 @@ from agentic_common.base_tool import BaseTool, ToolResult
 logger = structlog.get_logger(__name__)
 
 _DEFAULT_MAX_RETRIES: int = 3
-_DEFAULT_RETRY_DELAY: float = 0.5   # seconds; doubles on each retry
+_DEFAULT_RETRY_DELAY: float = 0.5  # seconds; doubles on each retry
 
 
 class MCPToolAdapter(BaseTool):
@@ -48,7 +49,7 @@ class MCPToolAdapter(BaseTool):
         name: str,
         description: str,
         parameters: dict[str, Any],
-        client: Any,                                         # fastmcp.Client
+        client: Any,  # fastmcp.Client
         category: str = "data",
         requires_sandbox: bool = True,
         interrupt_before: Callable[..., Awaitable[None]] | None = None,
@@ -72,15 +73,15 @@ class MCPToolAdapter(BaseTool):
     # ------------------------------------------------------------------
 
     @property
-    def name(self) -> str:           # type: ignore[override]
+    def name(self) -> str:  # type: ignore[override]
         return self._name
 
     @property
-    def description(self) -> str:    # type: ignore[override]
+    def description(self) -> str:  # type: ignore[override]
         return self._description
 
     @property
-    def parameters(self) -> dict[str, Any]:   # type: ignore[override]
+    def parameters(self) -> dict[str, Any]:  # type: ignore[override]
         return self._parameters
 
     def requires_confirmation(self, **kwargs: Any) -> bool:
@@ -132,7 +133,7 @@ class MCPToolAdapter(BaseTool):
                 log.warning("mcp_adapter.interrupt_before.failed", error=str(hook_exc))
 
         import tenacity
-        
+
         # Inject system parameters from orchestrator context into tool arguments
         # if the tool explicitly accepts them in its JSON Schema.
         if context:
@@ -155,14 +156,19 @@ class MCPToolAdapter(BaseTool):
                 attempt=rs.attempt_number,
                 error=str(rs.outcome.exception()) if rs.outcome else "unknown",
                 delay_s=rs.next_action.sleep if rs.next_action else 0,
-            )
+            ),
         )
 
         try:
             async for attempt in retryer:
                 with attempt:
                     try:
-                        logger.info("mcp_adapter.call_tool", tool=self.name, attempt=attempt.retry_state.attempt_number, arguments=kwargs)
+                        logger.info(
+                            "mcp_adapter.call_tool",
+                            tool=self.name,
+                            attempt=attempt.retry_state.attempt_number,
+                            arguments=kwargs,
+                        )
                         result = await self._client.call_tool(self.name, arguments=kwargs)
                         output = self._parse_result(result)
 
@@ -173,7 +179,9 @@ class MCPToolAdapter(BaseTool):
                                     tool_name=self.name, args=kwargs, result=output, context=context
                                 )
                             except Exception as hook_exc:
-                                logger.warning("mcp_adapter.interrupt_after.failed", tool=self.name, error=str(hook_exc))
+                                logger.warning(
+                                    "mcp_adapter.interrupt_after.failed", tool=self.name, error=str(hook_exc)
+                                )
 
                         return ToolResult(success=True, output=output)
                     except (ValueError, PermissionError) as permanent:
@@ -187,7 +195,7 @@ class MCPToolAdapter(BaseTool):
                 success=False,
                 error=f"Tool '{self.name}' failed after {self._max_retries + 1} attempts: {exc}",
             )
-        
+
         return ToolResult(success=False, error=f"Tool '{self.name}' failed (unreachable)")
 
     # ------------------------------------------------------------------
