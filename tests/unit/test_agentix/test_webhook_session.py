@@ -48,6 +48,8 @@ async def test_handle_siem_alert_persists():
         assert kwargs["siem_severity"] == 12
         assert kwargs["source_ip"] == "192.168.1.50"
         assert kwargs["mitre_ids"] == ["T1110"]
+        assert kwargs["owner_id"] == "siem"
+        assert kwargs["source"] == "SIEM"
         assert "SSH Brute Force login attempt from 192.168.1.50" in kwargs["display_name"]
         
         # Verify audit event and background task

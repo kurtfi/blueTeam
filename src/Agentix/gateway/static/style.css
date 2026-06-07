@@ -764,6 +764,8 @@ textarea:focus-visible,
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     padding-bottom: 12px;
     animation: fadeIn 0.3s ease-out;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .user-msg {
@@ -794,7 +796,10 @@ textarea:focus-visible,
     line-height: 1.5;
     padding-left: 20px;
     word-break: break-word;
+    overflow-wrap: anywhere;
     white-space: pre-wrap;
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* Step specific styling */
@@ -818,8 +823,11 @@ textarea:focus-visible,
     font-size: 12px;
     white-space: pre-wrap;
     word-break: break-all;
+    overflow-wrap: anywhere;
     margin-top: 4px;
     color: #ffd080;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .step-observation {
@@ -834,10 +842,13 @@ textarea:focus-visible,
     font-size: 12px;
     white-space: pre-wrap;
     word-break: break-all;
+    overflow-wrap: anywhere;
     margin-top: 4px;
     max-height: 250px;
     overflow-y: auto;
     color: #bcc9cd;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .step-answer {
@@ -1952,6 +1963,11 @@ textarea:focus-visible,
     padding-right: 4px;
 }
 
+.right-metadata-col .glass-panel-content {
+    height: auto;
+    flex-shrink: 0;
+}
+
 .alert-panel-header {
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 8px;
@@ -2313,9 +2329,74 @@ textarea:focus-visible,
         transform: translateY(10px);
     }
 }
+/* HITL Action Summary Presentation */
+.hitl-action-summary-container {
+    background: rgba(245, 158, 11, 0.05);
+    border: 1px solid rgba(245, 158, 11, 0.15);
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
 
+.action-field {
+    font-size: 13.5px;
+    margin-bottom: 0px;
+}
 
+.action-label {
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-right: 6px;
+}
 
+.action-params-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(245, 158, 11, 0.1);
+    font-size: 12.5px;
+}
 
+.param-item {
+    display: flex;
+    justify-content: space-between;
+}
 
+.param-label {
+    color: var(--text-muted);
+}
+
+.param-value {
+    font-family: var(--font-mono);
+    color: var(--warning);
+    font-weight: 600;
+}
+
+/* Accordion toggle styling for technical details */
+.hitl-technical-accordion {
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.technical-toggle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.technical-toggle-header:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
 

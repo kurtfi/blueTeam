@@ -302,7 +302,7 @@
             <div id="panel-session-detail" class="hide flex-col full-height-panel">
                 <div class="detail-header session-detail-header-bar">
                     <button id="detail-back-btn" class="btn btn-secondary"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back</button>
-                    <div style="flex-grow: 1; min-width: 0;">
+                    <div style="flex-grow: 1; min-width: 0; margin-left: 15px;">
                         <h3 id="detail-display-name" class="detail-display-title">Session Name</h3>
                         <div class="detail-badges-row">
                             <span id="detail-source-badge" class="badge">SIEM</span>
@@ -311,6 +311,7 @@
                             <span id="detail-time-badge" class="font-mono text-xs text-muted detail-time-offset">Created: Jun 05 15:30</span>
                         </div>
                     </div>
+                    <button id="detail-refresh-btn" class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Refresh</button>
                 </div>
                 
                 <div class="split-layout-2-1">
@@ -363,13 +364,31 @@
                                 <h3><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> AUTHORIZATION GATE</h3>
                             </div>
                             <p class="hitl-sub-label">The agent is requesting authorization for a critical response action:</p>
+                            
+                            <!-- Human readable action summary -->
+                            <div id="hitl-action-summary-box" class="hitl-action-summary-container">
+                                <div class="action-field"><span class="action-label">Action:</span> <strong id="detail-hitl-action-friendly" class="text-bright">Loading Action…</strong></div>
+                                <div id="detail-hitl-params-list" class="action-params-list">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
                             <div id="detail-hitl-justification" class="hitl-justification-block">
                                 Loading justification…
                             </div>
-                            <div class="hitl-code-block-wrapper">
-                                <p class="hitl-tool-title" id="detail-hitl-tool">Tool Name</p>
-                                <pre class="hitl-pre-args"><code id="detail-hitl-args">{}</code></pre>
+
+                            <!-- Collapsible Technical Details -->
+                            <div class="hitl-technical-accordion hide">
+                                <div class="technical-toggle-header" id="hitl-technical-toggle">
+                                    <span><i class="fa-solid fa-code text-muted"></i> Raw Tool Parameters</span>
+                                    <i class="fa-solid fa-chevron-down text-muted" style="font-size: 10px;"></i>
+                                </div>
+                                <div class="hitl-code-block-wrapper hide" id="hitl-technical-body" style="padding: 12px; border-top: 1px solid var(--border-color);">
+                                    <p class="hitl-tool-title" id="detail-hitl-tool">Tool Name</p>
+                                    <pre class="hitl-pre-args"><code id="detail-hitl-args">{}</code></pre>
+                                </div>
                             </div>
+
                             <div class="hitl-actions-row">
                                 <button id="detail-hitl-reject" class="btn btn-muted flex-grow-1">Reject</button>
                                 <button id="detail-hitl-approve" class="btn btn-success flex-grow-1">Approve</button>

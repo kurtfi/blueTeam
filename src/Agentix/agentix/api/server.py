@@ -345,6 +345,31 @@ async def start_session_background_run(
                 
                 # Publish to all clients
                 await task_manager.publish_step(session_id, step_dict)
+
+                # Persist event in PostgreSQL
+                try:
+                    event_type = step.step_type.value
+                    actor = "agent" if step.step_type in (StepType.THINK, StepType.ACT, StepType.ANSWER) else "system"
+                    if step.step_type == StepType.CONFIRM:
+                        event_type = "hitl_request"
+                        actor = "agent"
+                        has_confirm = True
+                    elif step.step_type == StepType.OBSERVE:
+                        actor = "system" if "Teams Integration" in (step.content or "") else "tool"
+
+                    await postgres_session_repo.add_event(
+                        session_id=session_id,
+                        event_type=event_type,
+                        actor=actor,
+                        content=step.content,
+                        metadata={
+                            "tool_name": step.tool_name,
+                            "tool_input": step.tool_input,
+                            "tool_output": step.tool_output,
+                        }
+                    )
+                except Exception as ex:
+                    logger.critical("api.event_log_failed", session_id=session_id, error=str(ex), alert=True, db_failure=True)
             
             # If the stream finished and we have no pending confirmation, mark COMPLETED (only for SIEM/automated sessions)
             if not has_confirm:

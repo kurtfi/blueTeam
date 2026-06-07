@@ -112,7 +112,7 @@ services:
     ports:
       - "9001:9001"
     environment:
-      - "JAVA_OPTS=-Xms512m -Xmx512m"
+      - "JAVA_OPTS=-Xms512m -Xmx512m -Dworker.updateDockerImage=false"
     command:
       - --es-uri
       - http://thehive-elasticsearch:9200

@@ -122,6 +122,7 @@ const detailStatusBadge = document.getElementById('detail-status-badge');
 const detailVerdictBadge = document.getElementById('detail-verdict-badge');
 const detailTimeBadge = document.getElementById('detail-time-badge');
 const detailBackBtn = document.getElementById('detail-back-btn');
+const detailRefreshBtn = document.getElementById('detail-refresh-btn');
 const detailWazuhCard = document.getElementById('detail-wazuh-card');
 const detailRawAlertCard = document.getElementById('detail-raw-alert-card');
 const detailHitlCard = document.getElementById('detail-hitl-card');
@@ -425,6 +426,20 @@ function setupEventListeners() {
         });
     }
 
+    // Refresh Button from detail view
+    if (detailRefreshBtn) {
+        detailRefreshBtn.addEventListener('click', async () => {
+            if (activeSessionId) {
+                await fetchWithLoader(
+                    { buttons: [detailRefreshBtn], container: document.getElementById('detail-timeline') },
+                    async () => {
+                        await openSessionDetail(activeSessionId);
+                    }
+                );
+            }
+        });
+    }
+
     // Filter changes
     if (filterSource) {
         filterSource.addEventListener('change', async () => {
@@ -586,6 +601,21 @@ function setupEventListeners() {
             const body = document.getElementById('raw-alert-body');
             body.classList.toggle('hide');
             const icon = rawAlertToggleHeader.querySelector('i');
+            if (body.classList.contains('hide')) {
+                icon.className = 'fa-solid fa-chevron-down text-muted';
+            } else {
+                icon.className = 'fa-solid fa-chevron-up text-muted';
+            }
+        });
+    }
+
+    // Accordion Toggle for HITL Technical Details
+    const hitlTechnicalToggle = document.getElementById('hitl-technical-toggle');
+    if (hitlTechnicalToggle) {
+        hitlTechnicalToggle.addEventListener('click', () => {
+            const body = document.getElementById('hitl-technical-body');
+            body.classList.toggle('hide');
+            const icon = hitlTechnicalToggle.querySelector('.fa-chevron-down, .fa-chevron-up');
             if (body.classList.contains('hide')) {
                 icon.className = 'fa-solid fa-chevron-down text-muted';
             } else {
@@ -1109,16 +1139,41 @@ function renderHitlQueuePage() {
                 
                 if (hitlRequestEvent && hitlRequestEvent.metadata && hitlRequestEvent.metadata.tool_name) {
                     toolName = hitlRequestEvent.metadata.tool_name;
-                    toolArgs = hitlRequestEvent.metadata.tool_args || {};
+                    toolArgs = hitlRequestEvent.metadata.tool_args || hitlRequestEvent.metadata.tool_input || {};
                 } else if (hitlEvent && hitlEvent.metadata && hitlEvent.metadata.tool_name) {
                     toolName = hitlEvent.metadata.tool_name;
                     toolArgs = hitlEvent.metadata.tool_input || {};
                 }
                 
-                toolEl.textContent = toolName;
-                argsEl.textContent = typeof toolArgs === 'string' 
-                    ? toolArgs 
-                    : JSON.stringify(toolArgs, null, 2);
+                // Human-friendly representation for the pending HITL card
+                toolEl.textContent = `${getFriendlyToolName(toolName)} (${toolName})`;
+                if (typeof toolArgs === 'object' && FRIENDLY_TOOLS[toolName]) {
+                    const lines = [];
+                    // Context-based target enrichment for isolate_endpoint
+                    if (toolName === 'isolate_endpoint') {
+                        const agentName = sess.alert_payload?.all_fields?.agent?.name || sess.alert_payload?.all_fields?.manager?.name || '';
+                        const hostname = sess.alert_payload?.all_fields?.predecoder?.hostname || '';
+                        const srcIp = sess.alert_payload?.all_fields?.data?.srcip || sess.alert_payload?.all_fields?.syslog_headers?.from || '';
+                        
+                        if (agentName || hostname) {
+                            lines.push(`Target Host: ${agentName || hostname}`);
+                        }
+                        if (srcIp) {
+                            lines.push(`Trigger IP: ${srcIp}`);
+                        }
+                        // Skip displaying raw agent_id parameter because it's not meaningful in the front-end (we show target hostname instead)
+                    } else {
+                        Object.keys(toolArgs).forEach(k => {
+                            const label = FRIENDLY_TOOLS[toolName].paramLabels[k] || k;
+                            lines.push(`${label}: ${toolArgs[k]}`);
+                        });
+                    }
+                    argsEl.textContent = lines.join('\n');
+                } else {
+                    argsEl.textContent = typeof toolArgs === 'string' 
+                        ? toolArgs 
+                        : JSON.stringify(toolArgs, null, 2);
+                }
             })
             .catch(e => console.error('Failed to fetch events for HITL card:', e));
             
@@ -1304,10 +1359,22 @@ function renderSessionDetails(sess, events) {
             
             if (hitlRequestEvent && hitlRequestEvent.metadata && hitlRequestEvent.metadata.tool_name) {
                 toolName = hitlRequestEvent.metadata.tool_name;
-                toolArgs = hitlRequestEvent.metadata.tool_args || {};
+                toolArgs = hitlRequestEvent.metadata.tool_args || hitlRequestEvent.metadata.tool_input || {};
             } else if (hitlEvent && hitlEvent.metadata && hitlEvent.metadata.tool_name) {
                 toolName = hitlEvent.metadata.tool_name;
                 toolArgs = hitlEvent.metadata.tool_input || {};
+            }
+            
+            // Build human-friendly action summary representation
+            const friendlyName = getFriendlyToolName(toolName);
+            const detailHitlActionFriendly = document.getElementById('detail-hitl-action-friendly');
+            const detailHitlParamsList = document.getElementById('detail-hitl-params-list');
+            
+            if (detailHitlActionFriendly) {
+                detailHitlActionFriendly.textContent = friendlyName;
+            }
+            if (detailHitlParamsList) {
+                detailHitlParamsList.innerHTML = renderFriendlyParams(toolName, toolArgs, sess.alert_payload);
             }
             
             detailHitlTool.textContent = toolName;
@@ -1364,12 +1431,14 @@ function renderTimelineEvents(events) {
         
         switch (step.event_type) {
             case 'think':
+                stepBlock.classList.add('step-thinking');
                 headerHtml = `<div class="step-type-header step-thinking"><i class="fa-solid fa-brain"></i> THINKING (${step.actor})</div>`;
                 contentHtml = `<div class="step-content text-cyan">${step.content}</div>`;
                 break;
                 
             case 'tool':
             case 'act':
+                stepBlock.classList.add('step-tool');
                 const toolName = step.metadata?.tool_name || 'system';
                 headerHtml = `<div class="step-type-header step-tool"><i class="fa-solid fa-screwdriver-wrench"></i> EXECUTING TOOL: ${toolName}</div>`;
                 let inputArgs = '';
@@ -1381,6 +1450,7 @@ function renderTimelineEvents(events) {
                 break;
                 
             case 'observe':
+                stepBlock.classList.add('step-observation');
                 headerHtml = `<div class="step-type-header step-observation"><i class="fa-solid fa-eye"></i> OBSERVATION</div>`;
                 let outputText = '';
                 try {
@@ -1400,6 +1470,7 @@ function renderTimelineEvents(events) {
                     chatMessagesContainer.appendChild(userDiv);
                     return;
                 } else {
+                    stepBlock.classList.add('step-answer');
                     headerHtml = `<div class="step-type-header step-answer"><i class="fa-solid fa-circle-check"></i> AGENT MESSAGE</div>`;
                     contentHtml = `<div class="step-content step-answer"><div class="step-content-inner">${step.content}</div></div>`;
                 }
@@ -2035,5 +2106,104 @@ async function fetchWithLoader(loaderOptions, fetchFn) {
             });
         }
     }
+}
+
+// ==========================================
+// HITL PRESENTATION HELPERS
+// ==========================================
+const FRIENDLY_TOOLS = {
+    'isolate_endpoint': {
+        title: 'Isolate Endpoint / Host',
+        paramLabels: {
+            'agent_id': 'Wazuh Agent ID'
+        }
+    },
+    'block_ip': {
+        title: 'Block IP Address',
+        paramLabels: {
+            'ip_address': 'IP Address',
+            'ip': 'IP Address',
+            'direction': 'Direction'
+        }
+    },
+    'disable_user_account': {
+        title: 'Disable User Account',
+        paramLabels: {
+            'username': 'Username',
+            'user': 'Username',
+            'domain': 'Domain'
+        }
+    },
+    'delete_file': {
+        title: 'Delete File',
+        paramLabels: {
+            'path': 'File Path',
+            'filepath': 'File Path'
+        }
+    },
+    'execute_command': {
+        title: 'Execute Command',
+        paramLabels: {
+            'cmd': 'Command',
+            'command': 'Command'
+        }
+    }
+};
+
+function getFriendlyToolName(toolName) {
+    return FRIENDLY_TOOLS[toolName]?.title || toolName;
+}
+
+function renderFriendlyParams(toolName, toolArgs, alertPayload) {
+    if (!toolArgs || typeof toolArgs !== 'object') {
+        return `<div class="param-item"><span class="param-label">Arguments:</span> <span class="param-value">${toolArgs}</span></div>`;
+    }
+    const toolConfig = FRIENDLY_TOOLS[toolName];
+    const keys = Object.keys(toolArgs);
+    
+    let html = '';
+    
+    // Context enrichment from alert payload for isolate_endpoint
+    if (toolName === 'isolate_endpoint') {
+        const agentName = alertPayload?.all_fields?.agent?.name || alertPayload?.all_fields?.manager?.name || '';
+        const hostname = alertPayload?.all_fields?.predecoder?.hostname || '';
+        const srcIp = alertPayload?.all_fields?.data?.srcip || alertPayload?.all_fields?.syslog_headers?.from || '';
+        
+        if (agentName || hostname) {
+            html += `
+                <div class="param-item" style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 6px; border-bottom: 1px dashed rgba(245, 158, 11, 0.1); padding-bottom: 4px;">
+                    <span class="param-label" style="color: var(--text-muted);"><i class="fa-solid fa-server"></i> Target Hostname/Name:</span>
+                    <strong class="param-value" style="color: var(--warning); font-family: var(--font-mono);">${agentName || hostname}</strong>
+                </div>
+            `;
+        }
+        if (srcIp) {
+            html += `
+                <div class="param-item" style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 6px; border-bottom: 1px dashed rgba(245, 158, 11, 0.1); padding-bottom: 4px;">
+                    <span class="param-label" style="color: var(--text-muted);"><i class="fa-solid fa-network-wired"></i> Origin/Triggering IP:</span>
+                    <strong class="param-value" style="color: var(--text-bright); font-family: var(--font-mono);">${srcIp}</strong>
+                </div>
+            `;
+        }
+        // Completely skip showing agent_id raw parameter since it's represented by hostname above
+        return html;
+    }
+    
+    if (keys.length > 0) {
+        html += keys.map(key => {
+            const label = toolConfig?.paramLabels[key] || key;
+            const val = toolArgs[key];
+            return `
+                <div class="param-item" style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
+                    <span class="param-label" style="color: var(--text-muted);">${label}:</span>
+                    <strong class="param-value" style="font-family: var(--font-mono); color: var(--warning);">${val}</strong>
+                </div>
+            `;
+        }).join('');
+    } else {
+        html += `<div class="param-item"><span class="param-label">Parameters:</span> <span class="param-value">None</span></div>`;
+    }
+    
+    return html;
 }
 
