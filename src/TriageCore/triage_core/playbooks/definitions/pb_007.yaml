@@ -1,0 +1,96 @@
+id: PB-007
+name: Privilege Escalation – SUID/SGID Abuse
+description: A SUID/SGID binary was modified, created, or executed in an unusual context,
+  indicating potential privilege escalation attempt. Attacker may be attempting to
+  gain root.
+mitre_ids:
+- T1548
+- T1548.001
+severity: high
+tags:
+- privilege-escalation
+- suid
+- linux
+- wazuh-syscheck
+case_template: MITRE T1548.001 - Privilege Escalation via SUID
+steps:
+- order: 0
+  title: Query SIEM – SUID Event Details
+  group: Investigation
+  description: 'Search Wazuh syscheck for recently modified or new SUID binaries.
+    Check rule groups: syscheck, rootcheck. Note file path, old vs new permissions,
+    and user who made the change.'
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.groups:syscheck AND data.syscheck.mode:realtime AND agent.id:ctx.agent_id
+- order: 1
+  title: Check for Successful Root Command Execution
+  group: Investigation
+  description: Search for subsequent root-level commands executed after the SUID modification.
+    Check for sudo, su, or direct root shell access.
+  tool_hint: query_siem_logs
+  parameters:
+    query: data.dstuser:root AND agent.id:ctx.agent_id AND rule.level:>=10
+- order: 2
+  title: Get User Account Info
+  group: Investigation
+  description: Retrieve information on the user account that modified the SUID binary
+    to determine if this is a service account or human user.
+  tool_hint: get_ad_user_info
+  parameters:
+    username: ctx.alert.username
+- order: 3
+  title: Enrich File Hash via Cortex
+  group: Enrichment
+  description: If the SUID binary has a known hash (from syscheck), submit it to Cortex
+    VirusTotal to determine if it is a known exploit binary.
+  tool_hint: get_file_reputation
+  parameters:
+    file_hash: ctx.alert.file_hash
+  condition: alert.file_hash != ''
+- order: 4
+  title: Create TheHive Case
+  group: Investigation
+  description: 'Open case using ''MITRE T1548.001'' template. Include: affected binary
+    path, old/new permissions, user. Severity: HIGH (3).'
+  tool_hint: create_case
+  parameters:
+    title: '[T1548.001] SUID Escalation Attempt on ctx.agent_name'
+    severity: 3
+    tags:
+    - mitre
+    - t1548.001
+    - privilege-escalation
+    - suid
+- order: 5
+  title: Isolate Endpoint if Root Shell Confirmed
+  group: Containment
+  description: If investigation confirms a successful root shell was obtained, isolate
+    the endpoint immediately. Otherwise, remove SUID bit manually and monitor.
+  tool_hint: isolate_endpoint
+  parameters:
+    agent_id: ctx.agent_id
+  approval_gate:
+    message: Root-level access appears to have been gained on ctx.agent_name. Confirm
+      endpoint isolation to prevent further damage? [yes/no]
+    requires_confirmation_for: Wazuh host-deny after confirmed root escalation
+- order: 6
+  title: Remove SUID Bit and Audit All SUID Binaries
+  group: Remediation
+  description: 'Via Wazuh Active Response or manual intervention: chmod u-s on the
+    affected binary. Run ''find / -perm /4000'' to audit all SUID binaries on the
+    host.'
+  tool_hint: add_case_note
+  parameters:
+    case_id: ctx.case_id
+    note: 'PB-007: SUID binary identified. Manual chmod u-s required. Full SUID audit
+      initiated.'
+- order: 7
+  title: Document and Close
+  group: Reporting
+  description: 'Document: affected binary, user, root access achieved (yes/no), remediation
+    steps taken. Update TheHive case status.'
+  tool_hint: update_case_status
+  parameters:
+    case_id: ctx.case_id
+    status: Resolved

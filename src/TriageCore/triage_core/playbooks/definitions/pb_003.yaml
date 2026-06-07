@@ -1,0 +1,91 @@
+id: PB-003
+name: Brute Force Login Attack
+description: Multiple failed authentication attempts detected from a single source,
+  indicating a brute force or password spray attack. Assess whether any attempt succeeded
+  before containment.
+mitre_ids:
+- T1110
+- T1110.001
+- T1110.003
+severity: medium
+tags:
+- brute-force
+- authentication
+- linux
+- ssh
+case_template: MITRE T1110 - Brute Force Attack
+soar_workflow_id: agentix-brute-force-workflow-v1
+steps:
+- order: 0
+  title: Query SIEM – Authentication Failures
+  group: Investigation
+  description: Search for Wazuh rule 5710/5712 (SSH brute force) or rule 2501/2502
+    (PAM auth failures). Count failures per source IP in the last 15 minutes.
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.groups:authentication_failed AND agent.id:ctx.agent_id
+- order: 1
+  title: Check for Successful Login After Failures
+  group: Investigation
+  description: 'CRITICAL: Query for any successful authentication from the same source
+    IP within 5 minutes of the last failure. If found, escalate severity immediately.'
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.groups:authentication_success AND data.srcip:ctx.src_ip
+- order: 2
+  title: Enrich Source IP
+  group: Enrichment
+  description: Check attacker source IP reputation via Cortex VirusTotal to determine
+    if this is a known scanner, botnet node, or targeted attacker.
+  tool_hint: get_ip_reputation
+  parameters:
+    ip_address: ctx.src_ip
+- order: 3
+  title: Create TheHive Case
+  group: Investigation
+  description: 'Create case using ''MITRE T1110'' template. Include: source IP, targeted
+    account(s), failure count, whether any login succeeded. Severity: MEDIUM (2) or
+    HIGH (3) if login succeeded.'
+  tool_hint: create_case
+  parameters:
+    title: '[T1110] Brute Force Attack from ctx.src_ip'
+    severity: 2
+    tags:
+    - mitre
+    - t1110
+    - brute-force
+    - authentication
+- order: 4
+  title: Block Source IP at Firewall
+  group: Containment
+  description: Block the brute-force source IP on the perimeter firewall. Verify the
+    IP is not a legitimate admin jump host before blocking.
+  tool_hint: block_ip
+  parameters:
+    ip_address: ctx.src_ip
+  approval_gate:
+    message: About to block ctx.src_ip at the firewall. Confirm this is not a legitimate
+      admin IP. Proceed? [yes/no]
+    requires_confirmation_for: Firewall block for brute force source IP ctx.src_ip
+- order: 5
+  title: Lock Targeted User Account (if compromised)
+  group: Containment
+  description: If a successful login was detected, immediately disable the targeted
+    account via IAM/AD to prevent unauthorized access.
+  tool_hint: disable_user_account
+  parameters:
+    username: ctx.alert.target_user
+  approval_gate:
+    message: A successful login from the attacker IP was detected. About to disable
+      account ctx.alert.target_user. Confirm? [yes/no]
+    requires_confirmation_for: Disable user account ctx.alert.target_user (possible
+      compromise)
+- order: 6
+  title: Add Case Notes and Close
+  group: Reporting
+  description: Document source IP, failure count, success status, and containment
+    actions in TheHive. Close as 'TruePositive' or escalate if active session found.
+  tool_hint: add_case_note
+  parameters:
+    case_id: ctx.case_id
+    note: PB-003 executed. Brute force source blocked. Account status reviewed.

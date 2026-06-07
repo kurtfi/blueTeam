@@ -151,6 +151,173 @@ class Orchestrator:
 
         return await manager.verify(session_id, user_message, session_source)
 
+    async def _init_session_workspace(self, session_id: str) -> None:
+        """Initialise per-session workspace if enabled."""
+        if settings.agentix_session_workspace_enabled:
+            self._workspace = SessionWorkspace.from_session_id(session_id)
+            if self._workspace is None:
+                # First interaction for this session — create workspace.
+                self._workspace = SessionWorkspace(session_id=session_id)
+                await self._workspace.initialize()
+
+    async def _log_user_message_to_db(self, session_id: str, user_message: str, log: Any) -> None:
+        """Log user message stats and event to the database if repository is configured."""
+        if not self._db_repo:
+            return
+        try:
+            await self._db_repo.increment_stats(session_id, message_count=1)
+            # Avoid duplicate logs for automated siem triage prompt
+            if not user_message.strip().startswith("You are an autonomous Tier 1 (T1) SOC Analyst."):
+                await self._db_repo.add_event(
+                    session_id=session_id,
+                    event_type="message",
+                    actor="user",
+                    content=user_message,
+                )
+        except Exception as e:
+            log.error("orchestrator.postgres_user_msg_log_failed", error=str(e))
+
+    async def _check_session_guardrails(
+        self, session_id: str, user_message: str, log: Any
+    ) -> tuple[bool, str | None]:
+        """
+        Verify incoming user message against guardrails.
+        Returns a tuple of (passed, refusal_message).
+        """
+        session_source = "USER"
+        if self._db_repo:
+            try:
+                session = await self._db_repo.get_session(session_id)
+                session_source = session.get("source") if session else "USER"
+            except Exception as db_err:
+                log.error("orchestrator.fetch_session_source_failed", session_id=session_id, error=str(db_err))
+
+        guardrail_result = await self._run_guardrails(session_id, user_message, session_source)
+        if guardrail_result.passed:
+            return True, None
+
+        refusal = guardrail_result.refusal_message or "Request blocked by guardrails."
+        log.info("orchestrator.guardrail_blocked", reason=guardrail_result.reason)
+
+        if self._db_repo:
+            try:
+                await self._db_repo.add_event(
+                    session_id=session_id,
+                    event_type="error",
+                    actor="system",
+                    content=f"Guardrail block: {guardrail_result.reason}",
+                )
+            except Exception as db_ex:
+                log.error("orchestrator.postgres_guardrail_log_failed", error=str(db_ex))
+
+        await self._memory.append(session_id, user_message, refusal)
+        return False, refusal
+
+    def _is_approval_response(self, user_message: str) -> bool:
+        """Check if the user response is affirmative."""
+        return user_message.lower().strip() in (
+            "yes", "confirm", "evet", "onay", "y", "approve", "ok", "tamam", "go", "proceed"
+        )
+
+    async def _handle_hitl_approval(
+        self, session_id: str, draft_history: list[dict], log: Any
+    ) -> tuple[list[dict], dict[str, BaseTool], list[dict], list[dict]]:
+        """Handles Postgres updates and prepares tools/schemas/calls when user approves pending tools."""
+        log.info("orchestrator.resume.approved")
+        if self._db_repo:
+            try:
+                await self._db_repo.update_status(session_id, "ACTIVE")
+                await self._db_repo.add_event(
+                    session_id=session_id,
+                    event_type="hitl_response",
+                    actor="user",
+                    content="User approved the pending tool execution.",
+                )
+            except Exception as e:
+                log.error("orchestrator.postgres_hitl_approved_log_failed", error=str(e))
+
+        await self._memory.set_metadata(session_id, "draft_history", None)
+
+        all_tools = self._catalog.all_tools()
+        tool_map = {t.name: t for t in all_tools}
+        tool_schemas = [t.to_openai_schema() for t in all_tools]
+        
+        last_msg = draft_history[-1] if draft_history else {}
+        tool_calls = last_msg.get("tool_calls") or []
+
+        return draft_history, tool_map, tool_schemas, tool_calls
+
+    async def _handle_hitl_rejection(self, session_id: str, user_message: str, log: Any) -> None:
+        """Handles Postgres updates and cleans up draft state when user rejects pending tools."""
+        log.info("orchestrator.resume.rejected", user_message=user_message)
+        if self._db_repo:
+            try:
+                await self._db_repo.update_status(session_id, "COMPLETED")
+                await self._db_repo.add_event(
+                    session_id=session_id,
+                    event_type="hitl_response",
+                    actor="user",
+                    content="User rejected the pending tool execution. Workflow cancelled.",
+                )
+            except Exception as e:
+                log.error("orchestrator.postgres_hitl_rejected_log_failed", error=str(e))
+
+        await self._memory.set_metadata(session_id, "draft_history", None)
+        await self._memory.append(session_id, user_message, "Action cancelled by user.")
+
+    async def _setup_orchestrator_context(
+        self, user_message: str, user_id: str, history: list[dict], log: Any
+    ) -> tuple[list[dict], dict[str, BaseTool], list[dict]] | None:
+        """
+        Dynamically selects tools, retrieves RAG context, and composes system messages.
+        Returns a tuple of (messages, tool_map, tool_schemas), or None if no tools are available.
+        """
+        category_filter = self._config.tool_filters.categories if self._config else None
+        name_filter = self._config.tool_filters.names if self._config else None
+        exclude_names = self._config.tool_filters.exclude_names if self._config else None
+
+        matched_tools: list[BaseTool] = await self._catalog.select(
+            user_message,
+            category_filter=category_filter,
+            name_filter=name_filter,
+            exclude_names=exclude_names,
+            use_semantic_search=False,
+        )
+        tool_schemas = [t.to_openai_schema() for t in matched_tools]
+        tool_map = {t.name: t for t in matched_tools}
+        log.debug("tools.selected", count=len(matched_tools), names=list(tool_map.keys()))
+
+        if not matched_tools:
+            log.error(
+                "orchestrator.no_tools_available",
+                hint="MCP tools server may be down or catalog is empty. "
+                     "Ensure the MCP server is running before starting the API.",
+            )
+            return None
+
+        rag_context = await self._rag.retrieve_context(user_message, user_id, log)
+
+        base_prompt = (
+            self._config.system_prompt_override 
+            if self._config and self._config.system_prompt_override 
+            else None
+        )
+        from agentix.core.prompt_composer import SystemPromptComposer
+        composer = SystemPromptComposer(base_prompt)
+        system_prompt = composer.compose(
+            available_tools=matched_tools,
+            playbooks_str=getattr(self._catalog, "cached_playbooks", None),
+            rag_context=rag_context,
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            *history,
+            {"role": "user", "content": user_message},
+        ]
+        messages = self._context_manager.manage(messages)
+        return messages, tool_map, tool_schemas
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -191,28 +358,8 @@ class Orchestrator:
         log = logger.bind(session_id=session_id)
         log.info("orchestrator.run_stream.start", message=user_message[:120])
 
-        # Increment message count and log user message event in Postgres
-        if self._db_repo:
-            try:
-                await self._db_repo.increment_stats(session_id, message_count=1)
-                # Avoid duplicate logs for automated siem triage prompt
-                if not user_message.strip().startswith("You are an autonomous Tier 1 (T1) SOC Analyst."):
-                    await self._db_repo.add_event(
-                        session_id=session_id,
-                        event_type="message",
-                        actor="user",
-                        content=user_message,
-                    )
-            except Exception as e:
-                log.error("orchestrator.postgres_user_msg_log_failed", error=str(e))
-
-        # 0. Initialise per-session workspace (if enabled).
-        if settings.agentix_session_workspace_enabled:
-            self._workspace = SessionWorkspace.from_session_id(session_id)
-            if self._workspace is None:
-                # First interaction for this session — create workspace.
-                self._workspace = SessionWorkspace(session_id=session_id)
-                await self._workspace.initialize()
+        await self._log_user_message_to_db(session_id, user_message, log)
+        await self._init_session_workspace(session_id)
 
         # 1. Load conversation history and metadata from memory.
         history = await self._memory.get_history(session_id)
@@ -225,134 +372,24 @@ class Orchestrator:
         tool_calls: list[Any] = []
 
         if not draft_history:
-            # Check session source to pass to guardrails context
-            session_source = "USER"
-            if self._db_repo:
-                try:
-                    session = await self._db_repo.get_session(session_id)
-                    session_source = session.get("source") if session else "USER"
-                except Exception as db_err:
-                    log.error("orchestrator.fetch_session_source_failed", session_id=session_id, error=str(db_err))
-                    session_source = "USER"
-
-            guardrail_result = await self._run_guardrails(session_id, user_message, session_source)
-
-            if not guardrail_result.passed:
-                refusal = guardrail_result.refusal_message or "Request blocked by guardrails."
-                log.info("orchestrator.guardrail_blocked", reason=guardrail_result.reason)
-
-                if self._db_repo:
-                    try:
-                        await self._db_repo.add_event(
-                            session_id=session_id,
-                            event_type="error",
-                            actor="system",
-                            content=f"Guardrail block: {guardrail_result.reason}",
-                        )
-                    except Exception as db_ex:
-                        log.error("orchestrator.postgres_guardrail_log_failed", error=str(db_ex))
-
-                await self._memory.append(session_id, user_message, refusal)
-                yield ReActStep(StepType.ANSWER, refusal)
+            passed, refusal = await self._check_session_guardrails(session_id, user_message, log)
+            if not passed:
+                yield ReActStep(StepType.ANSWER, refusal or "Request blocked.")
                 return
 
         if draft_history:
-
-            is_positive = user_message.lower().strip() in (
-                "yes", "confirm", "evet", "onay", "y", "approve", "ok", "tamam", "go", "proceed"
-            )
-            if is_positive:
+            if self._is_approval_response(user_message):
                 is_resume = True
-                log.info("orchestrator.resume.approved", user_message=user_message)
-                
-                # Update status and add event in Postgres
-                if self._db_repo:
-                    try:
-                        await self._db_repo.update_status(session_id, "ACTIVE")
-                        await self._db_repo.add_event(
-                            session_id=session_id,
-                            event_type="hitl_response",
-                            actor="user",
-                            content="User approved the pending tool execution.",
-                        )
-                    except Exception as e:
-                        log.error("orchestrator.postgres_hitl_approved_log_failed", error=str(e))
-                
-                messages = draft_history
-                # Clear draft_history
-                await self._memory.set_metadata(session_id, "draft_history", None)
-                
-                # Load all tools when resuming to make sure we can resolve the tool call
-                all_tools = self._catalog.all_tools()
-                tool_map = {t.name: t for t in all_tools}
-                tool_schemas = [t.to_openai_schema() for t in all_tools]
-                
-                last_msg = messages[-1] if messages else {}
-                tool_calls = last_msg.get("tool_calls") or []
-            else:
-                log.info("orchestrator.resume.rejected", user_message=user_message)
-                
-                # Update status and add event in Postgres
-                if self._db_repo:
-                    try:
-                        await self._db_repo.update_status(session_id, "COMPLETED")
-                        await self._db_repo.add_event(
-                            session_id=session_id,
-                            event_type="hitl_response",
-                            actor="user",
-                            content="User rejected the pending tool execution. Workflow cancelled.",
-                        )
-                    except Exception as e:
-                        log.error("orchestrator.postgres_hitl_rejected_log_failed", error=str(e))
-                
-                await self._memory.set_metadata(session_id, "draft_history", None)
-                await self._memory.append(
-                    session_id,
-                    user_message,
-                    "Action cancelled by user."
+                messages, tool_map, tool_schemas, tool_calls = await self._handle_hitl_approval(
+                    session_id, draft_history, log
                 )
+            else:
+                await self._handle_hitl_rejection(session_id, user_message, log)
                 yield ReActStep(StepType.ANSWER, "Action cancelled by user.")
                 return
         else:
-            # 2. Dynamically select tools.
-            category_filter = self._config.tool_filters.categories if self._config else None
-            name_filter = self._config.tool_filters.names if self._config else None
-            exclude_names = self._config.tool_filters.exclude_names if self._config else None
-
-            matched_tools: list[BaseTool] = await self._catalog.select(
-                user_message,
-                category_filter=category_filter,
-                name_filter=name_filter,
-                exclude_names=exclude_names,
-                use_semantic_search=False,
-            )
-            tool_schemas = [t.to_openai_schema() for t in matched_tools]
-            tool_map = {t.name: t for t in matched_tools}
-            log.debug("tools.selected", count=len(matched_tools), names=list(tool_map.keys()))
-
-            # 3. Retrieve RAG context if enabled
-            rag_context = await self._rag.retrieve_context(user_message, user_id, log)
-
-            # 4. Compose final system prompt using SystemPromptComposer
-            base_prompt = (
-                self._config.system_prompt_override 
-                if self._config and self._config.system_prompt_override 
-                else None
-            )
-            from agentix.core.prompt_composer import SystemPromptComposer
-            composer = SystemPromptComposer(base_prompt)
-            system_prompt = composer.compose(
-                available_tools=matched_tools,
-                playbooks_str=getattr(self._catalog, "cached_playbooks", None),
-                rag_context=rag_context,
-            )
-
-            if not matched_tools:
-                log.error(
-                    "orchestrator.no_tools_available",
-                    hint="MCP tools server may be down or catalog is empty. "
-                         "Ensure the MCP server is running before starting the API.",
-                )
+            setup_res = await self._setup_orchestrator_context(user_message, user_id, history, log)
+            if setup_res is None:
                 yield ReActStep(
                     StepType.ANSWER,
                     "⚠️ No tools are currently available. The MCP tools server "
@@ -360,14 +397,7 @@ class Orchestrator:
                     "(MCP server, Redis, Postgres) are started and try again.",
                 )
                 return
-
-            # 4. Context Management — ensure total prompt fits within limits.
-            messages = [
-                {"role": "system", "content": system_prompt},
-                *history,
-                {"role": "user", "content": user_message},
-            ]
-            messages = self._context_manager.manage(messages)
+            messages, tool_map, tool_schemas = setup_res
 
         # 5. Observability — Start Langfuse trace
         trace = obs.trace(

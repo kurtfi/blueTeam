@@ -22,14 +22,15 @@ from agentix.core.llm import LLMClient
 
 
 class DummyPassGuardrail(BaseGuardrail):
-    async def validate(self, session_id: str, message: str, session_source: str = "USER") -> GuardrailResult:
+    async def _validate(self, session_id: str, message: str) -> GuardrailResult:
         return GuardrailResult(passed=True)
 
 
 class DummyBlockGuardrail(BaseGuardrail):
-    async def validate(self, session_id: str, message: str, session_source: str = "USER") -> GuardrailResult:
-        if session_source != "USER":
-            return GuardrailResult(passed=True)
+    def should_run(self, session_source: str) -> bool:
+        return session_source == "USER"
+
+    async def _validate(self, session_id: str, message: str) -> GuardrailResult:
         return GuardrailResult(passed=False, reason="Blocked by dummy guardrail", refusal_message="Refused by dummy.")
 
 

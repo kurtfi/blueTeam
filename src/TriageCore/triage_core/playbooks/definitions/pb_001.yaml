@@ -1,0 +1,96 @@
+id: PB-001
+name: OS Credential Dumping – /etc/shadow Access
+description: Triggered when an unauthorized process reads or copies /etc/shadow. Indicates
+  active credential harvesting. Immediate containment and credential rotation required.
+mitre_ids:
+- T1003
+- T1003.008
+severity: high
+tags:
+- credential-dumping
+- wazuh-rule-100002
+- linux
+case_template: MITRE T1003.008 - OS Credential Dumping
+soar_workflow_id: agentix-mitre-workflow-v1
+steps:
+- order: 0
+  title: Query SIEM – Identify Offending Process
+  group: Investigation
+  description: Search Wazuh/Elasticsearch for events matching rule 100002 on the affected
+    agent. Extract process name, PID, and user context.
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.id:100002 AND agent.id:ctx.agent_id
+- order: 1
+  title: Enrich Source IP via Cortex
+  group: Enrichment
+  description: If a source IP is associated with the event, run VirusTotal enrichment
+    via Cortex to determine if it is a known C2 or scanner.
+  tool_hint: get_ip_reputation
+  parameters:
+    ip_address: ctx.src_ip
+  condition: src_ip != ''
+- order: 2
+  title: Create TheHive Case
+  group: Investigation
+  description: 'Open a new TheHive case using the ''MITRE T1003.008'' template. Tag
+    with: mitre, t1003.008, credential-dumping. Set severity to HIGH (3).'
+  tool_hint: create_case
+  parameters:
+    title: '[T1003.008] Credential Dumping on ctx.agent_name'
+    severity: 3
+    tags:
+    - mitre
+    - t1003.008
+    - credential-dumping
+- order: 3
+  title: Isolate Endpoint via Wazuh Active Response
+  group: Containment
+  description: Send 'host-deny' active response to the Wazuh agent to cut network
+    access and prevent lateral movement or exfiltration.
+  tool_hint: isolate_endpoint
+  parameters:
+    agent_id: ctx.agent_id
+  approval_gate:
+    message: '⚠️ About to isolate endpoint. Agent: ctx.agent_name (ctx.agent_id).
+      This will cut all network access. Confirm? [yes/no]'
+    requires_confirmation_for: Wazuh host-deny active response on agent ctx.agent_id
+- order: 4
+  title: Rotate Compromised Credentials
+  group: Remediation
+  description: Immediately reset passwords for all local accounts on the compromised
+    host. If LDAP/AD is in scope, disable the user account that initiated the shadow
+    file access.
+  tool_hint: disable_user_account
+  parameters:
+    username: ctx.alert.username
+  approval_gate:
+    message: 'About to disable user account associated with the incident. Username:
+      ctx.alert.username. Confirm? [yes/no]'
+    requires_confirmation_for: Disable IAM/AD user account
+- order: 5
+  title: Check for Lateral Movement Indicators
+  group: Investigation
+  description: Query SIEM for subsequent login attempts, SSH sessions, or sudo commands
+    from the compromised host within 30 minutes of the credential dump event.
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.groups:authentication AND agent.id:ctx.agent_id
+- order: 6
+  title: Add Case Note – Actions Taken
+  group: Reporting
+  description: Document all actions taken (isolation, credential rotation, lateral
+    movement check) in the TheHive case as a timestamped note.
+  tool_hint: add_case_note
+  parameters:
+    case_id: ctx.case_id
+    note: Playbook PB-001 executed. Endpoint isolated. Credentials rotated.
+- order: 7
+  title: Close or Escalate Case
+  group: Reporting
+  description: If root cause is confirmed and contained, update TheHive case status
+    to 'Resolved'. If broader compromise is suspected, escalate to Tier 2/DFIR team.
+  tool_hint: update_case_status
+  parameters:
+    case_id: ctx.case_id
+    status: Resolved

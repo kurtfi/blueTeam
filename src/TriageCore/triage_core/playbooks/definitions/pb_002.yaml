@@ -1,0 +1,99 @@
+id: PB-002
+name: Reverse Shell / C2 Communication
+description: Detected reverse shell or suspicious bash redirect pattern on a monitored
+  host. Indicates active attacker presence. Immediate forensic capture and isolation
+  required.
+mitre_ids:
+- T1059
+- T1059.004
+severity: critical
+tags:
+- reverse-shell
+- c2
+- wazuh-rule-100003
+- linux
+case_template: MITRE T1059.004 - Suspicious Command Execution
+soar_workflow_id: agentix-mitre-workflow-v1
+steps:
+- order: 0
+  title: Query SIEM – Capture Event Details
+  group: Investigation
+  description: Retrieve full event data for rule 100003 on the affected agent. Note
+    command line, destination IP, and destination port.
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.id:100003 AND agent.id:ctx.agent_id
+- order: 1
+  title: Enrich Destination IP (C2 Check)
+  group: Enrichment
+  description: Run VirusTotal enrichment on the destination IP of the reverse shell
+    connection to determine if it is a known C2 server.
+  tool_hint: get_ip_reputation
+  parameters:
+    ip_address: ctx.src_ip
+- order: 2
+  title: Create TheHive Case
+  group: Investigation
+  description: 'Open TheHive case using template ''MITRE T1059.004''. Add observables:
+    destination IP, command line. Severity: CRITICAL (4).'
+  tool_hint: create_case
+  parameters:
+    title: '[T1059.004] Reverse Shell Detected on ctx.agent_name'
+    severity: 4
+    tags:
+    - mitre
+    - t1059.004
+    - reverse-shell
+    - c2
+- order: 3
+  title: Block C2 Destination IP
+  group: Containment
+  description: Block the attacker-controlled destination IP on the perimeter firewall
+    or NAC to cut the active C2 channel.
+  tool_hint: block_ip
+  parameters:
+    ip_address: ctx.src_ip
+  approval_gate:
+    message: About to block IP ctx.src_ip at the firewall. This will disrupt any legitimate
+      traffic to this IP. Confirm? [yes/no]
+    requires_confirmation_for: Firewall block for IP ctx.src_ip
+- order: 4
+  title: Isolate Endpoint
+  group: Containment
+  description: Apply Wazuh host-deny active response to terminate C2 channel and prevent
+    further commands from executing.
+  tool_hint: isolate_endpoint
+  parameters:
+    agent_id: ctx.agent_id
+  approval_gate:
+    message: About to isolate ctx.agent_name (ctx.agent_id). Network access will be
+      cut immediately. Confirm? [yes/no]
+    requires_confirmation_for: Wazuh host-deny on ctx.agent_id
+- order: 5
+  title: Check Persistence Mechanisms
+  group: Investigation
+  description: Query for cron job modifications, new user accounts, .bashrc edits,
+    or SUID binaries created around the time of the event.
+  tool_hint: query_siem_logs
+  parameters:
+    query: (rule.groups:syscheck OR rule.groups:rootcheck) AND agent.id:ctx.agent_id
+- order: 6
+  title: Trigger Automated SOAR Workflow
+  group: Containment
+  description: Trigger the Agentix MITRE workflow in the SOAR orchestrator for automated
+    Cortex enrichment and case task creation.
+  tool_hint: trigger_soar_workflow
+  parameters:
+    workflow_id: agentix-mitre-workflow-v1
+    data:
+      agent_id: ctx.agent_id
+      src_ip: ctx.src_ip
+- order: 7
+  title: Document and Escalate
+  group: Reporting
+  description: Add full timeline to TheHive case. If active attacker control is confirmed,
+    escalate to DFIR team for memory forensics and full host imaging before remediation.
+  tool_hint: add_case_note
+  parameters:
+    case_id: ctx.case_id
+    note: PB-002 executed. C2 IP blocked. Endpoint isolated. DFIR escalation pending.

@@ -13,6 +13,47 @@ from agentic_common.settings import settings
 
 logger = structlog.get_logger(__name__)
 
+class AlertKeyExtractor:
+    """
+    Extracts deduplication keys from SIEM alert payloads.
+    Separates the payload schema logic from the Redis deduplication workflow (SRP).
+    """
+
+    @staticmethod
+    def extract_rule_id(payload: dict) -> str:
+        """Finds rule.id in the alert payload."""
+        all_fields = payload.get("all_fields", {})
+        rule_id = (payload.get("rule_id") 
+                   or payload.get("rule", {}).get("id")
+                   or all_fields.get("rule", {}).get("id")
+                   or "")
+        return str(rule_id).strip()
+
+    @staticmethod
+    def extract_src_ip(payload: dict) -> str:
+        """Finds source IP in the alert payload."""
+        all_fields = payload.get("all_fields", {})
+        src_ip = (payload.get("srcip")
+                  or payload.get("data", {}).get("srcip")
+                  or all_fields.get("data", {}).get("srcip")
+                  or all_fields.get("agent", {}).get("ip")
+                  or payload.get("agent", {}).get("ip")
+                  or "")
+        return str(src_ip).strip()
+
+    @classmethod
+    def extract_key(cls, payload: dict) -> str | None:
+        """
+        Derives the deduplication key string.
+        Format: "rule_id:src_ip"
+        """
+        rule_id = cls.extract_rule_id(payload)
+        if not rule_id:
+            return None
+        src_ip = cls.extract_src_ip(payload)
+        return f"{rule_id}:{src_ip or 'unknown'}"
+
+
 class AlertDeduplicator:
     def __init__(self, redis_url: str = settings.redis_url, window_seconds: int = 120):
         self._redis = redis.from_url(redis_url, decode_responses=True)
@@ -21,42 +62,22 @@ class AlertDeduplicator:
         self._bypass_rules: set[str] = set()
 
     def _extract_key(self, payload: dict) -> str | None:
-        """Extract dedup key from SIEM alert JSON."""
-        all_fields = payload.get("all_fields", {})
-        
-        rule_id = (payload.get("rule_id") 
-                   or payload.get("rule", {}).get("id")
-                   or all_fields.get("rule", {}).get("id"))
-        
-        src_ip = (payload.get("srcip")
-                  or payload.get("data", {}).get("srcip")
-                  or all_fields.get("data", {}).get("srcip")
-                  or all_fields.get("agent", {}).get("ip")
-                  or payload.get("agent", {}).get("ip"))
-        
-        rule_id_str = str(rule_id).strip() if rule_id is not None else ""
-        logger.debug("alert_dedup.extract_key", rule_id=rule_id_str, src_ip=src_ip)
-        if not rule_id_str:
-            return None
-        return f"{rule_id_str}:{src_ip or 'unknown'}"
+        """Deprecated: Use AlertKeyExtractor.extract_key directly. Maintained for backwards compatibility."""
+        return AlertKeyExtractor.extract_key(payload)
 
     async def check_and_register(self, payload: dict, session_id: str) -> tuple[bool, str | None]:
         """
         Check if the alert has already been received within the time window.
         Returns (is_duplicate, existing_session_id).
         """
-        all_fields = payload.get("all_fields", {})
-        rule_id = str(payload.get("rule_id") 
-                      or payload.get("rule", {}).get("id")
-                      or all_fields.get("rule", {}).get("id") 
-                      or "").strip()
+        rule_id = AlertKeyExtractor.extract_rule_id(payload)
                       
         logger.debug("alert_dedup.checking", rule_id=rule_id, session_id=session_id)
         if rule_id in self._bypass_rules:
             logger.debug("alert_dedup.bypass_rule", rule_id=rule_id)
             return False, None
 
-        key = self._extract_key(payload)
+        key = AlertKeyExtractor.extract_key(payload)
         if not key:
             logger.debug("alert_dedup.no_key", payload=payload)
             return False, None

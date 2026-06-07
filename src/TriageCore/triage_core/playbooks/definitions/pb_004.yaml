@@ -1,0 +1,87 @@
+id: PB-004
+name: Pass-the-Hash / Lateral Movement
+description: NTLM hash reuse or anomalous lateral movement detected between internal
+  hosts. Attacker may have stolen credentials and is pivoting through the network.
+  Aggressive containment required.
+mitre_ids:
+- T1550
+- T1550.002
+severity: critical
+tags:
+- pass-the-hash
+- lateral-movement
+- ntlm
+- windows
+case_template: MITRE T1550.002 - Pass-the-Hash / Lateral Movement
+steps:
+- order: 0
+  title: Query SIEM – Detect NTLM Auth Anomalies
+  group: Investigation
+  description: Search for Wazuh rules indicating NTLM relay or pass-the-hash (rules
+    60106, 60107 or custom). Identify source and destination hosts.
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.groups:windows AND data.win.system.eventID:4624 AND data.win.eventdata.logonType:3
+- order: 1
+  title: Map Lateral Movement Path
+  group: Investigation
+  description: 'Trace the authentication chain: identify which account was used, from
+    which source host, to which destination. Visualize in TheHive using graph observables.'
+  tool_hint: query_siem_logs
+  parameters:
+    query: data.win.system.eventID:(4624 OR 4625 OR 4648) AND data.win.eventdata.subjectUserName:ctx.alert.username
+- order: 2
+  title: Get Wazuh Agent Info for All Affected Hosts
+  group: Investigation
+  description: Retrieve Wazuh agent details for all hosts in the lateral movement
+    chain to get their OS, IP, and last seen times.
+  tool_hint: get_endpoint_info
+  parameters:
+    agent_id: ctx.agent_id
+- order: 3
+  title: Create High-Severity TheHive Case
+  group: Investigation
+  description: 'Open case using ''MITRE T1550.002'' template. Include all affected
+    hosts as observables. Severity: CRITICAL (4).'
+  tool_hint: create_case
+  parameters:
+    title: '[T1550.002] Pass-the-Hash Lateral Movement – ctx.agent_name'
+    severity: 4
+    tags:
+    - mitre
+    - t1550.002
+    - pass-the-hash
+    - lateral-movement
+- order: 4
+  title: Isolate Source Host
+  group: Containment
+  description: Isolate the originating host to stop lateral movement. This is the
+    host where pass-the-hash was initiated.
+  tool_hint: isolate_endpoint
+  parameters:
+    agent_id: ctx.agent_id
+  approval_gate:
+    message: About to isolate ctx.agent_name (ctx.agent_id) — the source of lateral
+      movement. This will cut ALL network access. Confirm isolation? [yes/no]
+    requires_confirmation_for: Wazuh host-deny on lateral movement source ctx.agent_id
+- order: 5
+  title: Force NTLM Hash Reset for Affected Account
+  group: Remediation
+  description: Disable the compromised account and force a password reset to invalidate
+    stolen NTLM hashes. Coordinate with AD team.
+  tool_hint: disable_user_account
+  parameters:
+    username: ctx.alert.username
+  approval_gate:
+    message: About to disable account ctx.alert.username to invalidate stolen NTLM
+      hash. This may impact active sessions. Confirm? [yes/no]
+    requires_confirmation_for: Disable AD account and force password reset
+- order: 6
+  title: Escalate to DFIR
+  group: Reporting
+  description: Pass-the-Hash indicates credential compromise at scale. Escalate immediately
+    to DFIR for memory forensics, NTDS.dit assessment, and Kerberoasting sweep.
+  tool_hint: add_case_note
+  parameters:
+    case_id: ctx.case_id
+    note: PB-004 executed. DFIR escalation required for full credential audit.

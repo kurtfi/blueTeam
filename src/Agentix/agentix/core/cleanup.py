@@ -23,6 +23,46 @@ from agentic_common.workspace import SessionWorkspace
 logger = structlog.get_logger(__name__)
 
 
+class WorkspaceExpiryPolicy:
+    """
+    Evaluates workspace metadata to determine if cleanup action is needed.
+    Isolates policy evaluation from file system side-effects (SRP).
+    """
+    def __init__(self, ttl_hours: float, destroy_enabled: bool) -> None:
+        self.ttl_hours = ttl_hours
+        self.destroy_enabled = destroy_enabled
+
+    def evaluate(self, meta: dict, now: datetime) -> str:
+        """
+        Returns one of: 'IGNORE', 'CLEAN', 'DESTROY'.
+        """
+        created_str = meta.get("created_at")
+        if not created_str:
+            return "IGNORE"
+
+        created_at = datetime.fromisoformat(created_str)
+        age_hours = (now - created_at).total_seconds() / 3600
+
+        if age_hours < self.ttl_hours:
+            return "IGNORE"
+
+        status = meta.get("status", "active")
+
+        if status == "active":
+            return "CLEAN"
+
+        if status == "cleaned" and self.destroy_enabled:
+            cleaned_at = meta.get("cleaned_at")
+            age_since_cleanup = 0.0
+            if cleaned_at:
+                age_since_cleanup = (now - datetime.fromisoformat(cleaned_at)).total_seconds() / 3600
+            
+            if age_since_cleanup >= self.ttl_hours:
+                return "DESTROY"
+
+        return "IGNORE"
+
+
 async def cleanup_expired_workspaces() -> dict[str, Any]:
     """
     One-shot scan: find and clean expired session workspaces.
@@ -30,6 +70,8 @@ async def cleanup_expired_workspaces() -> dict[str, Any]:
     Returns a summary dict with counts and details.
     """
     ttl_hours = settings.agentix_session_ttl_hours
+    destroy_enabled = settings.agentix_session_destroy_on_expire
+    policy = WorkspaceExpiryPolicy(ttl_hours, destroy_enabled)
     now = datetime.now(UTC)
     session_ids = SessionWorkspace.list_sessions()
 
@@ -44,36 +86,23 @@ async def cleanup_expired_workspaces() -> dict[str, Any]:
                 continue
 
             meta = ws.get_metadata()
-            created_str = meta.get("created_at")
-            if not created_str:
-                continue
+            action = policy.evaluate(meta, now)
 
-            created_at = datetime.fromisoformat(created_str)
-            age_hours = (now - created_at).total_seconds() / 3600
-
-            if age_hours < ttl_hours:
-                continue
-
-            status = meta.get("status", "active")
-
-            if status == "active":
+            if action == "CLEAN":
                 # Selective cleanup: keep outputs, delete temp + downloads
                 await ws.cleanup()
                 cleaned.append(sid)
-                logger.info("cleanup.expired_session.cleaned", session_id=sid, age_hours=round(age_hours, 1))
+                created_str = meta.get("created_at")
+                if created_str:
+                    created_at = datetime.fromisoformat(created_str)
+                    age_hours = (now - created_at).total_seconds() / 3600
+                    logger.info("cleanup.expired_session.cleaned", session_id=sid, age_hours=round(age_hours, 1))
 
-            elif status == "cleaned" and settings.agentix_session_destroy_on_expire:
+            elif action == "DESTROY":
                 # Already cleaned once — now fully destroy if configured
-                age_since_cleanup = 0.0
-                cleaned_at = meta.get("cleaned_at")
-                if cleaned_at:
-                    age_since_cleanup = (now - datetime.fromisoformat(cleaned_at)).total_seconds() / 3600
-
-                # Give an additional grace period (equal to TTL) before full destroy
-                if age_since_cleanup >= ttl_hours:
-                    await ws.destroy()
-                    destroyed.append(sid)
-                    logger.info("cleanup.expired_session.destroyed", session_id=sid)
+                await ws.destroy()
+                destroyed.append(sid)
+                logger.info("cleanup.expired_session.destroyed", session_id=sid)
 
         except Exception as exc:
             errors.append({"session_id": sid, "error": str(exc)})

@@ -1,0 +1,76 @@
+id: PB-005
+name: Data Exfiltration via DNS Tunneling
+description: Anomalous DNS query volume or long/encoded DNS queries detected, indicating
+  possible data exfiltration via DNS tunneling (e.g. iodine, dnscat2). Identify scope
+  of data loss and block channel.
+mitre_ids:
+- T1048
+- T1048.003
+severity: high
+tags:
+- exfiltration
+- dns-tunneling
+- covert-channel
+case_template: MITRE T1048 - Data Exfiltration via DNS
+steps:
+- order: 0
+  title: Query SIEM – Detect DNS Anomalies
+  group: Investigation
+  description: 'Search for Wazuh alerts on high DNS query rate or long DNS subdomains
+    (rule groups: network). Look for queries >50 chars or >100 queries/min from a
+    single host.'
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.groups:network_traffic AND data.dns.type:query AND agent.id:ctx.agent_id
+- order: 1
+  title: Enrich DNS Destination Domain
+  group: Enrichment
+  description: Run VirusTotal/PassiveDNS enrichment on the suspicious DNS destination
+    domain to check if it is a known C2 or DGA domain.
+  tool_hint: get_domain_url_reputation
+  parameters:
+    url_or_domain: ctx.alert.dns_domain
+- order: 2
+  title: Estimate Exfiltration Volume
+  group: Investigation
+  description: Calculate total DNS query payload size over the detection window to
+    estimate data volume exfiltrated. Document in case.
+  tool_hint: query_siem_logs
+  parameters:
+    query: data.dns.type:query AND data.dns.qname:ctx.alert.dns_domain
+- order: 3
+  title: Create TheHive Case
+  group: Investigation
+  description: 'Open case using ''MITRE T1048'' template. Add DNS domain as observable.
+    Severity: HIGH (3).'
+  tool_hint: create_case
+  parameters:
+    title: '[T1048] DNS Exfiltration Detected from ctx.agent_name'
+    severity: 3
+    tags:
+    - mitre
+    - t1048
+    - dns-tunneling
+    - exfiltration
+- order: 4
+  title: Block DNS Tunnel Destination
+  group: Containment
+  description: Block the destination IP of the DNS tunnel at the firewall and/or add
+    the domain to DNS sinkhole. Coordinate with network team.
+  tool_hint: block_ip
+  parameters:
+    ip_address: ctx.src_ip
+  approval_gate:
+    message: About to block DNS tunnel destination ctx.src_ip. Confirm this will not
+      affect legitimate DNS traffic? [yes/no]
+    requires_confirmation_for: Firewall block for DNS exfiltration destination IP
+- order: 5
+  title: Notify Data Owner / DPO
+  group: Reporting
+  description: If exfiltration of PII or sensitive data is confirmed, notify the Data
+    Protection Officer and initiate breach assessment per GDPR/regulatory requirements.
+  tool_hint: add_case_note
+  parameters:
+    case_id: ctx.case_id
+    note: 'PB-005: DNS tunnel blocked. DPO notification required if sensitive data
+      confirmed.'

@@ -1,0 +1,103 @@
+id: PB-006
+name: Ransomware / Mass File Encryption
+description: Detected mass file modification, rename events, or ransom note creation.
+  Indicates active ransomware execution. This is a P0 incident. IMMEDIATE isolation
+  and escalation required — do NOT wait for enrichment.
+mitre_ids:
+- T1486
+severity: critical
+tags:
+- ransomware
+- encryption
+- p0-incident
+- wazuh-syscheck
+case_template: MITRE T1486 - Ransomware / Data Encrypted for Impact
+soar_workflow_id: agentix-ransomware-workflow-v1
+steps:
+- order: 0
+  title: '⚡ IMMEDIATE: Isolate Affected Host'
+  group: Containment
+  description: DO NOT WAIT for investigation. Immediately isolate the affected host
+    via Wazuh Active Response to stop encryption spread. Time is critical.
+  tool_hint: isolate_endpoint
+  parameters:
+    agent_id: ctx.agent_id
+  approval_gate:
+    message: 🚨 RANSOMWARE DETECTED on ctx.agent_name (ctx.agent_id). Immediate isolation
+      required to prevent spread. Confirm emergency isolation NOW? [yes/no]
+    requires_confirmation_for: EMERGENCY Wazuh host-deny for ransomware containment
+- order: 1
+  title: Query SIEM – Scope of Mass File Changes
+  group: Investigation
+  description: Search Wazuh syscheck events for the past 30 minutes to count total
+    file modification/deletion events. Identify encrypted file extensions and ransom
+    note filenames.
+  tool_hint: query_siem_logs
+  parameters:
+    query: rule.groups:syscheck AND agent.id:ctx.agent_id AND rule.level:>=10
+- order: 2
+  title: Identify Ransomware Process
+  group: Investigation
+  description: Look for the process responsible for file changes. Check for known
+    ransomware process names, unsigned executables, or processes running from temp/user-writable
+    paths.
+  tool_hint: query_siem_logs
+  parameters:
+    query: data.win.system.eventID:(4688 OR 1) AND agent.id:ctx.agent_id
+- order: 3
+  title: Enrich Ransomware File Hash
+  group: Enrichment
+  description: If ransomware binary hash is available from the syscheck event, submit
+    to Cortex VirusTotal to identify the ransomware family.
+  tool_hint: get_file_reputation
+  parameters:
+    file_hash: ctx.alert.file_hash
+  condition: alert.file_hash != ''
+- order: 4
+  title: Create P0 TheHive Case
+  group: Investigation
+  description: 'Open critical-severity case using ''MITRE T1486'' template. Add: ransom
+    note content, encrypted extension, ransomware family (if known). Severity: CRITICAL
+    (4). Assign to on-call analyst.'
+  tool_hint: create_case
+  parameters:
+    title: 🚨 [T1486] RANSOMWARE ACTIVE – ctx.agent_name
+    severity: 4
+    tags:
+    - mitre
+    - t1486
+    - ransomware
+    - p0
+    - active-incident
+- order: 5
+  title: Block Ransomware C2 (if identified)
+  group: Containment
+  description: If a C2 IP/domain was identified from the ransomware binary or network
+    logs, block it immediately at the firewall to prevent key transmission to attacker.
+  tool_hint: block_ip
+  parameters:
+    ip_address: ctx.src_ip
+  approval_gate:
+    message: About to block ransomware C2 IP ctx.src_ip. Confirm? [yes/no]
+    requires_confirmation_for: Block ransomware C2 IP at perimeter firewall
+- order: 6
+  title: Trigger Automated SOAR Ransomware Workflow
+  group: Containment
+  description: Trigger the automated SOAR ransomware workflow to coordinate Wazuh
+    isolation, Cortex family identification, and TheHive task assignment across the
+    team.
+  tool_hint: trigger_soar_workflow
+  parameters:
+    workflow_id: agentix-ransomware-workflow-v1
+    data:
+      agent_id: ctx.agent_id
+      case_id: ctx.case_id
+- order: 7
+  title: Initiate Backup Restore Assessment
+  group: Remediation
+  description: 'Contact backup/DR team to assess: last clean backup date, restore
+    time objective, and whether backups are also encrypted. Document in TheHive case.'
+  tool_hint: add_case_note
+  parameters:
+    case_id: ctx.case_id
+    note: 'PB-006: Host isolated. Backup team notified. Family identification pending.'
