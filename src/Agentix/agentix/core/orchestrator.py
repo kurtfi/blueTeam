@@ -214,7 +214,9 @@ class Orchestrator:
         messages = self._context_manager.manage(messages)
         return messages, tool_map, tool_schemas
 
-    async def _prepare_session(self, session_id: str, user_message: str, log: Any) -> tuple[list[dict], dict, str] | None:
+    async def _prepare_session(
+        self, session_id: str, user_message: str, log: Any
+    ) -> tuple[list[dict], dict, str] | None:
         """Initialise workspace, metadata, and history."""
         await self._db_logger.log_user_message(session_id, user_message)
         await self._init_session_workspace(session_id)

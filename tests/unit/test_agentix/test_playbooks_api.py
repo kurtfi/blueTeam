@@ -34,7 +34,7 @@ async def test_get_playbook_details_gateway_success(client):
         mock_get_details.return_value = {
             "id": "PB-001",
             "name": "OS Credential Dumping – /etc/shadow Access",
-            "steps": []
+            "steps": [],
         }
 
         response = client.get("/web/playbooks/PB-001", headers={"Authorization": f"Bearer {token}"})

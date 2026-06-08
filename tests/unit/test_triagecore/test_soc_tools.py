@@ -86,6 +86,7 @@ async def test_trigger_soar_workflow(mock_registry):
 @pytest.mark.asyncio
 async def test_get_playbook_details():
     import json
+
     result_str = await get_playbook_details("PB-001")
     assert "PB-001" in result_str
     data = json.loads(result_str)
@@ -93,7 +94,7 @@ async def test_get_playbook_details():
     assert "steps" in data
     assert len(data["steps"]) > 0
     assert data["steps"][0]["title"] == "Query SIEM – Identify Offending Process"
-    
+
     # Check invalid playbook
     err_result = await get_playbook_details("PB-INVALID")
     assert "not found" in err_result.lower()
@@ -102,6 +103,7 @@ async def test_get_playbook_details():
 @pytest.mark.asyncio
 async def test_list_playbooks_json():
     import json
+
     result_str = await list_playbooks_json()
     assert "[" in result_str
     data = json.loads(result_str)

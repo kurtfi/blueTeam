@@ -174,9 +174,7 @@ async def get_playbooks_summary() -> list:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(
-                f"{AGENTIX_API_URL}/v1/playbooks/summary",
-                headers=_internal_headers(),
-                timeout=5.0
+                f"{AGENTIX_API_URL}/v1/playbooks/summary", headers=_internal_headers(), timeout=5.0
             )
             response.raise_for_status()
             return response.json()
@@ -192,9 +190,7 @@ async def get_playbook_details(playbook_id: str) -> dict:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(
-                f"{AGENTIX_API_URL}/v1/playbooks/{playbook_id}",
-                headers=_internal_headers(),
-                timeout=5.0
+                f"{AGENTIX_API_URL}/v1/playbooks/{playbook_id}", headers=_internal_headers(), timeout=5.0
             )
             response.raise_for_status()
             return response.json()

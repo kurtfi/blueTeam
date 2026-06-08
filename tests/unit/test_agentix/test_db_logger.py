@@ -55,7 +55,9 @@ async def test_log_step_confirm():
     db_mock = AsyncMock()
     logger = OrchestratorEventLogger(db_mock)
 
-    step = ReActStep(StepType.CONFIRM, "manual confirmation needed", tool_name="isolate_endpoint", tool_input={"agent_id": "007"})
+    step = ReActStep(
+        StepType.CONFIRM, "manual confirmation needed", tool_name="isolate_endpoint", tool_input={"agent_id": "007"}
+    )
     await logger.log_step("session-123", step)
 
     db_mock.add_event.assert_called_once_with(

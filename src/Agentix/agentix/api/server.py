@@ -595,8 +595,9 @@ async def get_playbook_details(playbook_id: str, request: Request):
     try:
         result = await session.call_tool("get_playbook_details", {"playbook_id": playbook_id})
         from agentix.tools.mcp_adapter import MCPToolAdapter
+
         parsed_result = MCPToolAdapter._parse_result(result)
-        
+
         if isinstance(parsed_result, dict):
             return parsed_result
         try:

@@ -137,28 +137,35 @@ async def get_playbook_details(playbook_id: str) -> str:
     logger.info("tool.get_playbook_details", playbook_id=playbook_id)
     try:
         from triage_core.playbooks import registry as pb_registry
+
         pb = pb_registry.get(playbook_id)
-        
+
         steps_data = []
         for s in pb.steps:
-            steps_data.append({
-                "order": s.order,
-                "title": s.title,
-                "group": s.group,
-                "description": s.description,
-                "tool": s.tool_hint or "system",
-                "approval": s.approval_gate.requires_confirmation_for if s.approval_gate else None
-            })
-        
+            steps_data.append(
+                {
+                    "order": s.order,
+                    "title": s.title,
+                    "group": s.group,
+                    "description": s.description,
+                    "tool": s.tool_hint or "system",
+                    "approval": s.approval_gate.requires_confirmation_for if s.approval_gate else None,
+                }
+            )
+
         import json
-        return json.dumps({
-            "id": pb.id,
-            "name": pb.name,
-            "description": pb.description,
-            "mitre_ids": pb.mitre_ids,
-            "severity": pb.severity.value.upper(),
-            "steps": steps_data
-        }, ensure_ascii=False)
+
+        return json.dumps(
+            {
+                "id": pb.id,
+                "name": pb.name,
+                "description": pb.description,
+                "mitre_ids": pb.mitre_ids,
+                "severity": pb.severity.value.upper(),
+                "steps": steps_data,
+            },
+            ensure_ascii=False,
+        )
     except KeyError:
         return f"Playbook '{playbook_id}' not found."
     except Exception as e:
