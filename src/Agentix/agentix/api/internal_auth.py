@@ -11,10 +11,11 @@ warning log.
 from __future__ import annotations
 
 import structlog
-from agentic_common.settings import settings
 from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
+
+from agentic_common.settings import settings
 
 logger = structlog.get_logger(__name__)
 

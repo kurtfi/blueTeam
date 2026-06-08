@@ -24,12 +24,12 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
 import structlog
+
 from agentic_common.base_tool import BaseTool
 from agentic_common.memory import postgres_session_repo
 from agentic_common.memory.session import SessionStore
 from agentic_common.settings import settings
 from agentic_common.workspace import SessionWorkspace
-
 from agentix.core.context.manager import ContextManager
 from agentix.core.guardrails.base import GuardrailResult
 from agentix.core.guardrails.manager import GuardrailManager

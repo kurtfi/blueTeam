@@ -2,10 +2,10 @@ import asyncio
 import json
 
 import structlog
+
 from agentic_common.memory import postgres_session_repo
 from agentic_common.memory.redis_store import RedisSessionStore
 from agentic_common.settings import settings
-
 from agentix.agents.factory import AgentFactory
 from agentix.core.react import StepType
 from agentix.core.verdict import parse_verdict

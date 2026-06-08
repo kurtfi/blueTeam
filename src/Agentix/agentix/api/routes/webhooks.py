@@ -5,10 +5,11 @@ import uuid
 from datetime import datetime
 
 import structlog
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
+
 from agentic_common.memory import postgres_session_repo
 from agentix.core.alert_dedup import AlertDeduplicator
 from agentix.core.triage_workflow import process_siem_alert
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 
 logger = structlog.get_logger(__name__)
 

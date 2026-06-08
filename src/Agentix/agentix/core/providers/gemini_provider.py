@@ -3,11 +3,11 @@ import uuid
 from typing import Any
 
 import structlog
-from agentic_common.settings import settings
 from google import genai
 from google.genai import types
 from openai.types.chat import ChatCompletionMessageParam
 
+from agentic_common.settings import settings
 from agentix.core.providers.base import BaseLLMProvider
 
 logger = structlog.get_logger(__name__)

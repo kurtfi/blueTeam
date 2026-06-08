@@ -6,11 +6,11 @@ from typing import Any
 import asyncpg  # type: ignore[import-untyped]
 import jwt
 import structlog
+from fastapi import HTTPException, Request, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 # Load settings and env
 from agentic_common.settings import settings
-from fastapi import HTTPException, Request, Security, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 logger = structlog.get_logger(__name__)
 

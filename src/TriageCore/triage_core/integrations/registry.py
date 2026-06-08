@@ -1,6 +1,7 @@
 import os
 
 import structlog
+
 from triage_core.integrations.base import (
     ICaseManagementProvider,
     IEndpointProvider,

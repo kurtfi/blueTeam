@@ -15,6 +15,12 @@ from datetime import datetime
 from typing import Any
 
 import structlog
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
+from mcp import ClientSession
+from mcp.client.sse import sse_client
+from pydantic import BaseModel
+
 from agentic_common.memory import postgres_session_repo
 from agentic_common.memory.redis_preferences import RedisPreferenceStore
 from agentic_common.memory.redis_store import RedisSessionStore
@@ -27,11 +33,6 @@ from agentix.core.cleanup import run_periodic_cleanup
 from agentix.core.orchestrator import Orchestrator
 from agentix.core.verdict import parse_verdict
 from agentix.registry.catalog import ToolCatalog
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
-from mcp import ClientSession
-from mcp.client.sse import sse_client
-from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
 

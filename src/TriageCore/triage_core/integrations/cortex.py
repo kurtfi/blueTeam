@@ -4,6 +4,7 @@ import os
 
 import httpx
 import structlog
+
 from triage_core.integrations.base import IEnrichmentProvider
 
 logger = structlog.get_logger(__name__)

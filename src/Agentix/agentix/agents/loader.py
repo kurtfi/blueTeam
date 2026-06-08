@@ -6,8 +6,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentix.agents.schema import AgentConfig
 from yaml import safe_load
+
+from agentix.agents.schema import AgentConfig
 
 
 class AgentLoader:

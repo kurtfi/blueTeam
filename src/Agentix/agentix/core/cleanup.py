@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+
 from agentic_common.settings import settings
 from agentic_common.workspace import SessionWorkspace
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 
 import structlog
+
 from agentic_common.base_tool import ToolResult
 from agentic_common.settings import settings
 

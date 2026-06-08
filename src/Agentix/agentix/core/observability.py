@@ -12,8 +12,9 @@ from collections.abc import Callable
 from typing import Any, TypeVar
 
 import structlog
-from agentic_common.settings import settings
 from langfuse import Langfuse
+
+from agentic_common.settings import settings
 
 logger = structlog.get_logger(__name__)
 

@@ -11,9 +11,9 @@ import time
 from typing import Any
 
 import structlog
-from agentic_common.settings import settings
 from openai.types.chat import ChatCompletionMessageParam
 
+from agentic_common.settings import settings
 from agentix.core.providers.base import BaseLLMProvider
 from agentix.core.providers.gemini_provider import GeminiProvider
 from agentix.core.providers.ollama_provider import OllamaProvider

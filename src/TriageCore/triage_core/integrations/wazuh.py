@@ -3,6 +3,7 @@ import os
 
 import httpx
 import structlog
+
 from triage_core.integrations.base import IEndpointProvider, ISiemProvider
 
 logger = structlog.get_logger(__name__)

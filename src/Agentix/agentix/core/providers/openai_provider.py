@@ -1,10 +1,10 @@
 from typing import Any
 
 import structlog
-from agentic_common.settings import settings
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
+from agentic_common.settings import settings
 from agentix.core.providers.base import BaseLLMProvider
 
 logger = structlog.get_logger(__name__)

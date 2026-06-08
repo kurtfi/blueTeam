@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import redis.asyncio as aioredis
 import structlog
+
 from agentic_common.base_tool import BaseTool
 from agentic_common.embeddings import EmbeddingFactory
 from agentic_common.settings import settings

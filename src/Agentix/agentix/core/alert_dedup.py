@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import redis.asyncio as redis
 import structlog
+
 from agentic_common.settings import settings
 
 logger = structlog.get_logger(__name__)

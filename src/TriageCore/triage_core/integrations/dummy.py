@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 import structlog
+
 from triage_core.integrations.base import (
     ICaseManagementProvider,
     IEndpointProvider,

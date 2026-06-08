@@ -6,6 +6,7 @@ import importlib
 import os
 
 import structlog
+
 from triage_core.tools import mcp
 
 logger = structlog.get_logger(__name__)

@@ -3,6 +3,7 @@ from typing import Any
 
 import httpx
 import structlog
+
 from triage_core.integrations.base import ICaseManagementProvider
 
 logger = structlog.get_logger(__name__)
