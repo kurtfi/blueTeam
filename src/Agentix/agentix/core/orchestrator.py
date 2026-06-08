@@ -1,20 +1,5 @@
 """
 Orchestrator — central decision engine of the Agentix platform.
-
-Design principles encoded here:
-  1. Dynamic Tool Selection  — only intent-matched tools are loaded into
-                               each request context, not the whole registry.
-  2. Chain of Thought (CoT)  — Think → Act → Observe → Answer loop via
-                               the ReAct module.
-  3. Stateless Logic /       — business logic is pure; session state is
-     Stateful Experience       delegated to MemoryStore.
-  4. Safety First            — sandbox & permission checks before every
-                               tool execution.
-  5. Native RAG              — relevant knowledge is automatically injected
-                               into the system prompt before the ReAct loop
-                               starts. The LLM never needs to call a RAG tool.
-  6. Parallel Tool Calls     — independent tool calls in a single LLM turn
-                               are fanned out concurrently via asyncio.gather.
 """
 
 from __future__ import annotations
@@ -31,7 +16,7 @@ from agentic_common.memory.session import SessionStore
 from agentic_common.settings import settings
 from agentic_common.workspace import SessionWorkspace
 from agentix.core.context.manager import ContextManager
-from agentix.core.guardrails.base import GuardrailResult
+from agentix.core.db_logger import OrchestratorEventLogger
 from agentix.core.guardrails.manager import GuardrailManager
 from agentix.core.hitl_coordinator import HitlCoordinator
 from agentix.core.llm import LLMClient
@@ -50,25 +35,6 @@ logger = structlog.get_logger(__name__)
 class Orchestrator:
     """
     The central decision-making engine.
-
-    Responsibilities
-    ----------------
-    - Inject RAG context into the system prompt before the ReAct loop.
-    - Parse the user intent from the incoming request.
-    - Ask the ToolCatalog for the relevant tools (dynamic selection).
-    - Drive the ReAct loop, fanning out parallel tool calls via asyncio.gather.
-    - Store/retrieve session context via SessionStore.
-
-    Usage
-    -----
-    .. code-block:: python
-
-        orchestrator = Orchestrator()
-        result = await orchestrator.run(
-            session_id="user-42",
-            user_message="List the files in /tmp and summarise them",
-        )
-        print(result.final_answer)
     """
 
     def __init__(
@@ -123,13 +89,10 @@ class Orchestrator:
             db_repo=self._db_repo,
             memory=self._memory,
         )
+        self._db_logger = OrchestratorEventLogger(self._db_repo)
 
-    async def _run_guardrails(self, session_id: str, user_message: str, session_source: str) -> GuardrailResult:
-        """
-        Executes the guardrails manager pipeline on the incoming user message.
-        Conforms to SOLID by dynamically loading default guardrails from the factory
-        if no manager was injected, and delegating the execution logic to GuardrailManager.
-        """
+    async def _run_guardrails(self, session_id: str, user_message: str, session_source: str) -> Any:
+        """Executes guardrails pipeline on incoming user message."""
         manager = self._guardrail_manager
         if manager is None:
             from agentix.core.guardrails.factory import GuardrailFactory
@@ -148,41 +111,9 @@ class Orchestrator:
                 self._workspace = SessionWorkspace(session_id=session_id)
                 await self._workspace.initialize()
 
-    async def _log_user_message_to_db(self, session_id: str, user_message: str, log: Any) -> None:
-        """Log user message stats and event to the database if repository is configured."""
-        if not self._db_repo:
-            return
-        try:
-            await self._db_repo.increment_stats(session_id, message_count=1)
-            # Avoid duplicate logs for automated siem triage prompt
-            if not user_message.strip().startswith("You are an autonomous Tier 1 (T1) SOC Analyst."):
-                await self._db_repo.add_event(
-                    session_id=session_id,
-                    event_type="message",
-                    actor="user",
-                    content=user_message,
-                )
-        except Exception as e:
-            log.critical("orchestrator.postgres_user_msg_log_failed", error=str(e), alert=True, db_failure=True)
-
     async def _check_session_guardrails(self, session_id: str, user_message: str, log: Any) -> tuple[bool, str | None]:
-        """
-        Verify incoming user message against guardrails.
-        Returns a tuple of (passed, refusal_message).
-        """
-        session_source = "USER"
-        if self._db_repo:
-            try:
-                session = await self._db_repo.get_session(session_id)
-                session_source = str(session.get("source")) if (session and session.get("source")) else "USER"
-            except Exception as db_err:
-                log.critical(
-                    "orchestrator.fetch_session_source_failed",
-                    session_id=session_id,
-                    error=str(db_err),
-                    alert=True,
-                    db_failure=True,
-                )
+        """Verify incoming user message against guardrails."""
+        session_source = await self._db_logger.get_session_source(session_id)
 
         guardrail_result = await self._run_guardrails(session_id, user_message, session_source)
         if guardrail_result.passed:
@@ -191,19 +122,7 @@ class Orchestrator:
         refusal = guardrail_result.refusal_message or "Request blocked by guardrails."
         log.info("orchestrator.guardrail_blocked", reason=guardrail_result.reason)
 
-        if self._db_repo:
-            try:
-                await self._db_repo.add_event(
-                    session_id=session_id,
-                    event_type="error",
-                    actor="system",
-                    content=f"Guardrail block: {guardrail_result.reason}",
-                )
-            except Exception as db_ex:
-                log.critical(
-                    "orchestrator.postgres_guardrail_log_failed", error=str(db_ex), alert=True, db_failure=True
-                )
-
+        await self._db_logger.log_guardrail_block(session_id, guardrail_result.reason)
         await self._memory.append(session_id, user_message, refusal)
         return False, refusal
 
@@ -225,22 +144,9 @@ class Orchestrator:
     async def _handle_hitl_approval(
         self, session_id: str, draft_history: list[dict], log: Any
     ) -> tuple[list[dict], dict[str, BaseTool], list[dict], list[dict]]:
-        """Handles Postgres updates and prepares tools/schemas/calls when user approves pending tools."""
+        """Prepares tools/schemas/calls when user approves pending tools."""
         log.info("orchestrator.resume.approved")
-        if self._db_repo:
-            try:
-                await self._db_repo.update_status(session_id, "ACTIVE")
-                await self._db_repo.add_event(
-                    session_id=session_id,
-                    event_type="hitl_response",
-                    actor="user",
-                    content="User approved the pending tool execution.",
-                )
-            except Exception as e:
-                log.critical(
-                    "orchestrator.postgres_hitl_approved_log_failed", error=str(e), alert=True, db_failure=True
-                )
-
+        await self._db_logger.log_hitl_approval(session_id)
         await self._memory.set_metadata(session_id, "draft_history", None)
 
         all_tools = self._catalog.all_tools()
@@ -253,32 +159,16 @@ class Orchestrator:
         return draft_history, tool_map, tool_schemas, tool_calls
 
     async def _handle_hitl_rejection(self, session_id: str, user_message: str, log: Any) -> None:
-        """Handles Postgres updates and cleans up draft state when user rejects pending tools."""
+        """Cleans up draft state when user rejects pending tools."""
         log.info("orchestrator.resume.rejected", user_message=user_message)
-        if self._db_repo:
-            try:
-                await self._db_repo.update_status(session_id, "COMPLETED")
-                await self._db_repo.add_event(
-                    session_id=session_id,
-                    event_type="hitl_response",
-                    actor="user",
-                    content="User rejected the pending tool execution. Workflow cancelled.",
-                )
-            except Exception as e:
-                log.critical(
-                    "orchestrator.postgres_hitl_rejected_log_failed", error=str(e), alert=True, db_failure=True
-                )
-
+        await self._db_logger.log_hitl_rejection(session_id)
         await self._memory.set_metadata(session_id, "draft_history", None)
         await self._memory.append(session_id, user_message, "Action cancelled by user.")
 
     async def _setup_orchestrator_context(
         self, user_message: str, user_id: str, history: list[dict], log: Any
     ) -> tuple[list[dict], dict[str, BaseTool], list[dict]] | None:
-        """
-        Dynamically selects tools, retrieves RAG context, and composes system messages.
-        Returns a tuple of (messages, tool_map, tool_schemas), or None if no tools are available.
-        """
+        """Dynamically selects tools, retrieves RAG context, and composes system messages."""
         category_filter = self._config.tool_filters.categories if self._config else None
         name_filter = self._config.tool_filters.names if self._config else None
         exclude_names = self._config.tool_filters.exclude_names if self._config else None
@@ -324,21 +214,23 @@ class Orchestrator:
         messages = self._context_manager.manage(messages)
         return messages, tool_map, tool_schemas
 
+    async def _prepare_session(self, session_id: str, user_message: str, log: Any) -> tuple[list[dict], dict, str] | None:
+        """Initialise workspace, metadata, and history."""
+        await self._db_logger.log_user_message(session_id, user_message)
+        await self._init_session_workspace(session_id)
+
+        history = await self._memory.get_history(session_id)
+        metadata = await self._memory.get_metadata(session_id)
+        user_id = metadata.get("owner_id", "anonymous")
+
+        return history, metadata, user_id
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     async def run(self, session_id: str, user_message: str) -> ReActTrace:
-        """
-        Process a single user message and return the full ReAct trace.
-
-        Args:
-            session_id:   Identifier for the ongoing conversation / user.
-            user_message: The raw user request.
-
-        Returns:
-            A :class:`ReActTrace` containing every step and the final answer.
-        """
+        """Process a single user message and return the full ReAct trace."""
         trace = ReActTrace(request=user_message)
 
         async for step in self.run_stream(session_id, user_message):
@@ -349,83 +241,133 @@ class Orchestrator:
         return trace
 
     async def run_stream(self, session_id: str, user_message: str) -> AsyncGenerator[ReActStep, None]:
-        """
-        Process a single user message and yield the full ReAct trace as a stream.
-
-        Args:
-            session_id:   Identifier for the ongoing conversation / user.
-            user_message: The raw user request.
-
-        Yields:
-            Each :class:`ReActStep` in real-time as the agent thinks and acts.
-        """
+        """Process a single user message and yield the full ReAct trace as a stream."""
         log = logger.bind(session_id=session_id)
         log.info("orchestrator.run_stream.start", message=user_message[:120])
 
-        await self._log_user_message_to_db(session_id, user_message, log)
-        await self._init_session_workspace(session_id)
-
-        # 1. Load conversation history and metadata from memory.
-        history = await self._memory.get_history(session_id)
-        metadata = await self._memory.get_metadata(session_id)
-        user_id = metadata.get("owner_id", "anonymous")
-
-        # Check if we are resuming from a pending approval/confirmation state
-        draft_history = metadata.get("draft_history")
-        is_resume = False
-        tool_calls: list[Any] = []
-
-        if not draft_history:
-            passed, refusal = await self._check_session_guardrails(session_id, user_message, log)
-            if not passed:
-                yield ReActStep(StepType.ANSWER, refusal or "Request blocked.")
+        try:
+            prep_res = await self._prepare_session(session_id, user_message, log)
+            if prep_res is None:
                 return
+            history, metadata, user_id = prep_res
 
-        if draft_history:
-            if self._is_approval_response(user_message):
-                is_resume = True
-                messages, tool_map, tool_schemas, tool_calls = await self._handle_hitl_approval(
-                    session_id, draft_history, log
-                )
+            # Check if we are resuming from a pending approval/confirmation state
+            draft_history = metadata.get("draft_history")
+            is_resume = False
+            tool_calls: list[Any] = []
+
+            if not draft_history:
+                passed, refusal = await self._check_session_guardrails(session_id, user_message, log)
+                if not passed:
+                    refusal_step = ReActStep(StepType.ANSWER, refusal or "Request blocked.")
+                    yield refusal_step
+                    await self._db_logger.log_step(session_id, refusal_step)
+                    return
+
+            if draft_history:
+                if self._is_approval_response(user_message):
+                    is_resume = True
+                    messages, tool_map, tool_schemas, tool_calls = await self._handle_hitl_approval(
+                        session_id, draft_history, log
+                    )
+                else:
+                    await self._handle_hitl_rejection(session_id, user_message, log)
+                    rej_step = ReActStep(StepType.ANSWER, "Action cancelled by user.")
+                    yield rej_step
+                    await self._db_logger.log_step(session_id, rej_step)
+                    return
             else:
-                await self._handle_hitl_rejection(session_id, user_message, log)
-                yield ReActStep(StepType.ANSWER, "Action cancelled by user.")
-                return
-        else:
-            setup_res = await self._setup_orchestrator_context(user_message, user_id, history, log)
-            if setup_res is None:
-                yield ReActStep(
-                    StepType.ANSWER,
-                    "⚠️ No tools are currently available. The MCP tools server "
-                    "may not be running. Please ensure all infrastructure services "
-                    "(MCP server, Redis, Postgres) are started and try again.",
-                )
-                return
-            messages, tool_map, tool_schemas = setup_res
+                setup_res = await self._setup_orchestrator_context(user_message, user_id, history, log)
+                if setup_res is None:
+                    err_step = ReActStep(
+                        StepType.ANSWER,
+                        "⚠️ No tools are currently available. The MCP tools server "
+                        "may not be running. Please ensure all infrastructure services "
+                        "(MCP server, Redis, Postgres) are started and try again.",
+                    )
+                    yield err_step
+                    await self._db_logger.log_step(session_id, err_step)
+                    return
+                messages, tool_map, tool_schemas = setup_res
 
-        # 5. Observability — Start Langfuse trace
-        trace = obs.trace(
-            name="orchestrator.run", session_id=session_id, user_message=user_message[:120], tool_count=len(tool_map)
-        )
+            # 5. Observability — Start Langfuse trace
+            trace = obs.trace(
+                name="orchestrator.run",
+                session_id=session_id,
+                user_message=user_message[:120],
+                tool_count=len(tool_map),
+            )
 
-        if trace and hasattr(trace, "id") and trace.id:
-            if self._db_repo:
-                try:
-                    await self._db_repo.update_stats(session_id, langfuse_trace_id=str(trace.id))
-                except Exception as e:
-                    log.critical("orchestrator.update_trace_id_failed", error=str(e), alert=True, db_failure=True)
+            if trace and hasattr(trace, "id") and trace.id:
+                await self._db_logger.update_langfuse_trace_id(session_id, str(trace.id))
 
-        final_answer = ""
-        iterations = 0
+            final_answer = ""
+            iterations = 0
+            confirmation_hit = False
 
-        # 6. ReAct loop.
-        for _ in range(self._max_iterations):
-            iterations += 1
+            # 6. ReAct loop.
+            for _ in range(self._max_iterations):
+                iterations += 1
 
-            # Resume flow: run pending tool calls directly in first iteration
-            if is_resume and tool_calls:
-                is_resume = False
-                confirmation_hit = False
+                # Resume flow: run pending tool calls directly in first iteration
+                if is_resume and tool_calls:
+                    is_resume = False
+                    async for step in self._process_tool_calls_stream(
+                        tool_calls=tool_calls,
+                        tool_map=tool_map,
+                        session_id=session_id,
+                        messages=messages,
+                        trace=trace,
+                        log=log,
+                        force_approved=True,
+                    ):
+                        yield step
+                        await self._db_logger.log_step(session_id, step)
+                        if step.step_type == StepType.CONFIRM:
+                            confirmation_hit = True
+
+                    if confirmation_hit:
+                        return
+                    continue
+
+                gen_name = f"generation_{iterations}"
+                generation = trace.generation(name=gen_name, model=self._llm.model, input=messages) if trace else None
+
+                response = await self._llm.chat(messages, tools=tool_schemas or None)  # type: ignore[arg-type]
+
+                if generation:
+                    generation.end(output=response)
+
+                # --- Final Answer ---
+                if response.get("content") and not response.get("tool_calls"):
+                    content: str = response["content"]
+                    if "Final Answer:" in content:
+                        answer = content.split("Final Answer:")[-1].strip()
+                        final_answer = answer
+                        ans_step = ReActStep(StepType.ANSWER, answer)
+                        yield ans_step
+                        await self._db_logger.log_step(session_id, ans_step)
+                        break
+                    # Model responded without a tool but also without the prefix
+                    final_answer = content
+                    ans_step = ReActStep(StepType.ANSWER, content)
+                    yield ans_step
+                    await self._db_logger.log_step(session_id, ans_step)
+                    break
+
+                # --- Tool calls ---
+                tool_calls = response.get("tool_calls") or []
+                if not tool_calls:
+                    if not final_answer:
+                        final_answer = "LLM returned an empty response and no tool calls. Aborting."
+                        ans_step = ReActStep(StepType.ANSWER, final_answer)
+                        yield ans_step
+                        await self._db_logger.log_step(session_id, ans_step)
+                        log.warning("orchestrator.llm_empty_response")
+                    break
+
+                messages.append({"role": "assistant", **response})
+
                 async for step in self._process_tool_calls_stream(
                     tool_calls=tool_calls,
                     tool_map=tool_map,
@@ -433,75 +375,39 @@ class Orchestrator:
                     messages=messages,
                     trace=trace,
                     log=log,
-                    force_approved=True,
                 ):
                     yield step
+                    await self._db_logger.log_step(session_id, step)
                     if step.step_type == StepType.CONFIRM:
                         confirmation_hit = True
 
                 if confirmation_hit:
                     return
-                continue
 
-            gen_name = f"generation_{iterations}"
-            generation = trace.generation(name=gen_name, model=self._llm.model, input=messages) if trace else None
+            if not final_answer and not confirmation_hit:
+                final_answer = "Max iterations reached without a final answer."
+                ans_step = ReActStep(StepType.ANSWER, final_answer)
+                yield ans_step
+                await self._db_logger.log_step(session_id, ans_step)
+                log.warning("orchestrator.max_iterations_reached", iterations=iterations)
 
-            response = await self._llm.chat(messages, tools=tool_schemas or None)  # type: ignore[arg-type]
+            # Persist updated history & stats.
+            if not confirmation_hit:
+                await self._memory.append(session_id, user_message, final_answer)
+                await self._db_logger.log_completion(session_id, final_answer)
 
-            if generation:
-                generation.end(output=response)
+            log.info("orchestrator.run_stream.done", iterations=iterations)
 
-            # --- Final Answer ---
-            if response.get("content") and not response.get("tool_calls"):
-                content: str = response["content"]
-                if "Final Answer:" in content:
-                    answer = content.split("Final Answer:")[-1].strip()
-                    final_answer = answer
-                    yield ReActStep(StepType.ANSWER, answer)
-                    break
-                # Model responded without a tool but also without the prefix
-                final_answer = content
-                yield ReActStep(StepType.ANSWER, content)
-                break
-
-            # --- Tool calls ---
-            tool_calls = response.get("tool_calls") or []
-            if not tool_calls:
-                if not final_answer:
-                    final_answer = "LLM returned an empty response and no tool calls. Aborting."
-                    yield ReActStep(StepType.ANSWER, final_answer)
-                    log.warning("orchestrator.llm_empty_response")
-                break
-
-            messages.append({"role": "assistant", **response})
-
-            confirmation_hit = False
-            async for step in self._process_tool_calls_stream(
-                tool_calls=tool_calls,
-                tool_map=tool_map,
-                session_id=session_id,
-                messages=messages,
-                trace=trace,
-                log=log,
-            ):
-                yield step
-                if step.step_type == StepType.CONFIRM:
-                    confirmation_hit = True
-
-            if confirmation_hit:
-                return
-
-        if not final_answer:
-            final_answer = "Max iterations reached without a final answer."
-            yield ReActStep(StepType.ANSWER, final_answer)
-            log.warning("orchestrator.max_iterations_reached", iterations=iterations)
-
-        # 6. Persist updated history.
-        await self._memory.append(session_id, user_message, final_answer)
-        log.info("orchestrator.run_stream.done", iterations=iterations)
-
-        # 7. Flush Langfuse traces to ensure they are sent before the request ends.
-        await obs.flush()
+        except Exception as e:
+            log.exception("orchestrator.run_stream.failed", error=str(e))
+            await self._db_logger.log_failure(session_id, str(e))
+            err_step = ReActStep(StepType.ANSWER, f"Error during execution: {str(e)}")
+            yield err_step
+            await self._db_logger.log_step(session_id, err_step)
+            raise e
+        finally:
+            # 7. Flush Langfuse traces to ensure they are sent before the request ends.
+            await obs.flush()
 
     async def _process_tool_calls_stream(
         self,
@@ -556,14 +462,7 @@ class Orchestrator:
                         return  # Caller must re-submit with approved=True.
 
         # Fan-out: execute all tool calls in parallel.
-        # Increment tool_calls count in Postgres
-        if self._db_repo:
-            try:
-                await self._db_repo.increment_stats(session_id, tool_calls=len(tool_calls))
-            except Exception as e:
-                log.critical(
-                    "orchestrator.postgres_increment_tool_calls_failed", error=str(e), alert=True, db_failure=True
-                )
+        await self._db_logger.log_tool_calls_count(session_id, len(tool_calls))
 
         observation_results = await self._tool_executor.execute_tools_parallel(
             tool_calls=tool_calls,

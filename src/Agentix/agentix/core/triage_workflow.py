@@ -8,7 +8,6 @@ from agentic_common.memory.redis_store import RedisSessionStore
 from agentic_common.settings import settings
 from agentix.agents.factory import AgentFactory
 from agentix.core.react import StepType
-from agentix.core.verdict import parse_verdict
 from agentix.registry.catalog import ToolCatalog
 
 logger = structlog.get_logger(__name__)
@@ -84,7 +83,6 @@ IMPORTANT NOTE (SIEM QUERIES):
             memory=redis_store,
         )
 
-        final_answer = None
         has_confirm = False
         async for step in orchestrator.run_stream(session_id=session_id, user_message=prompt):
             # Log the steps locally
@@ -96,57 +94,17 @@ IMPORTANT NOTE (SIEM QUERIES):
                 tool=step.tool_name,
             )
 
-            # Record event in PostgreSQL
-            try:
-                event_type = step.step_type.value
-                actor = "agent" if step.step_type in (StepType.THINK, StepType.ACT, StepType.ANSWER) else "system"
-                if step.step_type == StepType.CONFIRM:
-                    event_type = "hitl_request"
-                    actor = "agent"
-                    has_confirm = True
-                elif step.step_type == StepType.OBSERVE:
-                    actor = "system" if "Teams Integration" in (step.content or "") else "tool"
-
-                await postgres_session_repo.add_event(
-                    session_id=session_id,
-                    event_type=event_type,
-                    actor=actor,
-                    content=step.content,
-                    metadata={
-                        "tool_name": step.tool_name,
-                        "tool_input": step.tool_input,
-                        "tool_output": step.tool_output,
-                    },
-                )
-            except Exception as ex:
-                logger.critical(
-                    "triage_workflow.event_log_failed",
-                    session_id=session_id,
-                    error=str(ex),
-                    alert=True,
-                    db_failure=True,
-                )
-
-            if step.step_type == StepType.ANSWER:
-                final_answer = step.content
+            if step.step_type == StepType.CONFIRM:
+                has_confirm = True
 
         if has_confirm:
             # Session is currently WAITING_APPROVAL, do not mark it COMPLETED yet.
             logger.info("triage_workflow.suspended_for_approval", session_id=session_id)
             return
 
-        # Determine verdict from final answer
-        verdict = parse_verdict(final_answer)
-
-        await postgres_session_repo.update_status(
-            session_id=session_id,
-            status="COMPLETED",
-            verdict=verdict,
-        )
-
     except Exception as e:
         logger.exception("triage_workflow.error", session_id=session_id, error=str(e))
-        # Update status to FAILED in Postgres
+        # Update status to FAILED in Postgres as a fallback
         try:
             await postgres_session_repo.update_status(
                 session_id=session_id,

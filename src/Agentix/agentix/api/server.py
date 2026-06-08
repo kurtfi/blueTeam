@@ -31,7 +31,6 @@ from agentix.api.routes import webhooks
 from agentix.core.alert_dedup import AlertDeduplicator
 from agentix.core.cleanup import run_periodic_cleanup
 from agentix.core.orchestrator import Orchestrator
-from agentix.core.verdict import parse_verdict
 from agentix.registry.catalog import ToolCatalog
 
 logger = structlog.get_logger(__name__)
@@ -338,18 +337,8 @@ async def start_session_background_run(
                     logger.error("api.auto_agent_failed", error=str(e))
                     orchestrator = Orchestrator(catalog=catalog, memory=redis_store, preference_store=pref_store)
 
-            from agentix.core.react import StepType
-
-            final_answer = None
-            has_confirm = False
-
             # Consume the async generator from the orchestrator
             async for step in orchestrator.run_stream(session_id=session_id, user_message=message):
-                if step.step_type == StepType.CONFIRM:
-                    has_confirm = True
-                if step.step_type == StepType.ANSWER:
-                    final_answer = step.content
-
                 # Convert ReActStep to dictionary
                 step_dict = {
                     "type": step.step_type.value,
@@ -361,62 +350,6 @@ async def start_session_background_run(
 
                 # Publish to all clients
                 await task_manager.publish_step(session_id, step_dict)
-
-                # Persist event in PostgreSQL
-                try:
-                    event_type = step.step_type.value
-                    actor = "agent" if step.step_type in (StepType.THINK, StepType.ACT, StepType.ANSWER) else "system"
-                    if step.step_type == StepType.CONFIRM:
-                        event_type = "hitl_request"
-                        actor = "agent"
-                        has_confirm = True
-                    elif step.step_type == StepType.OBSERVE:
-                        actor = "system" if "Teams Integration" in (step.content or "") else "tool"
-
-                    await postgres_session_repo.add_event(
-                        session_id=session_id,
-                        event_type=event_type,
-                        actor=actor,
-                        content=step.content,
-                        metadata={
-                            "tool_name": step.tool_name,
-                            "tool_input": step.tool_input,
-                            "tool_output": step.tool_output,
-                        },
-                    )
-                except Exception as ex:
-                    logger.critical(
-                        "api.event_log_failed", session_id=session_id, error=str(ex), alert=True, db_failure=True
-                    )
-
-            # If the stream finished and we have no pending confirmation, mark COMPLETED (only for SIEM/automated sessions)
-            if not has_confirm:
-                try:
-                    session = await postgres_session_repo.get_session(session_id)
-                    session_source = session.get("source") if session else "USER"
-                except Exception as db_err:
-                    logger.critical(
-                        "api.fetch_session_source_failed",
-                        session_id=session_id,
-                        error=str(db_err),
-                        alert=True,
-                        db_failure=True,
-                    )
-                    session_source = "USER"  # Default safely to USER
-
-                if session_source != "USER":
-                    verdict = parse_verdict(final_answer)
-                    await postgres_session_repo.update_status(
-                        session_id=session_id,
-                        status="COMPLETED",
-                        verdict=verdict,
-                    )
-                    await postgres_session_repo.add_event(
-                        session_id=session_id,
-                        event_type="status_change",
-                        actor="system",
-                        content=f"Session status updated to COMPLETED with verdict {verdict}",
-                    )
         except Exception as e:
             logger.exception("orchestrator.background.error", session_id=session_id)
             await task_manager.publish_step(session_id, {"error": str(e)})
