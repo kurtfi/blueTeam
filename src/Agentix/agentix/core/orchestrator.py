@@ -446,7 +446,7 @@ class Orchestrator:
             gen_name = f"generation_{iterations}"
             generation = trace.generation(name=gen_name, model=self._llm.model, input=messages) if trace else None
 
-            response = await self._llm.chat(messages, tools=tool_schemas or None)
+            response = await self._llm.chat(messages, tools=tool_schemas or None)  # type: ignore[arg-type]
 
             if generation:
                 generation.end(output=response)

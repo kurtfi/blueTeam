@@ -137,13 +137,17 @@ class ToolCatalog:
             return []
 
         # If name_filter is provided (and not wildcard/empty), filter candidates.
+        candidates: list[BaseTool] = []
         if name_filter and "*" not in name_filter:
-            candidates = [self.get(name) for name in name_filter if self.get(name)]
+            for name in name_filter:
+                t = self.get(name)
+                if t is not None:
+                    candidates.append(t)
         else:
             candidates = list(self._tools.values())
 
         # Filter by exclusions and categories
-        selected = []
+        selected: list[BaseTool] = []
         for tool in candidates:
             if exclude_names and tool.name in exclude_names:
                 continue
@@ -208,7 +212,7 @@ class ToolCatalog:
 
         # 2. Redis cache hit
         try:
-            cached = await self._redis.hget(_EMBEDDING_CACHE_KEY, tool.name)
+            cached = await self._redis.hget(_EMBEDDING_CACHE_KEY, tool.name)  # type: ignore[misc]
             if cached:
                 emb: list[float] = json.loads(cached)
                 self._local_embeddings[tool.name] = emb  # Warm local cache
@@ -226,9 +230,9 @@ class ToolCatalog:
         # Write to both caches
         self._local_embeddings[tool.name] = emb
         try:
-            await self._redis.hset(_EMBEDDING_CACHE_KEY, tool.name, json.dumps(emb))
+            await self._redis.hset(_EMBEDDING_CACHE_KEY, tool.name, json.dumps(emb))  # type: ignore[misc]
             # Refresh TTL on every new write so frequently-used keys stay warm
-            await self._redis.expire(_EMBEDDING_CACHE_KEY, _EMBEDDING_CACHE_TTL)
+            await self._redis.expire(_EMBEDDING_CACHE_KEY, _EMBEDDING_CACHE_TTL)  # type: ignore[misc]
             logger.debug("catalog.redis_cache.written", tool=tool.name)
         except Exception as redis_err:
             logger.warning("catalog.redis_cache.write_failed", tool=tool.name, error=str(redis_err))

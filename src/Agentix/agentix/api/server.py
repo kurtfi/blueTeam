@@ -12,6 +12,7 @@ import json
 import uuid
 from contextlib import AsyncExitStack
 from datetime import datetime
+from typing import Any
 
 import structlog
 from agentic_common.memory import postgres_session_repo
@@ -48,7 +49,7 @@ class SessionTaskManager:
 
     async def get_or_create_queue(self, session_id: str) -> asyncio.Queue:
         async with self.lock:
-            q = asyncio.Queue()
+            q: asyncio.Queue[Any] = asyncio.Queue()
             if session_id not in self.queues:
                 self.queues[session_id] = []
             self.queues[session_id].append(q)

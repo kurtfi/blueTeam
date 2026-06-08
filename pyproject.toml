@@ -5,3 +5,12 @@ workspace = { members = ["src/Agentix", "src/TriageCore", "src/AgenticCommon"] }
 dev = [
     "pytest-cov>=7.1.0",
 ]
+
+[[tool.mypy.overrides]]
+module = [
+    "yaml.*",
+    "langfuse.*",
+    "asyncpg.*",
+    "pgvector.*"
+]
+ignore_missing_imports = true

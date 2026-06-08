@@ -217,7 +217,7 @@ class PostgresSessionRepository:
         sess_uuid = uuid.UUID(session_id)
 
         updates = []
-        params = [sess_uuid]
+        params: list[Any] = [sess_uuid]
 
         if message_count is not None:
             params.append(message_count)

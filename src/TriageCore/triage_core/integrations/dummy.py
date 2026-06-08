@@ -86,6 +86,7 @@ class DummySiemProvider(ISiemProvider):
         logger.info("provider.dummy_siem.query_logs", query=query, time_range=time_range)
         q = query.lower()
 
+        result: dict[str, Any]
         if any(k in q for k in ("100002", "198.51.100.45", "bruteforce", "brute", "ssh", "8923", "agent.id:1")):
             result = _SIEM_BRUTE_FORCE
         elif any(k in q for k in ("100003", "203.0.113.88", "c2", "cobalt", "powershell", "beacon")):
@@ -93,7 +94,7 @@ class DummySiemProvider(ISiemProvider):
         else:
             result = {"status": "success", "hits": []}
 
-        hits = result["hits"]
+        hits: list[dict[str, Any]] = result["hits"]  # type: ignore[assignment]
         if not hits:
             return f"No events found for query '{query}' in {time_range}."
 

@@ -91,7 +91,7 @@ class SecurityTopicGuardrail(BaseGuardrail):
         messages = self._build_messages(message)
 
         try:
-            response = await self._llm.chat(messages)
+            response = await self._llm.chat(messages)  # type: ignore[arg-type]
             content = response.get("content", "").strip()
 
             parsed = GuardrailResponseParser.parse(content)

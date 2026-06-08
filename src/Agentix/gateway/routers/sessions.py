@@ -236,9 +236,10 @@ async def update_session_endpoint(
                 detail="Only admin roles can interact with automated SIEM triage sessions.",
             )
 
+        status_val = req.status if req.status is not None else str(sess.get("status", ""))
         return await agentix_client.update_session_status(
             session_id=session_id,
-            status=req.status,
+            status=status_val,
             verdict=req.verdict,
         )
     except HTTPException:

@@ -178,7 +178,7 @@ async def list_sessions(
     """
     Fetch list of sessions from Core API with filters.
     """
-    params = {}
+    params: dict[str, str | int] = {}
     if owner_id:
         params["owner_id"] = owner_id
     if source:
