@@ -1,6 +1,7 @@
 from typing import Any
 
 import structlog
+
 from triage_core.integrations.registry import registry
 from triage_core.tools import mcp
 
