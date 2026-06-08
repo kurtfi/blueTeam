@@ -167,6 +167,42 @@ async def get_playbooks() -> str:
             return ""
 
 
+async def get_playbooks_summary() -> list:
+    """
+    Fetch the cached playbooks JSON summary from the Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/playbooks/summary",
+                headers=_internal_headers(),
+                timeout=5.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_playbooks_summary_failed", error=str(e))
+            return []
+
+
+async def get_playbook_details(playbook_id: str) -> dict:
+    """
+    Fetch the details of a specific playbook by ID from the Core API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/playbooks/{playbook_id}",
+                headers=_internal_headers(),
+                timeout=5.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_playbook_details_failed", playbook_id=playbook_id, error=str(e))
+            raise
+
+
 async def list_sessions(
     owner_id: str | None = None,
     source: str | None = None,

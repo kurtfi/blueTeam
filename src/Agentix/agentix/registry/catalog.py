@@ -61,6 +61,7 @@ class ToolCatalog:
         # Redis client — shared across all ToolCatalog instances in the same process
         self._redis: aioredis.Redis = aioredis.from_url(settings.redis_url, decode_responses=True)
         self.cached_playbooks: str | None = None
+        self.cached_playbooks_json: str | None = None
 
     # ------------------------------------------------------------------
     # Registration

@@ -158,6 +158,17 @@ async def startup_event():
             except Exception as e:
                 logger.warning("Failed to fetch and cache playbooks at startup", error=str(e))
 
+            # Sync TriageCore Playbooks JSON into our Catalog
+            try:
+                json_result = await app.state.triage_core_session.call_tool("list_playbooks_json")
+                from agentix.tools.mcp_adapter import MCPToolAdapter
+
+                playbooks_json_str = MCPToolAdapter._parse_result(json_result)
+                app.state.catalog.cached_playbooks_json = playbooks_json_str
+                logger.info("Successfully fetched and cached playbooks JSON from TriageCore.")
+            except Exception as e:
+                logger.warning("Failed to fetch and cache playbooks JSON at startup", error=str(e))
+
             logger.info("Successfully connected to SOC MCP Server and synced tools.")
             break
         except Exception as e:
@@ -557,6 +568,48 @@ async def get_cached_playbooks(catalog: ToolCatalog = Depends(get_catalog)) -> d
     Return the cached playbooks markdown text from TriageCore.
     """
     return {"playbooks_markdown": getattr(catalog, "cached_playbooks", "")}
+
+
+@app.get("/v1/playbooks/summary")
+async def get_cached_playbooks_json(catalog: ToolCatalog = Depends(get_catalog)):
+    """
+    Return the cached playbooks JSON summary from TriageCore.
+    """
+    data = getattr(catalog, "cached_playbooks_json", [])
+    if isinstance(data, str):
+        try:
+            return json.loads(data)
+        except Exception:
+            return []
+    return data or []
+
+
+@app.get("/v1/playbooks/{playbook_id}")
+async def get_playbook_details(playbook_id: str, request: Request):
+    """
+    Call the TriageCore MCP tool 'get_playbook_details' and return the result.
+    """
+    session = getattr(request.app.state, "triage_core_session", None)
+    if not session:
+        raise HTTPException(status_code=503, detail="TriageCore MCP session is not connected.")
+    try:
+        result = await session.call_tool("get_playbook_details", {"playbook_id": playbook_id})
+        from agentix.tools.mcp_adapter import MCPToolAdapter
+        parsed_result = MCPToolAdapter._parse_result(result)
+        
+        if isinstance(parsed_result, dict):
+            return parsed_result
+        try:
+            return json.loads(parsed_result)
+        except Exception:
+            if isinstance(parsed_result, str) and "not found" in parsed_result.lower():
+                raise HTTPException(status_code=404, detail=parsed_result)
+            return {"detail": parsed_result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("api.get_playbook_details_failed", playbook_id=playbook_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- Sessions Persistance Endpoints ---

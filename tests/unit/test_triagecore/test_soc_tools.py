@@ -7,6 +7,8 @@ from triage_core.tools.soc_tools import (
     isolate_endpoint,
     query_siem_logs,
     trigger_soar_workflow,
+    get_playbook_details,
+    list_playbooks_json,
 )
 
 
@@ -79,3 +81,30 @@ async def test_trigger_soar_workflow(mock_registry):
     result = await trigger_soar_workflow("wf-1", {"k": "v"})
     assert result == "Triggered"
     mock_registry["soar"].trigger_workflow.assert_called_once_with("wf-1", {"k": "v"}, "")
+
+
+@pytest.mark.asyncio
+async def test_get_playbook_details():
+    import json
+    result_str = await get_playbook_details("PB-001")
+    assert "PB-001" in result_str
+    data = json.loads(result_str)
+    assert data["id"] == "PB-001"
+    assert "steps" in data
+    assert len(data["steps"]) > 0
+    assert data["steps"][0]["title"] == "Query SIEM – Identify Offending Process"
+    
+    # Check invalid playbook
+    err_result = await get_playbook_details("PB-INVALID")
+    assert "not found" in err_result.lower()
+
+
+@pytest.mark.asyncio
+async def test_list_playbooks_json():
+    import json
+    result_str = await list_playbooks_json()
+    assert "[" in result_str
+    data = json.loads(result_str)
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert any(pb["id"] == "PB-001" for pb in data)

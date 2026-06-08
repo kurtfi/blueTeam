@@ -188,3 +188,27 @@ async def list_playbooks_endpoint(
 
     md_content = await get_playbooks()
     return {"markdown": md_content}
+
+
+@router.get("/playbooks/summary", summary="List cached playbooks JSON summary from TriageCore")
+async def list_playbooks_summary_endpoint(
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list:
+    """Return the cached playbooks JSON summary."""
+    from gateway.services.agentix_client import get_playbooks_summary
+
+    return await get_playbooks_summary()
+
+
+@router.get("/playbooks/{playbook_id}", summary="Get detailed definition of a playbook")
+async def get_playbook_details_endpoint(
+    playbook_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return structured JSON details of a single playbook."""
+    from gateway.services.agentix_client import get_playbook_details
+
+    try:
+        return await get_playbook_details(playbook_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

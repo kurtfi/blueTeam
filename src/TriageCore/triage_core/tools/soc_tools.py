@@ -116,6 +116,57 @@ async def list_playbooks(filter_mitre: str = "", filter_severity: str = "") -> s
 
 
 @mcp.tool()
+async def list_playbooks_json() -> str:
+    """Lists all registered SOC playbooks in JSON format."""
+    logger.info("tool.list_playbooks_json")
+    try:
+        import json
+
+        from triage_core.playbooks import registry as pb_registry
+
+        playbooks = pb_registry.list_all()
+        return json.dumps(playbooks, ensure_ascii=False)
+    except Exception as e:
+        logger.error("playbook.list_json.error", error=str(e))
+        return json.dumps({"error": f"Error fetching playbook list: {str(e)}"}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def get_playbook_details(playbook_id: str) -> str:
+    """Gets the detailed steps and description of a registered SOC playbook by its ID (as a JSON string)."""
+    logger.info("tool.get_playbook_details", playbook_id=playbook_id)
+    try:
+        from triage_core.playbooks import registry as pb_registry
+        pb = pb_registry.get(playbook_id)
+        
+        steps_data = []
+        for s in pb.steps:
+            steps_data.append({
+                "order": s.order,
+                "title": s.title,
+                "group": s.group,
+                "description": s.description,
+                "tool": s.tool_hint or "system",
+                "approval": s.approval_gate.requires_confirmation_for if s.approval_gate else None
+            })
+        
+        import json
+        return json.dumps({
+            "id": pb.id,
+            "name": pb.name,
+            "description": pb.description,
+            "mitre_ids": pb.mitre_ids,
+            "severity": pb.severity.value.upper(),
+            "steps": steps_data
+        }, ensure_ascii=False)
+    except KeyError:
+        return f"Playbook '{playbook_id}' not found."
+    except Exception as e:
+        logger.error("playbook.details.error", playbook_id=playbook_id, error=str(e))
+        return f"Error fetching playbook details: {str(e)}"
+
+
+@mcp.tool()
 async def find_playbook_for_alert(
     rule_id: str = "",
     mitre_ids: list[str] | None = None,
