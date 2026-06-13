@@ -15,11 +15,11 @@ from datetime import datetime
 from typing import Any
 
 import structlog
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Path, Query
 from fastapi.responses import StreamingResponse
 from mcp import ClientSession
 from mcp.client.sse import sse_client
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agentic_common.memory import postgres_session_repo
 from agentic_common.memory.redis_preferences import RedisPreferenceStore
@@ -169,6 +169,24 @@ async def startup_event():
             except Exception as e:
                 logger.warning("Failed to fetch and cache playbooks JSON at startup", error=str(e))
 
+            # Connect and Sync Attack Simulator MCP Server (optional/best effort at startup)
+            try:
+                logger.info("Connecting to Attack Simulator MCP Server...", url=settings.agentix_attack_simulator_url)
+                sim_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_attack_simulator_url))
+                sim_read, sim_write = sim_transport
+                app.state.attack_simulator_session = await app.state.mcp_stack.enter_async_context(
+                    ClientSession(sim_read, sim_write)
+                )
+                await app.state.attack_simulator_session.initialize()
+                await app.state.catalog.register_mcp_client(app.state.attack_simulator_session)
+                logger.info("Successfully connected to Attack Simulator MCP Server and registered tools.")
+            except Exception as e:
+                logger.warning(
+                    "Failed to connect to Attack Simulator MCP server at startup (Simulator might not be running)",
+                    url=settings.agentix_attack_simulator_url,
+                    error=str(e),
+                )
+
             logger.info("Successfully connected to SOC MCP Server and synced tools.")
             break
         except Exception as e:
@@ -228,13 +246,13 @@ async def shutdown_event():
 
 
 class StreamRequest(BaseModel):
-    session_id: str
-    message: str
-    agent: str | None = None  # Optional agent name (e.g. 'researcher')
+    session_id: str = Field(..., max_length=100)
+    message: str = Field(..., max_length=1000)
+    agent: str | None = Field(None, max_length=255)
 
 
 class CreateSessionRequest(BaseModel):
-    user_id: str = "anonymous"
+    user_id: str = Field("anonymous", max_length=255)
 
 
 class SessionResponse(BaseModel):
@@ -439,7 +457,7 @@ async def chat_stream(
 
 @app.post("/v1/sessions/{session_id}/approve")
 async def approve_session(
-    session_id: str,
+    session_id: str = Path(..., max_length=100),
     redis_store: RedisSessionStore = Depends(get_redis_store),
     catalog: ToolCatalog = Depends(get_catalog),
     pref_store: RedisPreferenceStore = Depends(get_pref_store),
@@ -474,7 +492,7 @@ async def approve_session(
 
 @app.post("/v1/sessions/{session_id}/reject")
 async def reject_session(
-    session_id: str,
+    session_id: str = Path(..., max_length=100),
     redis_store: RedisSessionStore = Depends(get_redis_store),
     catalog: ToolCatalog = Depends(get_catalog),
     pref_store: RedisPreferenceStore = Depends(get_pref_store),
@@ -508,7 +526,7 @@ async def reject_session(
 
 
 @app.delete("/v1/session/{session_id}")
-async def destroy_session(session_id: str, redis_store: RedisSessionStore = Depends(get_redis_store)):
+async def destroy_session(session_id: str = Path(..., max_length=100), redis_store: RedisSessionStore = Depends(get_redis_store)):
     """
     Clean up a session's workspace (temp + downloads) and optionally destroy it entirely.
     """
@@ -532,7 +550,7 @@ async def destroy_session(session_id: str, redis_store: RedisSessionStore = Depe
 
 
 @app.get("/v1/session/{session_id}/workspace")
-async def get_workspace_info(session_id: str, redis_store: RedisSessionStore = Depends(get_redis_store)):
+async def get_workspace_info(session_id: str = Path(..., max_length=100), redis_store: RedisSessionStore = Depends(get_redis_store)):
     """
     Return workspace usage statistics for a session.
     """
@@ -550,7 +568,7 @@ async def get_workspace_info(session_id: str, redis_store: RedisSessionStore = D
 
 
 @app.get("/v1/session/{session_id}/owner")
-async def get_session_owner(session_id: str, redis_store: RedisSessionStore = Depends(get_redis_store)):
+async def get_session_owner(session_id: str = Path(..., max_length=100), redis_store: RedisSessionStore = Depends(get_redis_store)):
     """
     Return the owner_id for a given session.
     Used by the Gateway to verify session ownership (IDOR prevention).
@@ -585,7 +603,7 @@ async def get_cached_playbooks_json(catalog: ToolCatalog = Depends(get_catalog))
 
 
 @app.get("/v1/playbooks/{playbook_id}")
-async def get_playbook_details(playbook_id: str, request: Request):
+async def get_playbook_details(request: Request, playbook_id: str = Path(..., max_length=255)):
     """
     Call the TriageCore MCP tool 'get_playbook_details' and return the result.
     """
@@ -617,17 +635,17 @@ async def get_playbook_details(playbook_id: str, request: Request):
 
 
 class UpdateSessionRequest(BaseModel):
-    status: str | None = None
-    verdict: str | None = None
+    status: str | None = Field(None, max_length=50)
+    verdict: str | None = Field(None, max_length=50)
 
 
 @app.get("/v1/sessions")
 async def list_sessions(
     response: Response,
-    source: str | None = None,
-    status: str | None = None,
-    owner_id: str | None = None,
-    search: str | None = None,
+    source: str | None = Query(None, max_length=255),
+    status: str | None = Query(None, max_length=255),
+    owner_id: str | None = Query(None, max_length=255),
+    search: str | None = Query(None, max_length=255),
     limit: int = 50,
     offset: int = 0,
 ):
@@ -660,7 +678,7 @@ async def get_session_stats():
 
 
 @app.get("/v1/sessions/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str = Path(..., max_length=100)):
     try:
         session = await postgres_session_repo.get_session(session_id)
         if not session:
@@ -673,7 +691,7 @@ async def get_session(session_id: str):
 
 
 @app.patch("/v1/sessions/{session_id}")
-async def update_session(session_id: str, req: UpdateSessionRequest):
+async def update_session(req: UpdateSessionRequest, session_id: str = Path(..., max_length=100)):
     try:
         session = await postgres_session_repo.get_session(session_id)
         if not session:
@@ -709,7 +727,7 @@ async def update_session(session_id: str, req: UpdateSessionRequest):
 
 
 @app.get("/v1/sessions/{session_id}/events")
-async def get_session_events(session_id: str, limit: int = 100):
+async def get_session_events(session_id: str = Path(..., max_length=100), limit: int = 100):
     try:
         session = await postgres_session_repo.get_session(session_id)
         if not session:
@@ -719,3 +737,317 @@ async def get_session_events(session_id: str, limit: int = 100):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Simulation Endpoints ---
+
+@app.get("/v1/simulations/scenarios")
+async def get_simulations_scenarios():
+    """
+    Get all ingested attack simulation scenarios from the database.
+    """
+    try:
+        pool = await postgres_session_repo.get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch("SELECT * FROM attack_scenarios ORDER BY name ASC")
+            scenarios = []
+            for row in rows:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                if d["created_at"]:
+                    d["created_at"] = d["created_at"].isoformat()
+                scenarios.append(d)
+            return scenarios
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/simulations/scenarios/{scenario_id}/events")
+async def get_simulation_scenario_events(scenario_id: str = Path(..., max_length=100)):
+    """
+    Get the event sequence preview for a scenario.
+    """
+    try:
+        sc_uuid = uuid.UUID(scenario_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid scenario UUID format")
+        
+    try:
+        pool = await postgres_session_repo.get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, sequence_order, correlation_rule, mitre_technique, mitre_tactic 
+                FROM attack_events 
+                WHERE scenario_id = $1 
+                ORDER BY sequence_order ASC
+                """,
+                sc_uuid
+            )
+            events = []
+            for row in rows:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                events.append(d)
+            return events
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/simulations/scenarios/{scenario_id}/activate")
+async def activate_simulation_scenario(scenario_id: str = Path(..., max_length=100)):
+    """
+    Activate a scenario and deactivate all others in a transaction.
+    """
+    try:
+        sc_uuid = uuid.UUID(scenario_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid scenario UUID format")
+        
+    try:
+        pool = await postgres_session_repo.get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # Verify exists
+                row = await conn.fetchrow("SELECT id FROM attack_scenarios WHERE id = $1", sc_uuid)
+                if not row:
+                    raise HTTPException(status_code=404, detail="Scenario not found")
+                    
+                # 1. Reset all to passive
+                await conn.execute("UPDATE attack_scenarios SET status = 'passive'")
+                await conn.execute("UPDATE attack_events SET status = 'passive'")
+                # 2. Activate target scenario
+                await conn.execute("UPDATE attack_scenarios SET status = 'active' WHERE id = $1", sc_uuid)
+                # 3. Activate target events
+                await conn.execute("UPDATE attack_events SET status = 'active' WHERE scenario_id = $1", sc_uuid)
+                
+        return {"status": "success", "message": f"Scenario {scenario_id} activated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/simulations/scenarios/{scenario_id}/run")
+async def run_simulation_scenario(
+    scenario_id: str = Path(..., max_length=100),
+    send_rate_per_sec: float = Query(1.0, ge=0.1, le=10.0),
+    strip_labels: bool = Query(False)
+):
+    """
+    Trigger a simulation run for the target scenario.
+    """
+    try:
+        sc_uuid = uuid.UUID(scenario_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid scenario UUID format")
+        
+    try:
+        pool = await postgres_session_repo.get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT name, total_events FROM attack_scenarios WHERE id = $1", sc_uuid)
+            if not row:
+                raise HTTPException(status_code=404, detail="Scenario not found")
+            scenario_name = row["name"]
+            total_events = row["total_events"]
+            
+        # Trigger using MCP server if connected, or direct background task execution
+        delay = 1.0 / send_rate_per_sec
+        run_id = None
+        
+        # Try using connected MCP session
+        mcp_triggered = False
+        if hasattr(app.state, "attack_simulator_session") and app.state.attack_simulator_session:
+            try:
+                logger.info("Triggering simulation via MCP client...", name=scenario_name, delay=delay, strip_labels=strip_labels)
+                res = await app.state.attack_simulator_session.call_tool(
+                    "trigger_attack_simulation", 
+                    {"scenario_name": scenario_name, "delay_between_events": delay, "strip_labels": strip_labels}
+                )
+                from agentix.tools.mcp_adapter import MCPToolAdapter
+                res_parsed = MCPToolAdapter._parse_result(res)
+                if isinstance(res_parsed, dict):
+                    res_json = res_parsed
+                else:
+                    res_json = json.loads(res_parsed)
+                run_id = res_json.get("run_id")
+                mcp_triggered = True
+                logger.info("Simulation triggered via MCP successfully", run_id=run_id)
+            except Exception as e:
+                logger.warning("Failed to trigger simulation via MCP client, falling back to direct DB/task launch", error=str(e))
+                
+        if not mcp_triggered:
+            # Fallback: direct launch
+            try:
+                from attack_simulator.models import db_repo
+                from attack_simulator.mcp_server import _run_simulation_task
+                
+                run_id = await db_repo.create_run(str(sc_uuid), total_events, send_rate_per_sec)
+                asyncio.create_task(_run_simulation_task(str(sc_uuid), run_id, delay, strip_labels=strip_labels))
+                logger.info("Simulation triggered via direct fallback successfully", run_id=run_id)
+            except Exception as e:
+                logger.critical("Failed to launch simulation directly", error=str(e))
+                raise HTTPException(status_code=500, detail=f"Failed to launch simulation: {str(e)}")
+                
+        return {"status": "success", "run_id": run_id, "message": "Simulation run triggered"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/simulations/runs")
+async def get_simulation_runs(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
+    """
+    Get recent simulation runs.
+    """
+    try:
+        pool = await postgres_session_repo.get_pool()
+        # Evaluate any active runs in real-time
+        try:
+            async with pool.acquire() as conn:
+                active_rows = await conn.fetch("SELECT id FROM simulation_runs WHERE status = 'RUNNING'")
+            if active_rows:
+                from attack_simulator.evaluator.playbook_match import evaluate_run
+                for r in active_rows:
+                    try:
+                        await evaluate_run(str(r["id"]))
+                    except Exception as eval_err:
+                        logger.warning("Failed to evaluate active run in list", run_id=str(r["id"]), error=str(eval_err))
+        except Exception as e:
+            logger.warning("Failed to auto-evaluate active simulation runs", error=str(e))
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT r.*, s.name as scenario_name 
+                FROM simulation_runs r 
+                LEFT JOIN attack_scenarios s ON r.scenario_id = s.id 
+                ORDER BY r.created_at DESC LIMIT $1 OFFSET $2
+                """,
+                limit, offset
+            )
+            runs = []
+            for row in rows:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                if d.get("scenario_id"):
+                    d["scenario_id"] = str(d["scenario_id"])
+                for t_field in ("started_at", "completed_at", "created_at"):
+                    if d.get(t_field):
+                        d[t_field] = d[t_field].isoformat()
+                runs.append(d)
+            return runs
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/simulations/runs/{run_id}/results")
+async def get_simulation_run_results(run_id: str = Path(..., max_length=100)):
+    """
+    Get detailed events/results for a simulation run.
+    """
+    try:
+        run_uuid = uuid.UUID(run_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid run UUID format")
+        
+    try:
+        # Evaluate run first in real-time
+        try:
+            from attack_simulator.evaluator.playbook_match import evaluate_run
+            await evaluate_run(run_id)
+        except Exception as e:
+            logger.warning("Failed to evaluate run before returning results", run_id=run_id, error=str(e))
+
+        pool = await postgres_session_repo.get_pool()
+        async with pool.acquire() as conn:
+            # Check run exists
+            run_row = await conn.fetchrow(
+                """
+                SELECT r.*, s.name as scenario_name
+                FROM simulation_runs r
+                LEFT JOIN attack_scenarios s ON r.scenario_id = s.id
+                WHERE r.id = $1
+                """,
+                run_uuid
+            )
+            if not run_row:
+                raise HTTPException(status_code=404, detail="Simulation run not found")
+                
+            # Get results
+            rows = await conn.fetch(
+                """
+                SELECT res.*, ev.mitre_technique, ev.mitre_tactic, ev.sequence_order, 
+                       COALESCE(ts.alert_payload, ev.wazuh_alert) as wazuh_alert
+                FROM simulation_results res
+                JOIN attack_events ev ON res.event_id = ev.id
+                LEFT JOIN sessions ts ON (CASE WHEN res.session_id IS NOT NULL AND res.session_id <> '' THEN res.session_id::uuid ELSE NULL END) = ts.id
+                WHERE res.run_id = $1
+                ORDER BY ev.sequence_order ASC
+                """,
+                run_uuid
+            )
+            results = []
+            for row in rows:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                d["run_id"] = str(d["run_id"])
+                d["event_id"] = str(d["event_id"])
+                if d.get("created_at"):
+                    d["created_at"] = d["created_at"].isoformat()
+                if isinstance(d.get("wazuh_alert"), str):
+                    try:
+                        d["wazuh_alert"] = json.loads(d["wazuh_alert"])
+                    except Exception:
+                        pass
+                results.append(d)
+                
+            run_dict = dict(run_row)
+            run_dict["id"] = str(run_dict["id"])
+            if run_dict.get("scenario_id"):
+                run_dict["scenario_id"] = str(run_dict["scenario_id"])
+            for t_field in ("started_at", "completed_at", "created_at"):
+                if run_dict.get(t_field):
+                    run_dict[t_field] = run_dict[t_field].isoformat()
+                    
+            return {
+                "run": run_dict,
+                "results": results
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/simulations/stats")
+async def get_simulation_stats():
+    """
+    Get overall simulation precision metrics.
+    """
+    try:
+        pool = await postgres_session_repo.get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT COUNT(*)::int as total_runs,
+                       COALESCE(SUM(matched_playbooks), 0)::int as matched,
+                       COALESCE(SUM(mismatched_playbooks), 0)::int as mismatched,
+                       COALESCE(SUM(no_playbook), 0)::int as no_playbook
+                FROM simulation_runs
+                """
+            )
+            stats = dict(row) if row else {"total_runs": 0, "matched": 0, "mismatched": 0, "no_playbook": 0}
+            
+            # Calculate precision/accuracy rate
+            total_finished = stats["matched"] + stats["mismatched"] + stats["no_playbook"]
+            accuracy = (stats["matched"] / total_finished * 100.0) if total_finished > 0 else 0.0
+            stats["accuracy_rate"] = round(accuracy, 1)
+            return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

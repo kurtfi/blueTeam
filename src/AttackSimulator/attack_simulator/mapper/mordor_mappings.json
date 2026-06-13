@@ -1,0 +1,963 @@
+{
+  "ec2_proxy_s3_exfiltration.zip": {
+    "techniques": [
+      "T1078.004",
+      "T1530"
+    ],
+    "tactics": [
+      "TA0001",
+      "TA0003",
+      "TA0004",
+      "TA0005",
+      "TA0009"
+    ],
+    "title": "AWS Cloud Bank Breach S3",
+    "description": "This dataset represents adversaries abusing a misconfigured EC2 reverse proxy to obtain instance profile keys and eventually exfiltrate files from an S3 bucket."
+  },
+  "sh_arp_cache.zip": {
+    "techniques": [
+      "T1018"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Arp Cache Discovery",
+    "description": "This dataset represents a threat actor using arp to list out the arp cache."
+  },
+  "sh_binary_padding_dd.zip": {
+    "techniques": [
+      "T1027.001"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "DD Binary Padding Hash Change",
+    "description": "This dataset represents a threat actor using dd to add a zero to the binary to change the hash."
+  },
+  "empire_powerview_ldap_ntsecuritydescriptor.zip": {
+    "techniques": [
+      "T1222.001"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Empire Powerview Add-DomainObjectAcl",
+    "description": "This datasets represent adversaries with enough permissions (i.e. domain admin) adding an access control entry (ACE) to the discretionary access control list (DACL) of an Active Directory object (i.e Root Domain). One example could be adversaries modifying the root domain DACL to allow a specific domain user, despite being in no privileged groups and not having local admin rights on the domain controller itself, to use Active Directory replication services and obtain secret domain data (i.e. Other user NTLM Hashes)"
+  },
+  "empire_dcsync_dcerpc_drsuapi_dsgetncchanges.zip": {
+    "techniques": [
+      "T1003.006"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Empire DCSync",
+    "description": "This dataset represents adversaries abusing Active Directory Replication services to retrieve secret domain data (i.e. NTLM hashes) from domain accounts."
+  },
+  "empire_shell_net_localgroup_administrators.zip": {
+    "techniques": [
+      "T1069.001"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Empire Net Local Administrators Group",
+    "description": "This dataset represents adversaries enumerating members of the local Administratrors group via the net.exe utility"
+  },
+  "empire_shell_net_local_users.zip": {
+    "techniques": [
+      "T1087.001"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Empire Net Local Users",
+    "description": "This dataset represents adversaries enumerating all local users on an endpoint"
+  },
+  "empire_shell_samr_enumdomainusers.zip": {
+    "techniques": [
+      "T1087.002"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Empire Net Domain Users",
+    "description": "This dataset represents adversaries enumerating all users that belong to a domain via RPC SAMR EnumDomainUsers."
+  },
+  "empire_persistence_registry_modification_run_keys_standard_user.zip": {
+    "techniques": [
+      "T1547.001"
+    ],
+    "tactics": [
+      "TA0003"
+    ],
+    "title": "Empire Userland Registry Run Keys",
+    "description": "This dataset represents adversaries modifying local Run registry keys (i.e. HKLM:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run) for persistence. It also captures the execution of the persistence mechanism."
+  },
+  "empire_schtasks_creation_standard_user.zip": {
+    "techniques": [
+      "T1053.005"
+    ],
+    "tactics": [
+      "TA0003"
+    ],
+    "title": "Empire Userland Scheduled Tasks",
+    "description": "This dataset represents adversaries creating and/or executing local scheduled tasks to maintain persistence in an environment."
+  },
+  "empire_over_pth_patch_lsass.zip": {
+    "techniques": [
+      "T1550.002"
+    ],
+    "tactics": [
+      "TA0005",
+      "TA0008"
+    ],
+    "title": "Empire Over-Pass-The-Hash",
+    "description": "This dataset represents adversaries taking a hash/key (rc4_hmac, aes256_cts_hmac_sha1, etc.) for a domain-joined user into a fully-fledged Kerberos TGT. In this case, an adversary can write the hash/key into an existing logon session (i.e. a sacrificial logon session) section in the memory content of LSASS and kick off the regular Kerberos authentication process."
+  },
+  "empire_shell_rubeus_asktgt_ptt.zip": {
+    "techniques": [
+      "T1003.003"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Rubeus Userland ASKTGT PTT",
+    "description": "This dataset represents adversaries crafting raw AS-REQ (TGT request) traffic for a specific user and encryption key (/rc4, /aes128, /aes256, or /des) to request TGTs without touching lsass."
+  },
+  "empire_shell_dcerpc_smb_service_dll_hijack.zip": {
+    "techniques": [
+      "T1574.001"
+    ],
+    "tactics": [
+      "TA0003",
+      "TA0004",
+      "TA0005"
+    ],
+    "title": "IKEEXT Remote Service DLL Hijack",
+    "description": "This dataset represents adversaries copying a file remotely to replace a file which is executed by a service that is vulnerable to DLL hijack. This dataset includes"
+  },
+  "empire_launcher_vbs.zip": {
+    "techniques": [
+      "T1059.005"
+    ],
+    "tactics": [
+      "TA0002"
+    ],
+    "title": "Empire VBS Execution",
+    "description": "This dataset represents adversaries executing a VBS script as a launcher for initial access."
+  },
+  "empire_wmi_local_event_subscriptions_elevated_user.zip": {
+    "techniques": [
+      "T1546.003"
+    ],
+    "tactics": [
+      "TA0003",
+      "TA0004"
+    ],
+    "title": "Empire Elevated WMI Eventing",
+    "description": "This dataset represents adversaries leveraging WMI subscriptions locally for persistence."
+  },
+  "empire_psinject_peinjection.zip": {
+    "techniques": [
+      "T1055.003"
+    ],
+    "tactics": [
+      "TA0004",
+      "TA0005"
+    ],
+    "title": "Empire PSInject",
+    "description": "This dataset represents adversaries reflectively loading/intecting a portable executable (PE) (not on disk) into a process via WriteprocessMemory and executed via CreateRemoteThread APIs"
+  },
+  "empire_shell_rpc_samr_smb_group_domain_admins_standard_user.zip": {
+    "techniques": [
+      "T1069.002"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Empire Shell Net Domain Admins",
+    "description": "This dataset represents adversaries enumerating members of domain groups (i.e. Domain Admins) via RPC SAMR interface over SMB. Some of the main RPC methods captured over the network are SamrLookupNamesInDomain (Opnum 17) and SamrQueryInformationGroup (Opnum 20) where there are indicators about the specific group name enumerated."
+  },
+  "empire_wdigest_downgrade.tar.gz": {
+    "techniques": [
+      "T1112"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Empire WDigest Downgrade",
+    "description": "This dataset represents adversaries setting the UseLogonCredential property value from HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest key to 1 to enable plain text passwords."
+  },
+  "empire_mimikatz_logonpasswords.zip": {
+    "techniques": [
+      "T1003.001"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Empire Mimikatz LogonPasswords",
+    "description": "This dataset represents adversaries reading credentials from the memory contents of lsass.exe. One popular tool performing this behavior is Mimikatz."
+  },
+  "empire_enable_rdp.tar.gz": {
+    "techniques": [
+      "T1112"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Empire Enable RDP",
+    "description": "This dataset represents adversaries enabling RDP and adding a firewall exception to a compromised system"
+  },
+  "empire_smbexec_dcerpc_smb_svcctl.zip": {
+    "techniques": [
+      "T1021.002"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Empire Invoke SMBExec",
+    "description": "This dataset represents adversaries remotely creating and starting a service via RPC methods over SMB named pipes such as svcctl."
+  },
+  "empire_psexec_dcerpc_tcp_svcctl.zip": {
+    "techniques": [
+      "T1021"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Empire Invoke PsExec",
+    "description": "This dataset represents adversaries remotely creating and starting a service via RPC methods over TCP."
+  },
+  "empire_dcom_shellwindows_stager.zip": {
+    "techniques": [
+      "T1021.003"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Empire Invoke DCOM ShellWindows",
+    "description": "This dataset represents adversaries executing commands remotely via DCOM ShellWindows COM Method."
+  },
+  "empire_psremoting_stager.zip": {
+    "techniques": [
+      "T1021.006"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Empire Invoke PSRemoting",
+    "description": "This dataset represents adversaries executing malicious code on remote hosts using PowerShell Remoting (WinRM)."
+  },
+  "empire_msbuild_dcerpc_wmi_smb.zip": {
+    "techniques": [
+      "T1047"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Empire Invoke Execute MSBuild",
+    "description": "This dataset represents an adversary remotely creating a file (.xml) via SMB and executing it remotetly via WMI and msbuild. This dataset focuses on the use of the WMI Win32_Process class and method Create to execute code remotely."
+  },
+  "empire_dllinjection_loadlibrary_createremotethread.zip": {
+    "techniques": [
+      "T1055.001"
+    ],
+    "tactics": [
+      "TA0004",
+      "TA0005"
+    ],
+    "title": "Empire Invoke DLLInjection",
+    "description": "This dataset represents a threat actor injecting a Dll (On Disk) into an arbitrary process via LoadLibrary and executd by CreateRemoteThread APIs"
+  },
+  "empire_find_localadmin_smb_svcctl_openscmanager.zip": {
+    "techniques": [
+      "T1069.001"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Empire Find Local Admin Access",
+    "description": "This dataset represents adversaries using the OpenSCManagerW Win32API call to establish a handle to the remote host and verify if the current user context has local administrator acess to the target."
+  },
+  "empire_mimikatz_extract_keys.zip": {
+    "techniques": [
+      "T1003.004"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Empire Mimikatz Extract Kerberos Keys",
+    "description": "This dataset represents adversaries extracting kerberos tickets from memory."
+  },
+  "empire_mimikatz_backupkeys_dcerpc_smb_lsarpc.zip": {
+    "techniques": [
+      "T1003"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Empire Mimikatz Backup Keys",
+    "description": "This dataset represents adversaries retrieving the DPAPI Domain Backup Key from the DC via RPC LSARPC methods over SMB."
+  },
+  "empire_getsession_dcerpc_smb_srvsvc_netsessenum.zip": {
+    "techniques": [
+      "T1049"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Empire Remote Get Session",
+    "description": "This dataset represents adversaries leveraging RPC SRVSVC and the method NetSessEnum over SMB to query remote hosts for active sessions"
+  },
+  "empire_mimikatz_sam_access.zip": {
+    "techniques": [
+      "T1003.002"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Empire Mimikatz SAM Extract Hashes",
+    "description": "This dataset represents adversaries calculating the SysKey to decrypt Security Account Mannager (SAM) database entries (from registry or hive) and get NTLM, and sometimes LM hashes of local accounts password."
+  },
+  "empire_shell_reg_dump_sam.zip": {
+    "techniques": [
+      "T1003.002"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Empire Reg Dump SAM Hive",
+    "description": "This dataset represents adversaries with administrator privileges using the windows reg utility to dump the SAM registry hive."
+  },
+  "rdp_interactive_taskmanager_lsass_dump.zip": {
+    "techniques": [
+      "T1003.001"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "RDP TaskManager LSASS Dump",
+    "description": "This dataset represents adversaries using RDP and task manager interactively and dump the memory space of lsass."
+  },
+  "covenant_installutil.zip": {
+    "techniques": [
+      "T1218.004"
+    ],
+    "tactics": [
+      "TA0005",
+      "TA0002"
+    ],
+    "title": "Covenant ShellCmd InstallUtil",
+    "description": "This dataset represents adversaries proxy executing code through InstallUtil, a trusted Windows utility."
+  },
+  "empire_monologue_netntlm_downgrade.zip": {
+    "techniques": [
+      "T1112"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Empire Invoke InternalMonologue",
+    "description": "This dataset represents adversaries downgrading the challenge/response authentication protocol used for network logons, the minimum security negotiated for applications using NTLMSSP, and security settings that restrict outgoing NTLM traffic to remote servers in an environment"
+  },
+  "msf_record_mic.zip": {
+    "techniques": [
+      "T1123"
+    ],
+    "tactics": [
+      "TA0009"
+    ],
+    "title": "MSF Record Mic",
+    "description": "This dataset represents adversaries accessing the microphone of an endpoint."
+  },
+  "empire_launcher_sct_regsvr32.zip": {
+    "techniques": [
+      "T1218.010"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Empire Regsvr32 Execution",
+    "description": "This dataset represents threat actors leveraging regsvr32 to proxy the execution of an empire payload (.sct file) to create a reverse connection to the C2."
+  },
+  "empire_persistence_registry_modification_run_keys_elevated_user.zip": {
+    "techniques": [
+      "T1547.001"
+    ],
+    "tactics": [
+      "TA0003"
+    ],
+    "title": "Empire Elevated Registry Run Keys",
+    "description": "This dataset represents adversaries modifying local Run registry keys (i.e. HKLM:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run) for persistence. It also captures the execution of the persistence mechanism."
+  },
+  "covenant_wmi_remote_event_subscription_activescripteventconsumers.zip": {
+    "techniques": [
+      "T1047"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Covenant Remote WMI Eventing ActiveScriptEventConsumers",
+    "description": "This dataset represents adversaries using WMI event subscriptions (ActiveScriptEventConsumers) remotely to move laterally."
+  },
+  "covenant_dcsync_dcerpc_drsuapi_dsgetncchanges.zip": {
+    "techniques": [
+      "T1003.006"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Covenant DCSync",
+    "description": "This dataset represents adversaries abusing Active Directory Replication services to retrieve secret domain data (i.e. NTLM hashes) from domain accounts."
+  },
+  "covenant_sc_query_dcerpc_smb_svcctl.zip": {
+    "techniques": [
+      "T1021.002"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Covenant SC.exe Utility Query",
+    "description": "This dataset represents an adversary leveraging the sc.exe utility to query (RPC QueryServiceStatus method) for the statu of a service on a remote endpoint."
+  },
+  "covenant_sharpsc_query_dcerpc_smb_svcctl.zip": {
+    "techniques": [
+      "T1021.002"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Covenant SharpSC Query",
+    "description": "This dataset represents a threat actor leveraging the RPC method EnumServiceStatusW over SMB svcctl to query the status of a service on a remote endpoint.."
+  },
+  "covenant_copy_smb_createrequest.zip": {
+    "techniques": [
+      "T1021.002"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Covenant Remote File Copy",
+    "description": "This dataset represents a threat actor remotely copying a file over SMB (CreateRequest)."
+  },
+  "covenant_sharpsc_create_dcerpc_smb_svcctl.zip": {
+    "techniques": [
+      "T1021.002"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Covenant SharpSC Create",
+    "description": "This dataset represents adversaries remotely creating a service via RPC methods such as CreateService over SMB named pipes such as svcctl."
+  },
+  "covenant_sharpsc_start_dcerpc_smb_svcctl.zip": {
+    "techniques": [
+      "T1021.002"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Covenant SharpSC Start",
+    "description": "This dataset represents adversaries remotely starting a service via RPC methods such as StartService over SMB named pipes such as svcctl."
+  },
+  "covenant_sharpsc_stop_dcerpc_smb_svcctl.zip": {
+    "techniques": [
+      "T1021.002"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Covenant SharpSC Stop Service",
+    "description": "This dataset represents a threat actor using the RPC ControlService method over SMB to stop a service."
+  },
+  "covenant_sharpwmi_create_dcerpc_wmi.zip": {
+    "techniques": [
+      "T1047"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Covenant SharpWMI Exec",
+    "description": "This dataset represents an adversary remotely executing code via WMI. This dataset focuses on the use of the WMI Win32_Process class and method Create to execute code remotely."
+  },
+  "covenant_psremoting_command.zip": {
+    "techniques": [
+      "T1021.006"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Covenant PowerShell Remoting Command",
+    "description": "This dataset represents adversaries executing malicious code on remote hosts using PowerShell Remoting (WinRM)."
+  },
+  "covenant_getdomaingroup_ldap_searchrequest_domain_admins.zip": {
+    "techniques": [
+      "T1069.002"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Covenant GetDomainGroup Domain Admins",
+    "description": "This dataset represents a threat actor enumerating the domain groups via LDAP (i.e. SearchRequest Method) in an environment."
+  },
+  "empire_mimikatz_lsadump_patch.zip": {
+    "techniques": [
+      "T1003.001"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Empire Mimikatz Lsadump LSA Patch",
+    "description": "This dataset represents adversaries reading credentials from the memory contents of lsass.exe. One popular tool performing this behavior is Mimikatz."
+  },
+  "empire_uac_shellapi_fodhelper.zip": {
+    "techniques": [
+      "T1548.002"
+    ],
+    "tactics": [
+      "TA0004"
+    ],
+    "title": "Invoke BypassUAC FodHelper",
+    "description": "This dataset represents adversaries elevating privileges (bypassing uac) by performing an registry modification for FodHelper."
+  },
+  "empire_wmic_add_user_backdoor.zip": {
+    "techniques": [
+      "T1047"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Empire Remote WMIC Add User",
+    "description": "This dataset represents an adversary remotely executing code via WMI to ad a backdoor user on the target system. This dataset focuses on the use of the WMI Win32_Process class and method Create to execute code remotely."
+  },
+  "mimikatz_cve-2020-1472_unauthenticated_netrserverauthenticate2.zip": {
+    "techniques": [
+      "T1210"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Mimikatz Netlogon Unauthenticated NetrServerAuthenticate2",
+    "description": "This dataset represents adversaries leveraging a vulnerability (CVE-2020-1472) in a cryptographic authentication scheme used by the Netlogon Remote Protocol, which among other things can be used to update computer passwords. This vulnerability was discovered by [@@SecuraBV](https://twitter.com/SecuraBV)."
+  },
+  "covenant_dcom_executeexcel4macro_allowed.zip": {
+    "techniques": [
+      "T1021.003"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "DCOM ExecuteExcel4macro",
+    "description": "This dataset represents adversaries leveraging the COM Method ExecuteExcel4Macro over DCOM to execute Excel4 macros remotely"
+  },
+  "covenant_dcom_registerxll.zip": {
+    "techniques": [
+      "T1021.003"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "DCOM RegisterXLL",
+    "description": "This dataset represents adversaries leveraging the COM Method RegisterXLL over DCOM to execute an XLL file remotely. The XLL file can exist on the target or externally in an UNC path such as \\\\SERVER\\FILES\\."
+  },
+  "empire_wmi_dcerpc_wmi_iwbemservices_execmethod.zip": {
+    "techniques": [
+      "T1047"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Empire Invoke WMI",
+    "description": "This dataset represents an adversary remotely executing code via WMI. This dataset focuses on the use of the WMI Win32_Process class and method Create to execute code remotely."
+  },
+  "empire_schtasks_creation_execution_elevated_user.zip": {
+    "techniques": [
+      "T1053.005"
+    ],
+    "tactics": [
+      "TA0003"
+    ],
+    "title": "Empire Elevated Scheduled Tasks",
+    "description": "This dataset represents adversaries creating and/or executing local scheduled tasks to maintain persistence in an environment."
+  },
+  "empire_shell_rubeus_asktgt_createnetonly.zip": {
+    "techniques": [
+      "T1003.003"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Rubeus Elevated ASKTGT CreateNetOnly",
+    "description": "This dataset represents adversaries crafting raw AS-REQ (TGT request) traffic for a specific user and encryption key (/rc4, /aes128, /aes256, or /des) to request TGTs without touching lsass."
+  },
+  "empire_powerdump_sam_access.zip": {
+    "techniques": [
+      "T1003.002"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Empire Powerdump Extract Hashes",
+    "description": "This dataset represents adversaries calculating the SysKey to decrypt Security Account Mannager (SAM) database entries (from registry or hive) and get NTLM, and sometimes LM hashes of local accounts password."
+  },
+  "covenant_wmi_wbemcomn_dll_hijack.zip": {
+    "techniques": [
+      "T1047"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0008"
+    ],
+    "title": "Covenant Remote WMI Wbemcomn DLL Hijacking",
+    "description": "This dataset represents adversaries abusing a DLL hijack vulnerability found in the execution of the WMI provider host (wmiprvse.exe) for lateral movement."
+  },
+  "covenant_dcom_iertutil_dll_hijack.zip": {
+    "techniques": [
+      "T1021.003"
+    ],
+    "tactics": [
+      "TA0008"
+    ],
+    "title": "Covenant Remote DCOM Iertutil DLL Hijacking",
+    "description": "This dataset represents adversaries abusing a DLL hijack vulnerability found in the execution of the DCOM InternetExplorer.Application class for lateral movement."
+  },
+  "covenant_lolbin_wuauclt_createremotethread.zip": {
+    "techniques": [
+      "T1218"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Covenant Wuauclt CreateRemoteThread Execution",
+    "description": "This dataset represents adversaries proxy executing code via the Windows Update client utility. In order to bypass rules looking for the binary reaching out directly to the Internet, this dataset shows the binary creating and running a thread in the virtual address space of another process via the CreateRemoteThread API."
+  },
+  "wmic_remote_xsl_jscript.zip": {
+    "techniques": [
+      "T1220"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "WMIC Remote XSL Jscript Execution",
+    "description": "This dataset represents adversaries proxy executing code and bypassing application controls by leveraging wmic and the `/FORMAT` argument switch to download and execute an XSL file (jscript)."
+  },
+  "psh_lsass_memory_dump_comsvcs.zip": {
+    "techniques": [
+      "T1003.001"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Lsass Memory Dump via Comsvcs.dll",
+    "description": "This dataset represents adversaries leveraging the MiniDump export function from comsvcs.dll via rundll32 to perform a memory dump from lsass."
+  },
+  "cmd_lsass_memory_dumpert_syscalls.zip": {
+    "techniques": [
+      "T1003.001"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Lsass Memory Dump via Syscalls",
+    "description": "This dataset represents adversaries using system calls (syscalls) and API unhooking to dump the memoty contents of lsass."
+  },
+  "cmd_sam_copy_esentutl.zip": {
+    "techniques": [
+      "T1003.002"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "SAM Copy via Esentutl VSS",
+    "description": "This dataset represents adversaries copying the SAM hive using the esentutl.exe utility and volume shadow copy services."
+  },
+  "cmd_psexec_lsa_secrets_dump.zip": {
+    "techniques": [
+      "T1003.004"
+    ],
+    "tactics": [
+      "TA0006"
+    ],
+    "title": "Psexec Reg LSA Secrets Dump",
+    "description": "This dataset represents adversaries using psexec to run reg.exe as system and dump LSA secrets. Location HKLM\\security\\policy\\secrets."
+  },
+  "cmd_userinitmprlogonscript_batch.zip": {
+    "techniques": [
+      "T1037.001"
+    ],
+    "tactics": [
+      "TA0003"
+    ],
+    "title": "Logon Scripts via UserInitMprLogonScript",
+    "description": "This dataset represents adversaries leveraging logon initialization scripts to achieve persistence via the UserInitMprLogonScript user environment."
+  },
+  "psh_mavinject_dll_notepad.zip": {
+    "techniques": [
+      "T1055"
+    ],
+    "tactics": [
+      "TA0004",
+      "TA0005"
+    ],
+    "title": "Mavinject Process DLL Injection",
+    "description": "This dataset represents adversaries leveraging"
+  },
+  "psh_input_capture_promptforcreds.zip": {
+    "techniques": [
+      "T1056.002"
+    ],
+    "tactics": [
+      "TA0006",
+      "TA0009"
+    ],
+    "title": "UI Prompt For Credentials Function",
+    "description": "This dataset represents adversaries leveraging functions such as CredUIPromptForCredentials to create and display a configurable dialog box that accepts credentials information from a user."
+  },
+  "cmd_netsh_fw_mod_open_ports.zip": {
+    "techniques": [
+      "T1562.004"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Netsh Open FW Proxy Ports",
+    "description": "This dataset represents adversaries modifying the local FW by opening port for proxy."
+  },
+  "cmd_service_mod_fax.zip": {
+    "techniques": [
+      "T1543.003"
+    ],
+    "tactics": [
+      "TA0003",
+      "TA0004"
+    ],
+    "title": "Service Modification Fax",
+    "description": "This dataset represents adversaries modifying a local service to execute powershell."
+  },
+  "cmd_discover_iexplorer_version_registry.zip": {
+    "techniques": [
+      "T1518"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Internet Explorer Version Discovery",
+    "description": "This dataset represents threat actors querying HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Internet Explorer to get the version of internet explorer installed on the system."
+  },
+  "psh_hh_local_html_payload.zip": {
+    "techniques": [
+      "T1218.001"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "HH Execution of Local Compiled HTML Payload",
+    "description": "This dataset represents threat actors executing local compiled HTML Help payloads via hh.exe."
+  },
+  "psh_control_panel_execution.zip": {
+    "techniques": [
+      "T1218.002"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Control Panel Execution",
+    "description": "This dataset represents threat actors leveraging control.exe to execute a .cpl file to proxy execute another payload (i.e. calc)."
+  },
+  "psh_cmstp_execution_bypassuac.zip": {
+    "techniques": [
+      "T1218.003"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "CMSTP Proxy Execution",
+    "description": "This dataset represents threat actors leveraging CMSTP to execute an Inf file to proxy execute other malicious commands (i.e. cmd.exe). (Embedding commands in the RunPreSetupCommandsSection of the INF file)."
+  },
+  "cmd_mshta_javascript_getobject_sct.zip": {
+    "techniques": [
+      "T1218.005"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Mshta Javascript GetObject Sct",
+    "description": "This dataset represents threat actors leveraging mshta.exe to proxy execute malicious .sct files via Javascript."
+  },
+  "cmd_mshta_vbscript_execute_psh.zip": {
+    "techniques": [
+      "T1218.005"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Mshta VBScript Execute PowerShell",
+    "description": "This dataset represents threat actors leveraging mshta.exe to proxy execute malicious powershell commands via vbscript."
+  },
+  "psh_mshta_html_application_execution.zip": {
+    "techniques": [
+      "T1218.005"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Mshta HTML Application (HTA) Execution",
+    "description": "This dataset represents threat actors leveraging mshta.exe to proxy execute malicious commands via an .hta file."
+  },
+  "purplesharp_ad_playbook_i.zip": {
+    "techniques": [
+      "T1110.003",
+      "T1135",
+      "T1021.006",
+      "T1558.003"
+    ],
+    "tactics": [
+      "TA0006",
+      "TA0007",
+      "TA0008"
+    ],
+    "title": "PurpleSharp Active Directory Playbook I",
+    "description": "This dataset represents threat actors performing a few techniques in Active Directory to brute force passwords, request Kerberos ticket-granting service (TGS) service tickets from all SPNs, test access to remote network shares, and move laterally over Windows Remote Management (WinRM)."
+  },
+  "psh_register_cimprovider_execute_dll.zip": {
+    "techniques": [
+      "T1218"
+    ],
+    "tactics": [
+      "TA0005"
+    ],
+    "title": "Register-CimProvider Execute Dll",
+    "description": "This dataset represents threat actors leveraging Register-Cimprovider to execute a malicious Dll."
+  },
+  "cmd_bitsadmin_download_psh_script.zip": {
+    "techniques": [
+      "T1197"
+    ],
+    "tactics": [
+      "TA0003",
+      "TA0005"
+    ],
+    "title": "Bitsadmin Download Malicious File",
+    "description": "This dataset represents threat actors leveraging bitsadmin.exe to download a file."
+  },
+  "purplesharp_pe_injection_createremotethread.zip": {
+    "techniques": [
+      "T1055.002"
+    ],
+    "tactics": [
+      "TA0004",
+      "TA0005"
+    ],
+    "title": "PurpleSharp PE Injection CreateRemoteThread",
+    "description": "This dataset represents threat actors injecting portable executables (PE) into processes via APIs such asVirtualAllocEx and WriteProcessMemory and running it on the virtual address space of another process via the CreateRemoteThread API."
+  },
+  "cmd_process_herpaderping_snippingtool.zip": {
+    "techniques": [
+      "T1055"
+    ],
+    "tactics": [
+      "TA0004",
+      "TA0005"
+    ],
+    "title": "Process Herpaderping Mimikatz",
+    "description": "This dataset represents the execution of a Process Herpaderping to obscure the intentions of a process by modifying the content on disk after the image has been mapped."
+  },
+  "psh_windows_vault_web_credentials.zip": {
+    "techniques": [
+      "T1055"
+    ],
+    "tactics": [
+      "TA0004",
+      "TA0005"
+    ],
+    "title": "Windows Vault Web Credentials",
+    "description": "This dataset represents threat actors accessing the Windows Vault and reading web credentials saved."
+  },
+  "psh_python_webserver.zip": {
+    "techniques": [
+      "T1059"
+    ],
+    "tactics": [
+      "TA0002"
+    ],
+    "title": "Python HTTP Server",
+    "description": "This dataset represents threat actors adding a FW inbound rule and starting a Python HTTP Server."
+  },
+  "cmd_sharpview_pcre_net.zip": {
+    "techniques": [
+      "T1059"
+    ],
+    "tactics": [
+      "TA0002"
+    ],
+    "title": "SharpView PCRE.NET",
+    "description": "This dataset represents a threat actor leveraging SharpView and specific functions such as Get-ObjectAcl creating files and loading dlls related to PCRE.NET use."
+  },
+  "psh_powershell_httplistener.zip": {
+    "techniques": [
+      "T1059.001"
+    ],
+    "tactics": [
+      "TA0002"
+    ],
+    "title": "PowerShell HTTP Listener",
+    "description": "This dataset represents a threat actor using PowerShell to start an HTTP Listener on a compromised endpoint"
+  },
+  "cmd_seatbelt_group_user.zip": {
+    "techniques": [
+      "T1012"
+    ],
+    "tactics": [
+      "TA0007"
+    ],
+    "title": "Seatbelt Group User Discovery",
+    "description": "This dataset represents a threat actor using Seatbelt profiling an endpoint. This specifically uses the -group=user command."
+  },
+  "schtask_create.zip": {
+    "techniques": [
+      "T1053.005"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0003",
+      "TA0004",
+      "TA0008"
+    ],
+    "title": "Remote Scheduled Task Creation",
+    "description": "This dataset represents a threat actor creating a scheduled task remotely using schtasks."
+  },
+  "schtask_modification.zip": {
+    "techniques": [
+      "T1053.005"
+    ],
+    "tactics": [
+      "TA0002",
+      "TA0003",
+      "TA0004",
+      "TA0008"
+    ],
+    "title": "Remote Scheduled Task Modification",
+    "description": "This dataset represents a threat actor modifying a scheduled task remotely."
+  },
+  "proxylogon_ssrf_rce_poc.zip": {
+    "techniques": [
+      "T1505.003"
+    ],
+    "tactics": [
+      "TA0003",
+      "TA0002"
+    ],
+    "title": "Exchange ProxyLogon SSRF RCE Vuln POC",
+    "description": "This dataset represents the execution of a public POC to abuse Exchange vulnerabilities (CVE-2021-26855 server-side request forgery (SSRF) vulnerability)"
+  }
+}

@@ -354,3 +354,113 @@ async def reject_session(session_id: str) -> dict:
         except Exception as e:
             logger.error("gateway.agentix_client.reject_session_failed", session_id=session_id, error=str(e))
             raise
+
+
+# --- Simulations Client Proxy Functions ---
+
+async def list_sim_scenarios() -> list[dict]:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/simulations/scenarios",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.list_sim_scenarios_failed", error=str(e))
+            raise
+
+
+async def get_sim_scenario_events(scenario_id: str) -> list[dict]:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/simulations/scenarios/{scenario_id}/events",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_sim_scenario_events_failed", scenario_id=scenario_id, error=str(e))
+            raise
+
+
+async def activate_sim_scenario(scenario_id: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{AGENTIX_API_URL}/v1/simulations/scenarios/{scenario_id}/activate",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.activate_sim_scenario_failed", scenario_id=scenario_id, error=str(e))
+            raise
+
+
+async def run_sim_scenario(scenario_id: str, rate: float, strip_labels: bool = False) -> dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{AGENTIX_API_URL}/v1/simulations/scenarios/{scenario_id}/run",
+                params={"send_rate_per_sec": rate, "strip_labels": strip_labels},
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.run_sim_scenario_failed", scenario_id=scenario_id, rate=rate, strip_labels=strip_labels, error=str(e))
+            raise
+
+
+async def list_sim_runs(limit: int = 20, offset: int = 0) -> list[dict]:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/simulations/runs",
+                params={"limit": limit, "offset": offset},
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.list_sim_runs_failed", error=str(e))
+            raise
+
+
+async def get_sim_run_results(run_id: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/simulations/runs/{run_id}/results",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_sim_run_results_failed", run_id=run_id, error=str(e))
+            raise
+
+
+async def get_sim_stats() -> dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/simulations/stats",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_sim_stats_failed", error=str(e))
+            raise
+

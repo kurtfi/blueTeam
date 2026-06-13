@@ -85,6 +85,9 @@ async def handle_siem_alert(
         or payload.get("rule", {}).get("id")
         or payload.get("all_fields", {}).get("rule", {}).get("id")
     )
+    if rule_id:
+        rule_id = str(rule_id)[:255]
+
     rule_desc = (
         payload.get("title")
         or payload.get("rule_description")
@@ -92,6 +95,8 @@ async def handle_siem_alert(
         or payload.get("all_fields", {}).get("rule", {}).get("description")
         or "Unknown SIEM Alert"
     )
+    rule_desc = str(rule_desc)[:1000]
+
     severity_val = (
         payload.get("severity")
         or payload.get("rule", {}).get("level")
@@ -109,6 +114,9 @@ async def handle_siem_alert(
         or payload.get("all_fields", {}).get("data", {}).get("srcip")
         or payload.get("all_fields", {}).get("syslog_headers", {}).get("from")
     )
+    if src_ip:
+        src_ip = str(src_ip)[:255]
+
     mitre_ids = (
         payload.get("mitre_ids")
         or payload.get("rule", {}).get("mitre", {}).get("id")
@@ -126,6 +134,7 @@ async def handle_siem_alert(
         display_name = f"{prefix}{rule_desc} from {src_ip} — {timestamp_str}"
     else:
         display_name = f"{prefix}{rule_desc} — {timestamp_str}"
+    display_name = display_name[:255]
 
     # Create persistent session in PostgreSQL
     try:
@@ -135,7 +144,7 @@ async def handle_siem_alert(
             source="SIEM",
             owner_id="siem",
             agent_name="soc_analyst",
-            siem_rule_id=str(rule_id) if rule_id else None,
+            siem_rule_id=rule_id,
             siem_rule_desc=rule_desc,
             siem_severity=severity,
             source_ip=src_ip,
@@ -147,7 +156,7 @@ async def handle_siem_alert(
             session_id=session_id,
             event_type="system",
             actor="siem",
-            content=f"Triage workflow initiated for alert: {rule_desc}",
+            content=f"Triage workflow initiated for alert: {rule_desc}"[:1000],
         )
     except Exception as e:
         logger.critical(

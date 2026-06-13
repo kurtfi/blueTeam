@@ -212,3 +212,91 @@ async def get_playbook_details_endpoint(
         return await get_playbook_details(playbook_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Simulation Proxy Endpoints ---
+
+@router.get("/simulations/scenarios", summary="List all attack simulation scenarios")
+async def web_list_scenarios(
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> list[dict[str, Any]]:
+    from gateway.services.agentix_client import list_sim_scenarios
+    try:
+        return await list_sim_scenarios()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/simulations/scenarios/{scenario_id}/events", summary="Get events sequence for a scenario")
+async def web_get_scenario_events(
+    scenario_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> list[dict[str, Any]]:
+    from gateway.services.agentix_client import get_sim_scenario_events
+    try:
+        return await get_sim_scenario_events(scenario_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/simulations/scenarios/{scenario_id}/activate", summary="Activate an attack simulation scenario")
+async def web_activate_scenario(
+    scenario_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
+    from gateway.services.agentix_client import activate_sim_scenario
+    try:
+        return await activate_sim_scenario(scenario_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/simulations/scenarios/{scenario_id}/run", summary="Trigger a simulation run for a scenario")
+async def web_run_scenario(
+    scenario_id: str,
+    rate: float = 1.0,
+    strip_labels: bool = False,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
+    from gateway.services.agentix_client import run_sim_scenario
+    try:
+        return await run_sim_scenario(scenario_id, rate, strip_labels)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/simulations/runs", summary="List recent simulation runs")
+async def web_list_runs(
+    limit: int = 20,
+    offset: int = 0,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> list[dict[str, Any]]:
+    from gateway.services.agentix_client import list_sim_runs
+    try:
+        return await list_sim_runs(limit, offset)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/simulations/runs/{run_id}/results", summary="Get results for a simulation run")
+async def web_run_results(
+    run_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
+    from gateway.services.agentix_client import get_sim_run_results
+    try:
+        return await get_sim_run_results(run_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/simulations/stats", summary="Get overall simulation precision stats")
+async def web_sim_stats(
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
+    from gateway.services.agentix_client import get_sim_stats
+    try:
+        return await get_sim_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

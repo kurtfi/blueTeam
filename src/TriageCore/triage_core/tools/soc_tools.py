@@ -7,6 +7,12 @@ from triage_core.tools import mcp
 
 logger = structlog.get_logger(__name__)
 
+
+def _validate_len(val: str | None, max_len: int, name: str) -> None:
+    if val and len(val) > max_len:
+        raise ValueError(f"Input '{name}' exceeds maximum length of {max_len} characters.")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Playbook Tools
 # ─────────────────────────────────────────────────────────────────────────────
@@ -31,6 +37,12 @@ async def trigger_playbook(
     - ``case_template``: TheHive case template name (if configured).
     - ``soar_workflow_id``: SOAR workflow to trigger (if configured).
     """
+    _validate_len(playbook_id, 255, "playbook_id")
+    _validate_len(agent_id, 255, "agent_id")
+    _validate_len(agent_name, 255, "agent_name")
+    _validate_len(src_ip, 255, "src_ip")
+    _validate_len(rule_id, 255, "rule_id")
+
     logger.info(
         "tool.trigger_playbook",
         playbook_id=playbook_id,
@@ -87,6 +99,8 @@ async def trigger_playbook(
 @mcp.tool()
 async def list_playbooks(filter_mitre: str = "", filter_severity: str = "") -> str:
     """Lists all registered SOC playbooks."""
+    _validate_len(filter_mitre, 255, "filter_mitre")
+    _validate_len(filter_severity, 255, "filter_severity")
     logger.info("tool.list_playbooks", filter_mitre=filter_mitre, filter_severity=filter_severity)
     try:
         from triage_core.playbooks import registry as pb_registry
@@ -134,6 +148,7 @@ async def list_playbooks_json() -> str:
 @mcp.tool()
 async def get_playbook_details(playbook_id: str) -> str:
     """Gets the detailed steps and description of a registered SOC playbook by its ID (as a JSON string)."""
+    _validate_len(playbook_id, 255, "playbook_id")
     logger.info("tool.get_playbook_details", playbook_id=playbook_id)
     try:
         from triage_core.playbooks import registry as pb_registry
@@ -179,6 +194,10 @@ async def find_playbook_for_alert(
     mitre_ids: list[str] | None = None,
 ) -> str:
     """Finds the most suitable playbook for a given rule ID or MITRE technique IDs."""
+    _validate_len(rule_id, 255, "rule_id")
+    if mitre_ids:
+        for idx, mid in enumerate(mitre_ids):
+            _validate_len(mid, 255, f"mitre_ids[{idx}]")
     logger.info("tool.find_playbook_for_alert", rule_id=rule_id, mitre_ids=mitre_ids)
     try:
         from triage_core.playbooks import registry as pb_registry
@@ -212,6 +231,11 @@ async def create_case(title: str = "", description: str = "", severity: int = 2,
     Returns a message containing 'Case ID: <id>' on success.
     IMPORTANT: Save the returned Case ID (e.g. ~12345) — you will need it for add_case_note and update_case_status.
     """
+    _validate_len(title, 255, "title")
+    _validate_len(description, 1000, "description")
+    if tags:
+        for idx, tag in enumerate(tags):
+            _validate_len(tag, 255, f"tags[{idx}]")
     provider = registry.get_case_management_provider()
     return await provider.create_case(title, description, severity, tags)
 
@@ -222,6 +246,9 @@ async def add_case_note(case_id: str, note: str, task_title: str = "Investigatio
     IMPORTANT: You MUST first create a case using 'create_case' and use the exact Case ID returned (e.g. ~12345).
     Do NOT use 'N/A', 'UNKNOWN', or any placeholder — only the real Case ID from create_case output.
     """
+    _validate_len(case_id, 255, "case_id")
+    _validate_len(note, 1000, "note")
+    _validate_len(task_title, 255, "task_title")
     provider = registry.get_case_management_provider()
     return await provider.add_case_note(case_id, note, task_title)
 
@@ -237,6 +264,10 @@ async def update_case_status(
     'InProgress' for ongoing investigation, 'Indeterminate' when uncertain.
     The resolution_type is used as a hint when status maps to a resolution (e.g. 'FalsePositive', 'TruePositive').
     """
+    _validate_len(case_id, 255, "case_id")
+    _validate_len(status, 255, "status")
+    _validate_len(resolution_type, 255, "resolution_type")
+    _validate_len(summary, 1000, "summary")
     provider = registry.get_case_management_provider()
     return await provider.update_case_status(case_id, status, resolution_type, summary)
 
@@ -252,6 +283,13 @@ async def create_alert(
     observables: list[dict[str, Any]] | None = None,
 ) -> str:
     """Creates an alert for triage in the Case Management system."""
+    _validate_len(title, 255, "title")
+    _validate_len(description, 1000, "description")
+    _validate_len(source, 255, "source")
+    _validate_len(source_ref, 255, "source_ref")
+    if tags:
+        for idx, tag in enumerate(tags):
+            _validate_len(tag, 255, f"tags[{idx}]")
     provider = registry.get_case_management_provider()
     return await provider.create_alert(title, description, source, source_ref, severity, tags, observables)
 
@@ -264,6 +302,7 @@ async def create_alert(
 @mcp.tool()
 async def get_ip_reputation(ip_address: str) -> str:
     """Queries IP address reputation."""
+    _validate_len(ip_address, 255, "ip_address")
     provider = registry.get_enrichment_provider()
     return await provider.get_ip_reputation(ip_address)
 
@@ -271,6 +310,7 @@ async def get_ip_reputation(ip_address: str) -> str:
 @mcp.tool()
 async def get_file_reputation(file_hash: str) -> str:
     """Queries file hash reputation."""
+    _validate_len(file_hash, 255, "file_hash")
     provider = registry.get_enrichment_provider()
     return await provider.get_file_reputation(file_hash)
 
@@ -278,6 +318,7 @@ async def get_file_reputation(file_hash: str) -> str:
 @mcp.tool()
 async def get_domain_url_reputation(url_or_domain: str) -> str:
     """Queries domain or URL reputation."""
+    _validate_len(url_or_domain, 1000, "url_or_domain")
     provider = registry.get_enrichment_provider()
     return await provider.get_domain_url_reputation(url_or_domain)
 
@@ -290,6 +331,7 @@ async def get_domain_url_reputation(url_or_domain: str) -> str:
 @mcp.tool()
 async def get_ad_user_info(username: str) -> str:
     """Fetches user information via IAM/AD."""
+    _validate_len(username, 255, "username")
     provider = registry.get_iam_provider()
     return await provider.get_user_info(username)
 
@@ -297,6 +339,7 @@ async def get_ad_user_info(username: str) -> str:
 @mcp.tool()
 async def disable_user_account(username: str) -> str:
     """Disables a compromised user account."""
+    _validate_len(username, 255, "username")
     provider = registry.get_iam_provider()
     return await provider.disable_user_account(username)
 
@@ -309,6 +352,8 @@ async def disable_user_account(username: str) -> str:
 @mcp.tool()
 async def query_siem_logs(query: str, time_range: str = "last 1 hour") -> str:
     """Fetches logs by running a query on the SIEM."""
+    _validate_len(query, 1000, "query")
+    _validate_len(time_range, 255, "time_range")
     provider = registry.get_siem_provider()
     return await provider.query_logs(query, time_range)
 
@@ -321,6 +366,7 @@ async def query_siem_logs(query: str, time_range: str = "last 1 hour") -> str:
 @mcp.tool()
 async def get_endpoint_info(agent_id: str) -> str:
     """Fetches endpoint information (hostname, IP, OS)."""
+    _validate_len(agent_id, 255, "agent_id")
     provider = registry.get_endpoint_provider()
     return await provider.get_endpoint_info(agent_id)
 
@@ -328,6 +374,7 @@ async def get_endpoint_info(agent_id: str) -> str:
 @mcp.tool()
 async def isolate_endpoint(agent_id: str) -> str:
     """Isolates the endpoint from the network after detecting malicious activity."""
+    _validate_len(agent_id, 255, "agent_id")
     provider = registry.get_endpoint_provider()
     return await provider.isolate_endpoint(agent_id)
 
@@ -335,6 +382,7 @@ async def isolate_endpoint(agent_id: str) -> str:
 @mcp.tool()
 async def block_ip(ip_address: str) -> str:
     """Blocks malicious IP on the firewall."""
+    _validate_len(ip_address, 255, "ip_address")
     provider = registry.get_firewall_provider()
     return await provider.block_ip(ip_address)
 
@@ -347,5 +395,7 @@ async def block_ip(ip_address: str) -> str:
 @mcp.tool()
 async def trigger_soar_workflow(workflow_id: str, data: dict[str, Any] | None = None, webhook_url: str = "") -> str:
     """Triggers a workflow on SOAR."""
+    _validate_len(workflow_id, 255, "workflow_id")
+    _validate_len(webhook_url, 1000, "webhook_url")
     provider = registry.get_soar_provider()
     return await provider.trigger_workflow(workflow_id, data, webhook_url)

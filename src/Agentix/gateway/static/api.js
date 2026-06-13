@@ -116,3 +116,54 @@ export async function startChatStream(sessionId, message, agent) {
     if (!response.ok) throw new Error(`Chat API error: ${response.status}`);
     return response;
 }
+
+// --- Simulations API Methods ---
+
+export async function getSimScenarios() {
+    const response = await fetch('/web/simulations/scenarios');
+    if (!response.ok) throw new Error('Failed to fetch simulation scenarios');
+    return response.json();
+}
+
+export async function getSimScenarioEvents(scenarioId) {
+    const response = await fetch(`/web/simulations/scenarios/${scenarioId}/events`);
+    if (!response.ok) throw new Error('Failed to fetch scenario events');
+    return response.json();
+}
+
+export async function activateSimScenario(scenarioId) {
+    const response = await fetch(`/web/simulations/scenarios/${scenarioId}/activate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Failed to activate scenario');
+    return response.json();
+}
+
+export async function runSimScenario(scenarioId, rate, stripLabels = false) {
+    const response = await fetch(`/web/simulations/scenarios/${scenarioId}/run?rate=${rate}&strip_labels=${stripLabels}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Failed to trigger simulation run');
+    return response.json();
+}
+
+export async function getSimRuns({ limit = 20, offset = 0 } = {}) {
+    const response = await fetch(`/web/simulations/runs?limit=${limit}&offset=${offset}`);
+    if (!response.ok) throw new Error('Failed to fetch simulation runs');
+    return response.json();
+}
+
+export async function getSimRunResults(runId) {
+    const response = await fetch(`/web/simulations/runs/${runId}/results`);
+    if (!response.ok) throw new Error(`Failed to fetch simulation run results: ${response.status}`);
+    return response.json();
+}
+
+export async function getSimStats() {
+    const response = await fetch('/web/simulations/stats');
+    if (!response.ok) throw new Error('Failed to fetch simulation statistics');
+    return response.json();
+}
+

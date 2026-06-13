@@ -1,5 +1,5 @@
 [tool.uv]
-workspace = { members = ["src/Agentix", "src/TriageCore", "src/AgenticCommon"] }
+workspace = { members = ["src/Agentix", "src/TriageCore", "src/AgenticCommon", "src/AttackSimulator"] }
 
 [dependency-groups]
 dev = [

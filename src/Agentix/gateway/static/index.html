@@ -82,6 +82,7 @@
                 <a href="#" id="nav-hitl" class="nav-item"><i class="fa-solid fa-clipboard-question" aria-hidden="true"></i> HITL Queue <span id="hitl-badge-count" class="badge badge-error hide hitl-badge-count">0</span></a>
                 <a href="#" id="nav-personas" class="nav-item"><i class="fa-solid fa-circle-nodes" aria-hidden="true"></i> Agent Personas</a>
                 <a href="#" id="nav-playbooks" class="nav-item"><i class="fa-solid fa-file-shield" aria-hidden="true"></i> Playbooks</a>
+                <a href="#" id="nav-simulations" class="nav-item"><i class="fa-solid fa-crosshairs" aria-hidden="true"></i> Simulations</a>
                 <a href="#" id="nav-settings" class="nav-item"><i class="fa-solid fa-gear" aria-hidden="true"></i> System Settings</a>
             </nav>
 
@@ -516,6 +517,158 @@
                     </form>
                 </div>
             </div>
+
+            <!-- PANEL 8: ATTACK SIMULATIONS VIEW -->
+            <div id="panel-simulations" class="hide flex-col full-height-panel scrollable">
+                
+                <!-- Top Metrics Row -->
+                <div class="simulations-top-metrics">
+                    <!-- Metric Card 2: BATCH RUN CONTROLLER -->
+                    <div class="glass-panel flex-col" style="padding: 16px; justify-content: space-between;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                            <span class="status-label" style="font-size: 10px; color: var(--text-muted);">BATCH RUN CONTROLLER</span>
+                            <button type="button" id="sim-clear-selection-btn" class="btn btn-secondary" style="padding: 2px 6px; font-size: 9px; line-height: 1.2;">Clear Selection</button>
+                        </div>
+                        <div style="margin: 8px 0;">
+                            <div id="sim-batch-selection-summary" style="font-size: 12px; color: var(--text-muted); line-height: 1.4; min-height: 36px; display: flex; align-items: center;">
+                                No scenarios selected. Select multiple scenarios in the catalog below.
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                            <label style="font-size: 11px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none;">
+                                <input type="checkbox" id="sim-strip-labels" style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--primary);">
+                                <span>Anonymize Alerts (Strip MITRE & Rule IDs)</span>
+                            </label>
+                        </div>
+                        <div style="display: flex; gap: 16px; align-items: center; justify-content: space-between; margin-top: auto; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px;">
+                            <div style="width: 130px;">
+                                <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 4px; font-family: var(--font-mono)">RATE (EVENTS/SEC)</label>
+                                <div class="rate-controller">
+                                    <button type="button" id="sim-rate-minus" class="rate-btn">-</button>
+                                    <input type="text" id="sim-rate-input" class="rate-input" value="1.0" readonly>
+                                    <button type="button" id="sim-rate-plus" class="rate-btn">+</button>
+                                </div>
+                            </div>
+                            <button type="button" id="sim-trigger-btn" class="btn btn-primary" style="flex-grow: 1; height: 32px;" disabled>
+                                <i class="fa-solid fa-play" aria-hidden="true"></i>
+                                <span id="sim-trigger-btn-text">TRIGGER BATCH RUN (0)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Metric Card 3: Playbook Accuracy -->
+                    <div class="glass-panel" style="padding: 16px; display: flex; align-items: center; gap: 16px;">
+                        <div class="sim-gauge-container">
+                            <div class="sim-gauge-circle">
+                                <svg width="70" height="70" viewBox="0 0 100 100" style="transform: rotate(-90deg);">
+                                    <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8" />
+                                    <circle id="sim-gauge-progress" cx="50" cy="50" r="40" fill="none" stroke="var(--primary)" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="251.2" style="transition: stroke-dashoffset 0.5s ease;" />
+                                </svg>
+                                <div id="sim-accuracy-val" class="sim-gauge-text">0.0%</div>
+                            </div>
+                        </div>
+                        <div style="flex-grow: 1;">
+                            <span class="status-label" style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 6px;">PLAYBOOK ACCURACY</span>
+                            <div class="sim-metrics-grid">
+                                <div class="sim-metric-card">
+                                    <div class="label">Runs</div>
+                                    <div id="sim-stat-runs" class="value">0</div>
+                                </div>
+                                <div class="sim-metric-card" style="border-color: rgba(34, 197, 94, 0.2)">
+                                    <div class="label" style="color: var(--secondary)">Match</div>
+                                    <div id="sim-stat-matched" class="value" style="color: var(--secondary)">0</div>
+                                </div>
+                                <div class="sim-metric-card" style="border-color: rgba(239, 68, 68, 0.2)">
+                                    <div class="label" style="color: var(--error)">Wrong</div>
+                                    <div id="sim-stat-mismatched" class="value" style="color: var(--error)">0</div>
+                                </div>
+                                <div class="sim-metric-card" style="border-color: rgba(245, 158, 11, 0.2)">
+                                    <div class="label" style="color: var(--warning)">NoBook</div>
+                                    <div id="sim-stat-nobook" class="value" style="color: var(--warning)">0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Grid Split -->
+                <div class="simulations-layout">
+                    <!-- Left: Scenario Catalog -->
+                    <div class="glass-panel simulations-left-panel">
+                        <div class="panel-header">
+                            <h3><i class="fa-solid fa-folder-open text-cyan" aria-hidden="true"></i> SCENARIO CATALOG</h3>
+                        </div>
+                        <div id="sim-scenario-list" class="sim-scenario-list scrollable">
+                            <div class="tree-empty">Loading scenarios...</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Simulation Runs & Detailed Event Audits -->
+                    <div class="simulations-right-panel">
+                        <!-- Top: Runs Table -->
+                        <div class="glass-panel simulations-runs-list">
+                            <div class="panel-header">
+                                <h3><i class="fa-solid fa-clock-rotate-left text-cyan" aria-hidden="true"></i> SIMULATION RUNS</h3>
+                                <button id="sim-runs-refresh-btn" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;">
+                                    <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="table-scroll-wrap">
+                                <table class="sim-table">
+                                    <thead>
+                                        <tr>
+                                            <th>RUN ID</th>
+                                            <th>SCENARIO</th>
+                                            <th>STATUS</th>
+                                            <th>RATE</th>
+                                            <th>PROGRESS</th>
+                                            <th>VERDICT STATS</th>
+                                            <th>STARTED AT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sim-runs-tbody">
+                                        <tr>
+                                            <td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No simulation runs recorded.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Bottom: Detailed Event Results -->
+                        <div class="glass-panel simulations-run-detail">
+                            <div class="panel-header">
+                                <h3><i class="fa-solid fa-fingerprint text-cyan" aria-hidden="true"></i> RUN EVENT AUDIT SEQUENCE</h3>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <span id="sim-run-detail-verdict" class="badge hide" style="font-family: var(--font-mono); font-size: 10px;">-</span>
+                                    <span id="sim-run-detail-session" class="badge badge-info hide" style="font-family: var(--font-mono); font-size: 10px;">-</span>
+                                    <span id="sim-run-detail-id" class="badge badge-muted hide" style="font-family: var(--font-mono); font-size: 10px;">-</span>
+                                </div>
+                            </div>
+                            <div class="table-scroll-wrap">
+                                <table class="sim-table">
+                                    <thead>
+                                        <tr>
+                                            <th>SEQ</th>
+                                            <th>MITRE TECHNIQUE</th>
+                                            <th>CORRELATION RULE</th>
+                                            <th id="sim-results-th-session">SESSION ID</th>
+                                            <th>EXPECTED PLAYBOOK</th>
+                                            <th>ACTUAL PLAYBOOK</th>
+                                            <th id="sim-results-th-verdict">VERDICT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sim-results-tbody">
+                                        <tr>
+                                            <td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">Select a run from the list above to view the detailed event sequence.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
         </main>
     </div>
@@ -547,6 +700,70 @@
             <div class="modal-footer">
                 <button id="hitl-deny-btn" class="btn btn-muted">DENY & ESCALATE</button>
                 <button id="hitl-approve-btn" class="btn btn-success">AUTHORIZE ACTION</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCENARIO DETAILS MODAL -->
+    <div id="sim-scenario-modal" class="modal-overlay hide">
+        <div class="modal-card glass-panel" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-circle-info text-cyan" aria-hidden="true"></i> SCENARIO DETAILS</h3>
+                <button type="button" id="sim-modal-close" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 12px 0; color: var(--text-main); font-size: 13px; display: flex; flex-direction: column; gap: 16px; min-height: 0;">
+                <div>
+                    <h2 id="sim-modal-name" style="font-size: 16px; color: var(--text-bright); margin-bottom: 6px;">-</h2>
+                    <p id="sim-modal-desc" style="color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">-</p>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 12px; border-radius: var(--border-radius);">
+                    <div>
+                        <span style="color: var(--text-muted); display: block; font-size: 9px; font-family: var(--font-mono); text-transform: uppercase;">DATASET</span>
+                        <strong id="sim-modal-dataset" class="text-cyan" style="font-size: 11px;">-</strong>
+                    </div>
+                    <div>
+                        <span style="color: var(--text-muted); display: block; font-size: 9px; font-family: var(--font-mono); text-transform: uppercase;">TOTAL EVENTS</span>
+                        <strong id="sim-modal-events" style="font-size: 11px;">-</strong>
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <span style="color: var(--text-muted); display: block; font-size: 9px; font-family: var(--font-mono); text-transform: uppercase; margin-bottom: 4px;">MITRE TECHNIQUES</span>
+                        <div id="sim-modal-mitre" style="display: flex; flex-wrap: wrap; gap: 4px;">-</div>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; min-height: 0; flex-grow: 1;">
+                    <h4 style="font-size: 10px; color: var(--text-bright); margin-bottom: 6px; font-family: var(--font-mono); text-transform: uppercase;">EVENT SEQUENCE PREVIEW</h4>
+                    <div id="sim-modal-events-preview" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: rgba(0,0,0,0.2); padding: 10px; font-family: var(--font-mono); font-size: 11px; scrollbar-width: thin;">
+                        Loading preview...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                <button type="button" id="sim-modal-close-footer" class="btn btn-muted">Close</button>
+                <button type="button" id="sim-modal-run-btn" class="btn btn-primary">
+                    <i class="fa-solid fa-play" aria-hidden="true"></i> Run Simulation
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIMULATION RAW JSON VIEWER MODAL -->
+    <div id="sim-json-modal" class="modal-overlay hide">
+        <div class="modal-card glass-panel" style="max-width: 700px; width: 90%;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-code text-cyan" aria-hidden="true"></i> WAZUH ALERT PAYLOAD</h3>
+                <button type="button" id="sim-json-modal-close" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 12px 0; min-height: 0;">
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">This is the exact correlation alert JSON payload posted to the SIEM webhook endpoint during the simulation:</p>
+                <div style="position: relative;">
+                    <button id="sim-json-copy-btn" class="btn btn-secondary" style="position: absolute; right: 10px; top: 10px; padding: 4px 8px; font-size: 10px;">
+                        <i class="fa-solid fa-copy" aria-hidden="true"></i> Copy
+                    </button>
+                    <pre id="sim-json-code-block" style="margin: 0; max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: rgba(0,0,0,0.3); padding: 16px; font-family: var(--font-mono); font-size: 11px; color: #a5d6ff; line-height: 1.5; white-space: pre-wrap; word-break: break-all; scrollbar-width: thin;"></pre>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                <button type="button" id="sim-json-modal-close-footer" class="btn btn-muted">Close</button>
             </div>
         </div>
     </div>

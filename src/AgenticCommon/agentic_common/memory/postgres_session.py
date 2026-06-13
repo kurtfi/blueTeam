@@ -114,6 +114,18 @@ class PostgresSessionRepository:
         Create a new persistent session in PostgreSQL.
         Returns the session ID (string representation of UUID).
         """
+        # Truncate input string arguments to match column character limits
+        display_name = display_name[:255]
+        owner_id = owner_id[:255]
+        if agent_name:
+            agent_name = agent_name[:255]
+        if siem_rule_id:
+            siem_rule_id = str(siem_rule_id)[:255]
+        if siem_rule_desc:
+            siem_rule_desc = siem_rule_desc[:1000]
+        if source_ip:
+            source_ip = source_ip[:255]
+
         pool = await self.get_pool()
         sess_id = uuid.UUID(session_id) if session_id else uuid.uuid4()
 
@@ -423,6 +435,12 @@ class PostgresSessionRepository:
         """
         Append an event to the session audit trail.
         """
+        # Truncate input string arguments to match column character limits
+        event_type = event_type[:100]
+        actor = actor[:100]
+        if content:
+            content = content[:1000]
+
         pool = await self.get_pool()
         sess_uuid = uuid.UUID(session_id)
         metadata_json = json.dumps(metadata) if metadata is not None else None

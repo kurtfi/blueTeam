@@ -10,6 +10,7 @@ const navItems = {
     hitl: document.getElementById('nav-hitl'),
     personas: document.getElementById('nav-personas'),
     playbooks: document.getElementById('nav-playbooks'),
+    simulations: document.getElementById('nav-simulations'),
     settings: document.getElementById('nav-settings')
 };
 
@@ -20,6 +21,7 @@ const panels = {
     'session-detail': document.getElementById('panel-session-detail'),
     personas: document.getElementById('panel-personas'),
     playbooks: document.getElementById('panel-playbooks'),
+    simulations: document.getElementById('panel-simulations'),
     settings: document.getElementById('panel-settings')
 };
 
@@ -56,6 +58,11 @@ const viewMeta = {
     playbooks: {
         title: "Incident Response Playbooks",
         desc: "Browse mapped incident triage checklists and response procedures",
+        showControls: false
+    },
+    simulations: {
+        title: "Attack Simulations & Telemetry",
+        desc: "Simulate advanced persistent threats, evaluate AI analyst playbook accuracy, and visualize detection gaps.",
         showControls: false
     },
     settings: {

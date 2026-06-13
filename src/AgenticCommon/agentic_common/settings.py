@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     agentix_rag_enabled: bool = True
     agentix_rag_top_k: int = 5
     agentix_triage_core_url: str = "http://localhost:8081/sse"
+    agentix_attack_simulator_url: str = "http://localhost:8082/sse"
 
     # Session Workspace — per-session isolated file storage
     agentix_session_workspace_enabled: bool = True

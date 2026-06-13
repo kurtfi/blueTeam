@@ -37,6 +37,7 @@ const navItems = {
     hitl: document.getElementById('nav-hitl'),
     personas: document.getElementById('nav-personas'),
     playbooks: document.getElementById('nav-playbooks'),
+    simulations: document.getElementById('nav-simulations'),
     settings: document.getElementById('nav-settings')
 };
 
@@ -498,6 +499,181 @@ function setupEventListeners() {
                     settingsSavedToast.classList.add('hide');
                 }, 3000);
             }
+        });
+    }
+
+    // Simulations Rate Control & Triggers
+    const simRateMinus = document.getElementById('sim-rate-minus');
+    const simRatePlus = document.getElementById('sim-rate-plus');
+    const simRateInput = document.getElementById('sim-rate-input');
+    const simTriggerBtn = document.getElementById('sim-trigger-btn');
+    const simRunsRefreshBtn = document.getElementById('sim-runs-refresh-btn');
+    const simClearSelectionBtn = document.getElementById('sim-clear-selection-btn');
+
+    if (simRateMinus && simRateInput) {
+        simRateMinus.addEventListener('click', () => {
+            let val = parseFloat(simRateInput.value);
+            if (val > 0.2) {
+                val = parseFloat((val - 0.5).toFixed(1));
+                if (val < 0.1) val = 0.1;
+                simRateInput.value = val;
+            }
+        });
+    }
+    if (simRatePlus && simRateInput) {
+        simRatePlus.addEventListener('click', () => {
+            let val = parseFloat(simRateInput.value);
+            if (val < 10.0) {
+                val = parseFloat((val + 0.5).toFixed(1));
+                simRateInput.value = val;
+            }
+        });
+    }
+
+    if (simClearSelectionBtn) {
+        simClearSelectionBtn.addEventListener('click', () => {
+            selectedScenarioIds.clear();
+            document.querySelectorAll('.sc-select-checkbox').forEach(cb => cb.checked = false);
+            updateBatchControllerUI();
+        });
+    }
+
+    if (simTriggerBtn) {
+        simTriggerBtn.addEventListener('click', async () => {
+            if (selectedScenarioIds.size === 0) return;
+            const rate = parseFloat(simRateInput.value) || 1.0;
+            const stripLabelsCheckbox = document.getElementById('sim-strip-labels');
+            const stripLabels = stripLabelsCheckbox ? stripLabelsCheckbox.checked : false;
+
+            simTriggerBtn.disabled = true;
+            const triggerBtnText = document.getElementById('sim-trigger-btn-text');
+            const originalText = triggerBtnText ? triggerBtnText.textContent : 'TRIGGER BATCH RUN (0)';
+            if (triggerBtnText) {
+                triggerBtnText.textContent = 'TRIGGERING BATCH...';
+            }
+
+            try {
+                const scenarioIds = [...selectedScenarioIds];
+                showNotification(`Triggering batch simulation run for ${scenarioIds.length} scenarios...`, 'info');
+                
+                // Activating and running each scenario sequentially because of database uniqueness constraint
+                for (const scId of scenarioIds) {
+                    await api.activateSimScenario(scId);
+                    await api.runSimScenario(scId, rate, stripLabels);
+                }
+                
+                showNotification(`Successfully triggered ${scenarioIds.length} simulation runs.`, 'success');
+                selectedScenarioIds.clear();
+                document.querySelectorAll('.sc-select-checkbox').forEach(cb => cb.checked = false);
+                updateBatchControllerUI();
+                await loadSimulationsData();
+            } catch (err) {
+                showNotification(err.message || 'Failed to trigger batch simulation', 'error');
+            } finally {
+                simTriggerBtn.disabled = false;
+                updateBatchControllerUI();
+            }
+        });
+    }
+
+    // Details Modal Handlers
+    const simModal = document.getElementById('sim-scenario-modal');
+    const simModalClose = document.getElementById('sim-modal-close');
+    const simModalCloseFooter = document.getElementById('sim-modal-close-footer');
+    const simModalRunBtn = document.getElementById('sim-modal-run-btn');
+
+    if (simModalClose) {
+        simModalClose.addEventListener('click', () => {
+            simModal.classList.add('hide');
+        });
+    }
+    if (simModalCloseFooter) {
+        simModalCloseFooter.addEventListener('click', () => {
+            simModal.classList.add('hide');
+        });
+    }
+    if (simModal) {
+        simModal.addEventListener('click', (e) => {
+            if (e.target === simModal) {
+                simModal.classList.add('hide');
+            }
+        });
+    }
+
+    const simJsonModal = document.getElementById('sim-json-modal');
+    const simJsonModalClose = document.getElementById('sim-json-modal-close');
+    const simJsonModalCloseFooter = document.getElementById('sim-json-modal-close-footer');
+    const simJsonCopyBtn = document.getElementById('sim-json-copy-btn');
+
+    if (simJsonModalClose) {
+        simJsonModalClose.addEventListener('click', () => {
+            simJsonModal.classList.add('hide');
+        });
+    }
+    if (simJsonModalCloseFooter) {
+        simJsonModalCloseFooter.addEventListener('click', () => {
+            simJsonModal.classList.add('hide');
+        });
+    }
+    if (simJsonModal) {
+        simJsonModal.addEventListener('click', (e) => {
+            if (e.target === simJsonModal) {
+                simJsonModal.classList.add('hide');
+            }
+        });
+    }
+    if (simJsonCopyBtn) {
+        simJsonCopyBtn.addEventListener('click', () => {
+            const code = document.getElementById('sim-json-code-block').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                showNotification('JSON payload copied to clipboard!', 'success');
+            }).catch(err => {
+                console.error('Failed to copy text:', err);
+            });
+        });
+    }
+    if (simModalRunBtn) {
+        simModalRunBtn.addEventListener('click', async () => {
+            const scenarioId = simModalRunBtn.getAttribute('data-scenario-id');
+            const scenarioName = simModalRunBtn.getAttribute('data-scenario-name');
+            const rate = parseFloat(simRateInput.value) || 1.0;
+            const stripLabelsCheckbox = document.getElementById('sim-strip-labels');
+            const stripLabels = stripLabelsCheckbox ? stripLabelsCheckbox.checked : false;
+            if (!scenarioId) return;
+
+            simModalRunBtn.disabled = true;
+            const originalHtml = simModalRunBtn.innerHTML;
+            simModalRunBtn.innerHTML = '<span>TRIGGERING…</span> <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>';
+
+            try {
+                // 1. Activate scenario under the hood
+                await api.activateSimScenario(scenarioId);
+                // 2. Trigger run
+                const res = await api.runSimScenario(scenarioId, rate, stripLabels);
+                showNotification(`Simulation run for "${scenarioName}" triggered successfully!`, 'success');
+                simModal.classList.add('hide');
+                if (res.run_id) {
+                    selectedRunId = res.run_id;
+                }
+                await loadSimulationsData();
+            } catch (err) {
+                showNotification(err.message || 'Failed to trigger simulation', 'error');
+            } finally {
+                simModalRunBtn.disabled = false;
+                simModalRunBtn.innerHTML = originalHtml;
+            }
+        });
+    }
+
+    if (simRunsRefreshBtn) {
+        simRunsRefreshBtn.addEventListener('click', async () => {
+            const table = document.getElementById('sim-runs-tbody');
+            await fetchWithLoader(
+                { buttons: [simRunsRefreshBtn], container: table },
+                async () => {
+                    await loadSimRunsList();
+                }
+            );
         });
     }
 }
@@ -1085,6 +1261,8 @@ function startPeriodicPolling() {
             loadDashboardData();
         } else if (state.activeView === 'hitl') {
             loadHitlQueue(false);
+        } else if (state.activeView === 'simulations') {
+            pollSimulationsData();
         }
     };
     
@@ -1112,8 +1290,528 @@ store.subscribe((state, prevState) => {
             loadAgents();
         } else if (viewName === 'playbooks') {
             loadPlaybooks();
+        } else if (viewName === 'simulations') {
+            loadSimulationsData();
         } else if (viewName === 'settings') {
             loadSettingsForm();
         }
     }
 });
+
+
+// ==========================================
+// 11. Attack Simulations View Controller
+// ==========================================
+
+let selectedRunId = null;
+const selectedScenarioIds = new Set();
+
+function updateBatchControllerUI() {
+    const summary = document.getElementById('sim-batch-selection-summary');
+    const triggerBtn = document.getElementById('sim-trigger-btn');
+    const triggerBtnText = document.getElementById('sim-trigger-btn-text');
+    if (!summary || !triggerBtn || !triggerBtnText) return;
+
+    const count = selectedScenarioIds.size;
+    if (count === 0) {
+        summary.textContent = 'No scenarios selected. Select multiple scenarios in the catalog below.';
+        triggerBtn.disabled = true;
+        triggerBtnText.textContent = 'TRIGGER BATCH RUN (0)';
+    } else {
+        const names = [];
+        const checkboxes = document.querySelectorAll('.sc-select-checkbox:checked');
+        checkboxes.forEach(cb => {
+            const name = cb.getAttribute('data-scenario-name');
+            if (name) names.push(name);
+        });
+        
+        if (names.length > 0) {
+            const displayNames = names.slice(0, 3).join(', ');
+            const suffix = names.length > 3 ? ` and ${names.length - 3} more` : '';
+            summary.innerHTML = `<span style="color: var(--text-bright); font-weight: bold;">Selected (${count}):</span> ${escapeHtml(displayNames)}${suffix}`;
+        } else {
+            summary.innerHTML = `<span style="color: var(--text-bright); font-weight: bold;">Selected (${count}) scenarios</span>`;
+        }
+        triggerBtn.disabled = false;
+        triggerBtnText.textContent = `TRIGGER BATCH RUN (${count})`;
+    }
+}
+
+async function loadSimulationsData() {
+    try {
+        await Promise.all([
+            loadSimStats(),
+            loadSimScenariosList(),
+            loadSimRunsList()
+        ]);
+        
+        if (selectedRunId) {
+            await renderRunDetails(selectedRunId);
+        }
+    } catch (err) {
+        console.error('Failed to load simulations data:', err);
+    }
+}
+
+async function pollSimulationsData() {
+    try {
+        await Promise.all([
+            loadSimStats(),
+            loadSimRunsList()
+        ]);
+        if (selectedRunId) {
+            await renderRunDetails(selectedRunId);
+        }
+    } catch (err) {
+        console.error('Error polling simulations:', err);
+    }
+}
+
+async function loadSimStats() {
+    try {
+        const stats = await api.getSimStats();
+        
+        document.getElementById('sim-stat-runs').textContent = stats.total_runs || 0;
+        document.getElementById('sim-stat-matched').textContent = stats.matched || 0;
+        document.getElementById('sim-stat-mismatched').textContent = stats.mismatched || 0;
+        document.getElementById('sim-stat-nobook').textContent = stats.no_playbook || 0;
+        
+        const accuracy = stats.accuracy_rate || 0.0;
+        document.getElementById('sim-accuracy-val').textContent = `${accuracy}%`;
+        
+        const progressCircle = document.getElementById('sim-gauge-progress');
+        if (progressCircle) {
+            const strokeOffset = 251.2 - (251.2 * accuracy) / 100;
+            progressCircle.setAttribute('stroke-dashoffset', strokeOffset);
+        }
+    } catch (err) {
+        console.error('Failed to load sim stats:', err);
+    }
+}
+
+const MITRE_NAMES = {
+    "T1110": "Brute Force",
+    "T1059": "Command and Scripting Interpreter",
+    "T1047": "Windows Management Instrumentation",
+    "T1569": "System Services",
+    "T1021": "Remote Services",
+    "T1053": "Scheduled Task/Job",
+    "T1003": "OS Credential Dumping",
+    "T1078": "Valid Accounts",
+    "T1543": "Create or Modify System Process",
+    "T1106": "Native API",
+    "T1218": "System Binary Proxy Execution"
+};
+
+async function loadSimScenariosList() {
+    const listContainer = document.getElementById('sim-scenario-list');
+    if (!listContainer) return;
+    
+    try {
+        const scenarios = await api.getSimScenarios();
+        
+        if (!scenarios || scenarios.length === 0) {
+            listContainer.innerHTML = '<div class="tree-empty">No scenarios ingested yet. Run the AttackSimulator CLI to ingest scenarios.</div>';
+            updateBatchControllerUI();
+            return;
+        }
+        
+        listContainer.innerHTML = '';
+        
+        // Group scenarios by MITRE ID
+        const groups = {}; // mitreId -> Array of scenarios
+        
+        scenarios.forEach(sc => {
+            const mitreIds = sc.mitre_ids || [];
+            if (mitreIds.length === 0) {
+                const key = "Other";
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(sc);
+            } else {
+                mitreIds.forEach(id => {
+                    const key = id;
+                    if (!groups[key]) groups[key] = [];
+                    if (!groups[key].some(s => s.id === sc.id)) {
+                        groups[key].push(sc);
+                    }
+                });
+            }
+        });
+        
+        // Sort keys: alphabetically with "Other" last
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === "Other") return 1;
+            if (b === "Other") return -1;
+            return a.localeCompare(b);
+        });
+        
+        sortedKeys.forEach(techId => {
+            const scList = groups[techId];
+            const node = document.createElement('div');
+            node.className = 'tree-node';
+            
+            const techName = techId === "Other" 
+                ? "Other / Custom Scenarios" 
+                : `${techId} - ${MITRE_NAMES[techId] || 'MITRE Technique'}`;
+                
+            node.innerHTML = `
+                <div class="tree-header">
+                    <i class="fa-solid fa-chevron-down tree-toggle-icon"></i>
+                    <span>${escapeHtml(techName)} (${scList.length})</span>
+                </div>
+                <div class="tree-children"></div>
+            `;
+            
+            const header = node.querySelector('.tree-header');
+            const childrenContainer = node.querySelector('.tree-children');
+            const toggleIcon = node.querySelector('.tree-toggle-icon');
+            
+            header.addEventListener('click', () => {
+                const isCollapsed = toggleIcon.classList.toggle('collapsed');
+                childrenContainer.classList.toggle('hide');
+            });
+            
+            scList.forEach(sc => {
+                const leaf = document.createElement('div');
+                leaf.className = 'tree-leaf';
+                const isChecked = selectedScenarioIds.has(sc.id) ? 'checked' : '';
+                
+                leaf.innerHTML = `
+                    <div class="tree-leaf-checkbox-container" style="display: flex; align-items: center; margin-right: 10px;">
+                        <input type="checkbox" class="sc-select-checkbox" data-scenario-id="${sc.id}" data-scenario-name="${escapeHtml(sc.name)}" ${isChecked} style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--primary);">
+                    </div>
+                    <div style="min-width: 0; flex-grow: 1; margin-right: 8px;">
+                        <div class="tree-leaf-title" title="${escapeHtml(sc.name)}">${escapeHtml(sc.name)}</div>
+                        <span class="tree-leaf-desc">${escapeHtml(sc.description || 'No description.')}</span>
+                    </div>
+                    <div class="tree-leaf-actions">
+                        <button class="btn btn-secondary btn-xs-padding-review view-sc-btn" title="View Details">
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        </button>
+                        <button class="btn btn-primary btn-xs-padding-review run-sc-btn" title="Run Simulation">
+                            <i class="fa-solid fa-play" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                `;
+                
+                const checkbox = leaf.querySelector('.sc-select-checkbox');
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        selectedScenarioIds.add(sc.id);
+                    } else {
+                        selectedScenarioIds.delete(sc.id);
+                    }
+                    updateBatchControllerUI();
+                });
+                
+                const viewBtn = leaf.querySelector('.view-sc-btn');
+                const runBtn = leaf.querySelector('.run-sc-btn');
+                
+                viewBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    
+                    document.getElementById('sim-modal-name').textContent = sc.name;
+                    document.getElementById('sim-modal-desc').textContent = sc.description || 'No description provided.';
+                    document.getElementById('sim-modal-dataset').textContent = sc.source_dataset || 'custom';
+                    document.getElementById('sim-modal-events').textContent = sc.total_events || 0;
+                    document.getElementById('sim-modal-status').innerHTML = sc.status === 'active' 
+                        ? `<span class="badge badge-info"><span class="pulse-cyan-dot"></span>Active</span>`
+                        : `<span class="badge badge-muted">Passive</span>`;
+                    
+                    const mitreContainer = document.getElementById('sim-modal-mitre');
+                    mitreContainer.innerHTML = (sc.mitre_ids || []).map(id => `<span>${escapeHtml(id)}</span>`).join(' ');
+                    if (mitreContainer.innerHTML === '') mitreContainer.innerHTML = '<span>None</span>';
+                    
+                    const previewContainer = document.getElementById('sim-modal-events-preview');
+                    previewContainer.innerHTML = '<div style="color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Loading sequence preview...</div>';
+                    
+                    const modalRunBtn = document.getElementById('sim-modal-run-btn');
+                    if (modalRunBtn) {
+                        modalRunBtn.setAttribute('data-scenario-id', sc.id);
+                        modalRunBtn.setAttribute('data-scenario-name', sc.name);
+                    }
+                    
+                    const modal = document.getElementById('sim-scenario-modal');
+                    modal.classList.remove('hide');
+                    
+                    try {
+                        const events = await api.getSimScenarioEvents(sc.id);
+                        if (!events || events.length === 0) {
+                            previewContainer.innerHTML = '<div style="color: var(--text-muted);">No events in this scenario.</div>';
+                        } else {
+                            previewContainer.innerHTML = events.map(ev => `
+                                <div style="border-bottom: 1px solid rgba(255,255,255,0.04); padding: 6px 0; display: flex; justify-content: space-between; font-size: 11px;">
+                                    <span>Seq ${ev.sequence_order}: Rule: <strong class="text-cyan">${escapeHtml(ev.correlation_rule || 'Unknown')}</strong></span>
+                                    <span style="color: var(--text-muted);">${escapeHtml(ev.mitre_technique || 'N/A')}</span>
+                                </div>
+                            `).join('');
+                        }
+                    } catch (err) {
+                        previewContainer.innerHTML = `<div class="text-error">Failed to load preview: ${escapeHtml(err.message)}</div>`;
+                    }
+                });
+                
+                runBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    runBtn.disabled = true;
+                    const originalHtml = runBtn.innerHTML;
+                    runBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>';
+                    
+                    try {
+                        const rate = parseFloat(document.getElementById('sim-rate-input').value) || 1.0;
+                        const stripLabelsCheckbox = document.getElementById('sim-strip-labels');
+                        const stripLabels = stripLabelsCheckbox ? stripLabelsCheckbox.checked : false;
+                        await api.activateSimScenario(sc.id);
+                        const res = await api.runSimScenario(sc.id, rate, stripLabels);
+                        showNotification(`Simulation run for "${sc.name}" triggered successfully!`, 'success');
+                        if (res.run_id) {
+                            selectedRunId = res.run_id;
+                        }
+                        await loadSimulationsData();
+                    } catch (err) {
+                        showNotification(err.message || 'Failed to trigger simulation', 'error');
+                    } finally {
+                        runBtn.disabled = false;
+                        runBtn.innerHTML = originalHtml;
+                    }
+                });
+                
+                childrenContainer.appendChild(leaf);
+            });
+            
+            listContainer.appendChild(node);
+        });
+        
+        updateBatchControllerUI();
+        
+    } catch (err) {
+        console.error('Failed to load scenarios list:', err);
+        listContainer.innerHTML = '<div class="tree-empty text-error">Failed to load scenarios.</div>';
+    }
+}
+
+async function loadSimRunsList() {
+    const tbody = document.getElementById('sim-runs-tbody');
+    if (!tbody) return;
+    
+    try {
+        const runs = await api.getSimRuns({ limit: 10 });
+        
+        if (!runs || runs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No simulation runs recorded.</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        runs.forEach(run => {
+            const tr = document.createElement('tr');
+            if (selectedRunId === run.id) {
+                tr.className = 'active-row';
+            }
+            
+            const statusClass = run.status === 'COMPLETED' 
+                ? 'badge-success' 
+                : run.status === 'RUNNING' 
+                ? 'badge-info' 
+                : run.status === 'FAILED' 
+                ? 'badge-error' 
+                : 'badge-muted';
+                
+            const progress = run.total_events > 0 
+                ? `${run.sent_events}/${run.total_events}`
+                : '0/0';
+                
+            const stats = run.status === 'COMPLETED' 
+                ? `<span class="text-emerald" style="font-family: var(--font-mono); font-weight: bold;">${run.matched_playbooks}M</span> / <span class="text-error" style="font-family: var(--font-mono); font-weight: bold;">${run.mismatched_playbooks}W</span> / <span class="text-amber" style="font-family: var(--font-mono); font-weight: bold;">${run.no_playbook}N</span>`
+                : '-';
+                
+            tr.innerHTML = `
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(run.id.substring(0, 8))}…</td>
+                <td style="font-weight: 500;">${escapeHtml(run.scenario_name || 'Deleted Scenario')}</td>
+                <td><span class="badge ${statusClass}">${escapeHtml(run.status)}</span></td>
+                <td style="font-family: var(--font-mono);">${escapeHtml(run.send_rate_per_sec)}/s</td>
+                <td>${progress}</td>
+                <td>${stats}</td>
+                <td>${formatDate(run.created_at)}</td>
+            `;
+            
+            tr.addEventListener('click', () => {
+                tbody.querySelectorAll('tr').forEach(r => r.classList.remove('active-row'));
+                tr.classList.add('active-row');
+                selectedRunId = run.id;
+                renderRunDetails(run.id);
+            });
+            
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Failed to load sim runs list:', err);
+    }
+}
+
+async function renderRunDetails(runId) {
+    const tbody = document.getElementById('sim-results-tbody');
+    const detailIdBadge = document.getElementById('sim-run-detail-id');
+    const detailSessionBadge = document.getElementById('sim-run-detail-session');
+    const detailVerdictBadge = document.getElementById('sim-run-detail-verdict');
+    const thSession = document.getElementById('sim-results-th-session');
+    const thVerdict = document.getElementById('sim-results-th-verdict');
+    if (!tbody || !detailIdBadge) return;
+    
+    try {
+        const data = await api.getSimRunResults(runId);
+        const results = data.results || [];
+        
+        detailIdBadge.textContent = `RUN: ${runId.substring(0, 18)}…`;
+        detailIdBadge.classList.remove('hide');
+        
+        if (results.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No sequence events logged for this run.</td></tr>';
+            if (detailSessionBadge) detailSessionBadge.classList.add('hide');
+            if (detailVerdictBadge) detailVerdictBadge.classList.add('hide');
+            if (thSession) thSession.classList.remove('hide');
+            if (thVerdict) thVerdict.classList.remove('hide');
+            return;
+        }
+
+        // Deduplication analysis
+        const sessions = [...new Set(results.map(r => r.session_id).filter(Boolean))];
+        const hasSingleSession = sessions.length <= 1;
+        const singleSessionId = sessions.length === 1 ? sessions[0] : null;
+
+        const verdicts = [...new Set(results.map(r => r.match_result).filter(Boolean))];
+        const hasSingleVerdict = verdicts.length <= 1;
+        const singleVerdict = verdicts.length === 1 ? verdicts[0] : null;
+
+        if (detailSessionBadge) {
+            if (singleSessionId) {
+                detailSessionBadge.innerHTML = `SESSION: <a href="#" class="view-single-session text-cyan" data-session-id="${singleSessionId}" style="text-decoration: underline; font-family: var(--font-mono);">${escapeHtml(singleSessionId.substring(0, 8))}…</a>`;
+                detailSessionBadge.classList.remove('hide');
+                
+                const singleLink = detailSessionBadge.querySelector('.view-single-session');
+                if (singleLink) {
+                    singleLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openSessionDetail(singleSessionId);
+                    });
+                }
+            } else if (sessions.length > 1) {
+                detailSessionBadge.textContent = 'SESSIONS: MULTIPLE';
+                detailSessionBadge.classList.remove('hide');
+            } else {
+                detailSessionBadge.classList.add('hide');
+            }
+        }
+
+        if (detailVerdictBadge) {
+            if (singleVerdict) {
+                const verdictClass = singleVerdict === 'CORRECT' 
+                    ? 'badge-success' 
+                    : singleVerdict === 'WRONG' 
+                    ? 'badge-error' 
+                    : singleVerdict === 'NO_PLAYBOOK' 
+                    ? 'badge-warning' 
+                    : 'badge-info';
+                detailVerdictBadge.className = `badge ${verdictClass}`;
+                detailVerdictBadge.textContent = `VERDICT: ${singleVerdict}`;
+                detailVerdictBadge.classList.remove('hide');
+            } else if (verdicts.length > 1) {
+                detailVerdictBadge.className = 'badge badge-info';
+                detailVerdictBadge.textContent = 'VERDICTS: MIXED';
+                detailVerdictBadge.classList.remove('hide');
+            } else {
+                detailVerdictBadge.classList.add('hide');
+            }
+        }
+
+        if (thSession) {
+            if (hasSingleSession) {
+                thSession.classList.add('hide');
+            } else {
+                thSession.classList.remove('hide');
+            }
+        }
+
+        if (thVerdict) {
+            if (hasSingleVerdict) {
+                thVerdict.classList.add('hide');
+            } else {
+                thVerdict.classList.remove('hide');
+            }
+        }
+        
+        tbody.innerHTML = '';
+        results.forEach(res => {
+            const tr = document.createElement('tr');
+            
+            const verdictClass = res.match_result === 'CORRECT' 
+                ? 'badge-success' 
+                : res.match_result === 'WRONG' 
+                ? 'badge-error' 
+                : res.match_result === 'NO_PLAYBOOK' 
+                ? 'badge-warning' 
+                : 'badge-info';
+                
+            const sessionLink = res.session_id 
+                ? `<a href="#" class="view-agent-session" data-session-id="${res.session_id}" style="color: var(--primary); font-family: var(--font-mono); font-size: 11px;">${escapeHtml(res.session_id.substring(0, 8))}…</a>`
+                : '-';
+
+            const sessionCell = hasSingleSession ? '' : `<td>${sessionLink}</td>`;
+            const verdictCell = hasSingleVerdict ? '' : `<td><span class="badge ${verdictClass}">${escapeHtml(res.match_result)}</span></td>`;
+                
+            tr.innerHTML = `
+                <td>
+                    #${res.sequence_order}
+                    <span class="view-raw-json-btn" style="cursor: pointer; margin-left: 6px;" title="View Raw Wazuh Alert Payload">
+                        <i class="fa-solid fa-eye text-cyan"></i>
+                    </span>
+                </td>
+                <td style="font-family: var(--font-mono);">${escapeHtml(res.mitre_technique || '-')}</td>
+                <td style="font-family: var(--font-mono); font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(res.correlation_rule || '')}">${escapeHtml(res.correlation_rule || '-')}</td>
+                ${sessionCell}
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(res.expected_playbook || 'None')}</td>
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(res.actual_playbook || 'None')}</td>
+                ${verdictCell}
+            `;
+            
+            const link = tr.querySelector('.view-agent-session');
+            if (link) {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openSessionDetail(res.session_id);
+                });
+            }
+
+            const jsonBtn = tr.querySelector('.view-raw-json-btn');
+            if (jsonBtn) {
+                jsonBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const codeBlock = document.getElementById('sim-json-code-block');
+                    const modal = document.getElementById('sim-json-modal');
+                    if (codeBlock && modal) {
+                        let alertObj = res.wazuh_alert;
+                        if (typeof alertObj === 'string') {
+                            try {
+                                alertObj = JSON.parse(alertObj);
+                            } catch (err) {
+                                console.error('Failed to parse wazuh_alert JSON string:', err);
+                            }
+                        }
+                        codeBlock.textContent = alertObj 
+                            ? JSON.stringify(alertObj, null, 2) 
+                            : 'No wazuh alert payload recorded for this event.';
+                        modal.classList.remove('hide');
+                    }
+                });
+            }
+            
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Failed to load run details:', err);
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-error" style="padding: 20px;">Failed to load run audit sequence.</td></tr>';
+    }
+}
+

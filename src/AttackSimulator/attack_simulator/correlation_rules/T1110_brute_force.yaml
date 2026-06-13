@@ -1,0 +1,17 @@
+technique_id: T1110
+technique_name: "Brute Force"
+correlation_type: aggregation
+match_events:
+  - event_id: 4625
+    channel: "Security"
+  - event_id: 1110
+    channel: "ssh"
+aggregation:
+  group_by: ["IpAddress", "srcip"]
+  threshold: 8
+  timeframe_seconds: 120
+output_alert:
+  rule_id: "5712"
+  level: 10
+  description: "Multiple failed login attempts - potential SSH Brute Force"
+  groups: ["authentication_failed", "brute_force", "mitre_t1110"]

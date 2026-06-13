@@ -22,17 +22,17 @@ END$$;
 CREATE TABLE IF NOT EXISTS sessions (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     deleted_at    TIMESTAMPTZ,
-    display_name  TEXT NOT NULL,
+    display_name  VARCHAR(255) NOT NULL,
     source        session_source NOT NULL,
     status        session_status NOT NULL DEFAULT 'ACTIVE',
-    owner_id      TEXT NOT NULL DEFAULT 'anonymous',
-    agent_name    TEXT,
+    owner_id      VARCHAR(255) NOT NULL DEFAULT 'anonymous',
+    agent_name    VARCHAR(255),
     
     -- SIEM-specific metadata
-    siem_rule_id      TEXT,
-    siem_rule_desc    TEXT,
+    siem_rule_id      VARCHAR(255),
+    siem_rule_desc    VARCHAR(1000),
     siem_severity     INTEGER,
-    source_ip         TEXT,
+    source_ip         VARCHAR(255),
     mitre_ids         TEXT[],
     verdict           triage_verdict,
     
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     hitl_count    INTEGER NOT NULL DEFAULT 0,
     
     -- Langfuse connection (optional, dev-only)
-    langfuse_trace_id TEXT,
+    langfuse_trace_id VARCHAR(255),
     
     -- Full alert payload
     alert_payload JSONB
@@ -78,9 +78,9 @@ CREATE INDEX IF NOT EXISTS idx_sessions_siem_rule ON sessions(siem_rule_id) WHER
 CREATE TABLE IF NOT EXISTS session_events (
     id          BIGSERIAL PRIMARY KEY,
     session_id  UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-    event_type  TEXT NOT NULL,         -- 'message', 'tool_call', 'hitl_request', 'hitl_response', 'status_change', 'error', 'system'
-    actor       TEXT NOT NULL,         -- 'agent', 'user', 'system', 'siem'
-    content     TEXT,
+    event_type  VARCHAR(100) NOT NULL,         -- 'message', 'tool_call', 'hitl_request', 'hitl_response', 'status_change', 'error', 'system'
+    actor       VARCHAR(100) NOT NULL,         -- 'agent', 'user', 'system', 'siem'
+    content     VARCHAR(1000),
     metadata    JSONB,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
