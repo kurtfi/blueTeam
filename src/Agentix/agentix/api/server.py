@@ -219,6 +219,10 @@ async def startup_event():
     else:
         app.state.cleanup_task = None
 
+    # Start bulk run status poller task
+    app.state.bulk_poller_task = asyncio.create_task(_bulk_run_status_poller())
+    logger.info("Bulk run status poller task started.")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -229,6 +233,15 @@ async def shutdown_event():
         cleanup_task.cancel()
         try:
             await cleanup_task
+        except asyncio.CancelledError:
+            pass
+
+    # Cancel bulk poller task
+    bulk_poller_task = getattr(app.state, "bulk_poller_task", None)
+    if bulk_poller_task and not bulk_poller_task.done():
+        bulk_poller_task.cancel()
+        try:
+            await bulk_poller_task
         except asyncio.CancelledError:
             pass
     if hasattr(app.state, "mcp_stack"):
@@ -1048,6 +1061,264 @@ async def get_simulation_stats():
             accuracy = (stats["matched"] / total_finished * 100.0) if total_finished > 0 else 0.0
             stats["accuracy_rate"] = round(accuracy, 1)
             return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _bulk_run_status_poller() -> None:
+    """
+    Background worker that polls for incomplete bulk runs and updates their overall status.
+    """
+    from attack_simulator.models import db_repo
+    from attack_simulator.evaluator.playbook_match import evaluate_run
+
+    while True:
+        try:
+            pool = await postgres_session_repo.get_pool()
+            # Find all active/running bulk runs
+            async with pool.acquire() as conn:
+                bulk_rows = await conn.fetch("SELECT id, total_scenarios FROM simulation_bulk_runs WHERE status = 'RUNNING'")
+            
+            for row in bulk_rows:
+                bulk_run_id = str(row["id"])
+                
+                # Get runs for this bulk run
+                runs = await db_repo.get_runs_for_bulk(bulk_run_id)
+                
+                completed_scenarios = 0
+                matched_count = 0
+                mismatched_count = 0
+                nobook_count = 0
+                all_done = len(runs) >= row["total_scenarios"]  # All scenarios must be launched
+                
+                for r in runs:
+                    r_id = r["id"]
+                    # If the sub-run is still running, trigger an evaluation in real-time
+                    if r["status"] == "RUNNING":
+                        try:
+                            await evaluate_run(r_id)
+                            # Re-read run status from DB
+                            updated_r = await db_repo.get_run(r_id)
+                            if updated_r:
+                                r = updated_r
+                        except Exception as eval_err:
+                            logger.warning("Failed to auto-evaluate sub-run in poller", run_id=r_id, error=str(eval_err))
+                    
+                    if r["status"] in ("COMPLETED", "FAILED"):
+                        completed_scenarios += 1
+                        matched_count += r.get("matched_playbooks", 0)
+                        mismatched_count += r.get("mismatched_playbooks", 0)
+                        nobook_count += r.get("no_playbook", 0)
+                    else:
+                        all_done = False
+                
+                # Update stats
+                bulk_status = "COMPLETED" if (all_done and len(runs) > 0) else "RUNNING"
+                
+                await db_repo.update_bulk_run_stats(
+                    bulk_run_id=bulk_run_id,
+                    status=bulk_status,
+                    completed_scenarios=completed_scenarios,
+                    matched=matched_count,
+                    mismatched=mismatched_count,
+                    nobook=nobook_count,
+                )
+                
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("bulk_run_status_poller.error", error=str(e))
+            
+        await asyncio.sleep(5)
+
+
+async def _run_bulk_simulation_task(
+    bulk_run_id: str,
+    scenario_ids: list[str],
+    send_rate_per_sec: float,
+    strip_labels: bool,
+) -> None:
+    """
+    Background executor that runs selected scenarios one by one for a bulk run.
+    """
+    from attack_simulator.models import db_repo
+    from attack_simulator.mcp_server import _run_simulation_task
+    import uuid
+
+    delay = 1.0 / send_rate_per_sec
+
+    for sc_id in scenario_ids:
+        try:
+            pool = await postgres_session_repo.get_pool()
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT total_events FROM attack_scenarios WHERE id = $1", uuid.UUID(sc_id))
+                if not row:
+                    logger.warning("bulk_run.scenario_not_found", scenario_id=sc_id)
+                    continue
+                total_events = row["total_events"]
+
+            run_id = await db_repo.create_run(
+                scenario_id=sc_id,
+                total_events=total_events,
+                send_rate_per_sec=send_rate_per_sec,
+                bulk_run_id=bulk_run_id,
+            )
+
+            logger.info("bulk_run.starting_scenario", bulk_run_id=bulk_run_id, scenario_id=sc_id, run_id=run_id)
+            # Awaiting the simulation task makes scenario execution sequential
+            await _run_simulation_task(
+                scenario_id=sc_id,
+                run_id=run_id,
+                delay_seconds=delay,
+                strip_labels=strip_labels,
+            )
+            logger.info("bulk_run.finished_scenario", bulk_run_id=bulk_run_id, scenario_id=sc_id, run_id=run_id)
+
+            # Short sleep between scenarios to prevent database locks/throttling
+            await asyncio.sleep(2)
+        except Exception as e:
+            logger.exception("bulk_run.scenario_failed", bulk_run_id=bulk_run_id, scenario_id=sc_id, error=str(e))
+
+
+@app.get("/v1/settings/llm")
+async def get_active_llm_setting():
+    """
+    Get active LLM settings for the core Agentix platform.
+    """
+    return {
+        "provider": settings.agentix_llm_provider,
+        "model": (
+            settings.openai_model if settings.agentix_llm_provider == "openai"
+            else settings.gemini_model if settings.agentix_llm_provider == "gemini"
+            else settings.ollama_model
+        )
+    }
+
+
+class BulkRunRequest(BaseModel):
+    name: str = Field(..., max_length=255)
+    scenario_ids: list[str]
+    send_rate_per_sec: float = Field(1.0, ge=0.1, le=10.0)
+    strip_labels: bool = False
+
+
+@app.post("/v1/simulations/bulk-runs")
+async def trigger_bulk_simulations(payload: BulkRunRequest):
+    """
+    Triggers a bulk run for selected scenarios.
+    """
+    if not payload.scenario_ids:
+        raise HTTPException(status_code=400, detail="At least one scenario ID must be provided")
+
+    try:
+        from attack_simulator.models import db_repo
+        
+        # 1. Get current LLM model info
+        llm_provider = settings.agentix_llm_provider
+        llm_model = (
+            settings.openai_model if llm_provider == "openai"
+            else settings.gemini_model if llm_provider == "gemini"
+            else settings.ollama_model
+        )
+        
+        # 2. Create the bulk run record
+        bulk_run_id = await db_repo.create_bulk_run(
+            name=payload.name,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            strip_labels=payload.strip_labels,
+            send_rate_per_sec=payload.send_rate_per_sec,
+            total_scenarios=len(payload.scenario_ids),
+        )
+        
+        # 3. Trigger sequential background execution
+        asyncio.create_task(
+            _run_bulk_simulation_task(
+                bulk_run_id=bulk_run_id,
+                scenario_ids=payload.scenario_ids,
+                send_rate_per_sec=payload.send_rate_per_sec,
+                strip_labels=payload.strip_labels,
+            )
+        )
+        
+        return {
+            "status": "success",
+            "bulk_run_id": bulk_run_id,
+            "message": "Bulk simulation run started in background"
+        }
+    except Exception as e:
+        logger.exception("api.trigger_bulk_simulations.error", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/simulations/bulk-runs")
+async def list_bulk_runs(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
+    """
+    Get recent bulk simulation runs.
+    """
+    try:
+        pool = await postgres_session_repo.get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT * 
+                FROM simulation_bulk_runs 
+                ORDER BY created_at DESC LIMIT $1 OFFSET $2
+                """,
+                limit, offset
+            )
+            bulk_runs = []
+            for row in rows:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                for t_field in ("completed_at", "created_at"):
+                    if d.get(t_field):
+                        d[t_field] = d[t_field].isoformat()
+                bulk_runs.append(d)
+            return bulk_runs
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/simulations/bulk-runs/{bulk_run_id}/results")
+async def get_bulk_run_results(bulk_run_id: str = Path(..., max_length=100)):
+    """
+    Get detailed results for all scenario runs under a bulk run.
+    """
+    try:
+        bulk_uuid = uuid.UUID(bulk_run_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid bulk run UUID format")
+
+    try:
+        from attack_simulator.models import db_repo
+        
+        # 1. Get bulk run meta
+        bulk_meta = await db_repo.get_bulk_run(bulk_run_id)
+        if not bulk_meta:
+            raise HTTPException(status_code=404, detail="Bulk run not found")
+        
+        # Format timestamps
+        for t_field in ("completed_at", "created_at"):
+            if bulk_meta.get(t_field):
+                bulk_meta[t_field] = bulk_meta[t_field].isoformat()
+
+        # 2. Get all sub runs
+        runs = await db_repo.get_runs_for_bulk(bulk_run_id)
+        for r in runs:
+            for t_field in ("started_at", "completed_at", "created_at"):
+                if r.get(t_field):
+                    r[t_field] = r[t_field].isoformat()
+
+        return {
+            "bulk_run": bulk_meta,
+            "runs": runs
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -167,3 +167,36 @@ export async function getSimStats() {
     return response.json();
 }
 
+export async function getActiveLlmInfo() {
+    const response = await fetch('/web/settings/llm');
+    if (!response.ok) throw new Error('Failed to fetch active LLM settings');
+    return response.json();
+}
+
+export async function triggerBulkRun(name, scenarioIds, rate, stripLabels = false) {
+    const response = await fetch('/web/simulations/bulk-runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name,
+            scenario_ids: scenarioIds,
+            send_rate_per_sec: rate,
+            strip_labels: stripLabels
+        })
+    });
+    if (!response.ok) throw new Error('Failed to trigger bulk run');
+    return response.json();
+}
+
+export async function getBulkRuns({ limit = 20, offset = 0 } = {}) {
+    const response = await fetch(`/web/simulations/bulk-runs?limit=${limit}&offset=${offset}`);
+    if (!response.ok) throw new Error('Failed to fetch bulk runs');
+    return response.json();
+}
+
+export async function getBulkRunResults(bulkRunId) {
+    const response = await fetch(`/web/simulations/bulk-runs/${bulkRunId}/results`);
+    if (!response.ok) throw new Error(`Failed to fetch bulk run results: ${response.status}`);
+    return response.json();
+}
+

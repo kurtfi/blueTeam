@@ -300,3 +300,63 @@ async def web_sim_stats(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/settings/llm", summary="Get active LLM settings")
+async def web_get_llm_settings(
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
+    from gateway.services.agentix_client import get_active_llm_info
+    try:
+        return await get_active_llm_info()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class WebBulkRunRequest(BaseModel):
+    name: str
+    scenario_ids: list[str]
+    send_rate_per_sec: float = 1.0
+    strip_labels: bool = False
+
+
+@router.post("/simulations/bulk-runs", summary="Trigger a bulk simulation run")
+async def web_trigger_bulk_run(
+    payload: WebBulkRunRequest,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
+    from gateway.services.agentix_client import trigger_bulk_run
+    try:
+        return await trigger_bulk_run(
+            name=payload.name,
+            scenario_ids=payload.scenario_ids,
+            rate=payload.send_rate_per_sec,
+            strip_labels=payload.strip_labels
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/simulations/bulk-runs", summary="List bulk simulation runs")
+async def web_list_bulk_runs(
+    limit: int = 20,
+    offset: int = 0,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> list[dict[str, Any]]:
+    from gateway.services.agentix_client import list_bulk_runs
+    try:
+        return await list_bulk_runs(limit, offset)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/simulations/bulk-runs/{bulk_run_id}/results", summary="Get results for a bulk simulation run")
+async def web_bulk_run_results(
+    bulk_run_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
+    from gateway.services.agentix_client import get_bulk_run_results
+    try:
+        return await get_bulk_run_results(bulk_run_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

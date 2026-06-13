@@ -60,28 +60,22 @@ class PostgresSessionRepository:
 
     async def run_migrations(self) -> None:
         """
-        Runs migrations to ensure sessions and session_events tables exist.
-        Reads SQL from migrations/001_create_sessions.sql relative to the repository.
+        Runs migrations from the migrations/ directory to set up the database.
+        Finds all .sql files in migrations/, sorts them alphabetically, and runs them.
         """
         import os
 
         pool = await self.get_pool()
 
-        # Resolve migration file path
-        # Assuming run is from workspace or python environment, look at absolute paths.
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # go up to src/AgenticCommon/agentic_common/memory -> src/AgenticCommon/ -> blueTeam root
-        # Let's search relative or absolute
-        migration_file = os.path.join(current_dir, "../../../../migrations/001_create_sessions.sql")
-        migration_file = os.path.abspath(migration_file)
+        migration_dir = os.path.abspath(os.path.join(current_dir, "../../../../migrations"))
 
-        if not os.path.exists(migration_file):
-            logger.error("postgres_session.migration_file_not_found", path=migration_file)
+        if not os.path.exists(migration_dir):
+            logger.error("postgres_session.migration_dir_not_found", path=migration_dir)
             return
 
-        logger.info("postgres_session.running_migrations", path=migration_file)
-        with open(migration_file) as f:
-            sql = f.read()
+        files = sorted([f for f in os.listdir(migration_dir) if f.endswith(".sql")])
+        logger.info("postgres_session.found_migrations", files=files)
 
         async with pool.acquire() as conn:
             # ALTER TYPE ... ADD VALUE cannot be executed inside a transaction block, so run it beforehand
@@ -91,8 +85,17 @@ class PostgresSessionRepository:
                 # Ignore if it already exists or type is not created yet
                 pass
 
-            async with conn.transaction():
-                await conn.execute(sql)
+            for file_name in files:
+                file_path = os.path.join(migration_dir, file_name)
+                logger.info("postgres_session.running_migration", file=file_name)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    sql = f.read()
+                try:
+                    async with conn.transaction():
+                        await conn.execute(sql)
+                except Exception as e:
+                    logger.error("postgres_session.migration_failed", file=file_name, error=str(e))
+                    raise
         logger.info("postgres_session.migrations_completed")
 
     async def create_session(

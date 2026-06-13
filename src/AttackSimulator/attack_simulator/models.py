@@ -189,24 +189,26 @@ class DatabaseRepository:
                 results.append(d)
             return results
 
-    async def create_run(self, scenario_id: str, total_events: int, send_rate_per_sec: float) -> str:
+    async def create_run(self, scenario_id: str, total_events: int, send_rate_per_sec: float, bulk_run_id: str | None = None) -> str:
         pool = await self.get_pool()
         sc_uuid = uuid.UUID(scenario_id)
         run_id = uuid.uuid4()
+        bulk_uuid = uuid.UUID(bulk_run_id) if bulk_run_id else None
 
         async with pool.acquire() as conn:
             await conn.execute(
                 """
                 INSERT INTO simulation_runs (
-                    id, scenario_id, status, total_events, sent_events, send_rate_per_sec, started_at, created_at
-                ) VALUES ($1, $2, 'RUNNING', $3, 0, $4, NOW(), NOW())
+                    id, scenario_id, status, total_events, sent_events, send_rate_per_sec, bulk_run_id, started_at, created_at
+                ) VALUES ($1, $2, 'RUNNING', $3, 0, $4, $5, NOW(), NOW())
                 """,
                 run_id,
                 sc_uuid,
                 total_events,
                 send_rate_per_sec,
+                bulk_uuid,
             )
-        logger.info("db.run_created", run_id=str(run_id), scenario_id=scenario_id)
+        logger.info("db.run_created", run_id=str(run_id), scenario_id=scenario_id, bulk_run_id=bulk_run_id)
         return str(run_id)
 
     async def update_run_stats(
@@ -377,6 +379,126 @@ class DatabaseRepository:
                 d["id"] = str(d["id"])
                 return d
         return None
+
+    async def create_bulk_run(
+        self,
+        name: str,
+        llm_provider: str | None,
+        llm_model: str | None,
+        strip_labels: bool,
+        send_rate_per_sec: float,
+        total_scenarios: int,
+    ) -> str:
+        pool = await self.get_pool()
+        bulk_uuid = uuid.uuid4()
+        name = name[:255]
+        if llm_provider:
+            llm_provider = llm_provider[:50]
+        if llm_model:
+            llm_model = llm_model[:255]
+
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO simulation_bulk_runs (
+                    id, name, llm_provider, llm_model, strip_labels, send_rate_per_sec,
+                    status, total_scenarios, completed_scenarios, matched_playbooks,
+                    mismatched_playbooks, no_playbook, created_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, 'RUNNING', $7, 0, 0, 0, 0, NOW())
+                """,
+                bulk_uuid,
+                name,
+                llm_provider,
+                llm_model,
+                strip_labels,
+                send_rate_per_sec,
+                total_scenarios,
+            )
+        logger.info("db.bulk_run_created", bulk_run_id=str(bulk_uuid), name=name)
+        return str(bulk_uuid)
+
+    async def get_bulk_runs(self, limit: int = 20) -> list[dict[str, Any]]:
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM simulation_bulk_runs ORDER BY created_at DESC LIMIT $1",
+                limit,
+            )
+            results = []
+            for row in rows:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                results.append(d)
+            return results
+
+    async def get_bulk_run(self, bulk_run_id: str) -> dict[str, Any] | None:
+        pool = await self.get_pool()
+        bulk_uuid = uuid.UUID(bulk_run_id)
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM simulation_bulk_runs WHERE id = $1",
+                bulk_uuid,
+            )
+            if row:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                return d
+        return None
+
+    async def update_bulk_run_stats(
+        self,
+        bulk_run_id: str,
+        status: str,
+        completed_scenarios: int,
+        matched: int,
+        mismatched: int,
+        nobook: int,
+    ) -> None:
+        pool = await self.get_pool()
+        bulk_uuid = uuid.UUID(bulk_run_id)
+        status = status[:50]
+        completed_at = datetime.now() if status in ("COMPLETED", "FAILED") else None
+
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE simulation_bulk_runs
+                SET status = $2, completed_scenarios = $3, matched_playbooks = $4,
+                    mismatched_playbooks = $5, no_playbook = $6, completed_at = $7
+                WHERE id = $1
+                """,
+                bulk_uuid,
+                status,
+                completed_scenarios,
+                matched,
+                mismatched,
+                nobook,
+                completed_at,
+            )
+        logger.info("db.bulk_run_updated", bulk_run_id=bulk_run_id, status=status)
+
+    async def get_runs_for_bulk(self, bulk_run_id: str) -> list[dict[str, Any]]:
+        pool = await self.get_pool()
+        bulk_uuid = uuid.UUID(bulk_run_id)
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT r.*, s.name as scenario_name
+                FROM simulation_runs r
+                LEFT JOIN attack_scenarios s ON r.scenario_id = s.id
+                WHERE r.bulk_run_id = $1
+                ORDER BY r.created_at ASC
+                """,
+                bulk_uuid,
+            )
+            results = []
+            for row in rows:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                d["scenario_id"] = str(d["scenario_id"]) if d.get("scenario_id") else None
+                d["bulk_run_id"] = str(d["bulk_run_id"]) if d.get("bulk_run_id") else None
+                results.append(d)
+            return results
 
     async def close(self) -> None:
         if self._pool:

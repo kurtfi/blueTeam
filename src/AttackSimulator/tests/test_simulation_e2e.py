@@ -11,6 +11,7 @@ from attack_simulator.models import db_repo
 from attack_simulator.loader.custom import CustomLoader
 from attack_simulator.correlation.engine import CorrelationEngine
 from attack_simulator.mcp_server import _run_simulation_task
+from agentic_common.memory import postgres_session_repo
 
 
 @pytest.mark.asyncio
@@ -18,6 +19,9 @@ async def test_ingest_and_run_simulation_e2e() -> None:
     """
     Integration test: Load scenario, ingest to DB, execute mock simulation, and evaluate.
     """
+    # Run migrations to ensure schema is fully populated
+    await postgres_session_repo.run_migrations()
+
     # 1. Resolve path to test scenario file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     scenario_path = os.path.join(

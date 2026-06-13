@@ -59,9 +59,15 @@ async def _run_simulation_task(scenario_id: str, run_id: str, delay_seconds: flo
             if strip_labels:
                 if "rule" in alert_payload and isinstance(alert_payload["rule"], dict):
                     alert_payload["rule"].pop("mitre", None)
-                alert_payload.pop("mitre_ids", None)
-                if "rule" in alert_payload and isinstance(alert_payload["rule"], dict):
+                    alert_payload["rule"].pop("rule_id", None)
+                    if "groups" in alert_payload["rule"] and isinstance(alert_payload["rule"]["groups"], list):
+                        import re
+                        alert_payload["rule"]["groups"] = [
+                            g for g in alert_payload["rule"]["groups"]
+                            if not (str(g).lower().startswith("mitre_") or re.match(r"^t\d{4}", str(g).lower()))
+                        ]
                     alert_payload["rule"]["id"] = "999999"
+                alert_payload.pop("mitre_ids", None)
                 alert_payload.pop("rule_id", None)
                 
             session_id = await send_alert_to_webhook(alert_payload)

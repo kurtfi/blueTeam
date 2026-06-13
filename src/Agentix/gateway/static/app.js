@@ -38,6 +38,7 @@ const navItems = {
     personas: document.getElementById('nav-personas'),
     playbooks: document.getElementById('nav-playbooks'),
     simulations: document.getElementById('nav-simulations'),
+    'bulk-evals': document.getElementById('nav-bulk-evals'),
     settings: document.getElementById('nav-settings')
 };
 
@@ -676,6 +677,106 @@ function setupEventListeners() {
             );
         });
     }
+
+    // Bulk Evaluations Rate Control & Triggers
+    const bulkRateMinus = document.getElementById('bulk-rate-minus');
+    const bulkRatePlus = document.getElementById('bulk-rate-plus');
+    const bulkRateInput = document.getElementById('bulk-rate-input');
+    const bulkTriggerBtn = document.getElementById('bulk-trigger-btn');
+    const bulkRunsRefreshBtn = document.getElementById('bulk-runs-refresh-btn');
+    const bulkClearSelectionBtn = document.getElementById('bulk-clear-selection-btn');
+    const bulkSelectAllBtn = document.getElementById('bulk-select-all-btn');
+
+    if (bulkRateMinus && bulkRateInput) {
+        bulkRateMinus.addEventListener('click', () => {
+            let val = parseFloat(bulkRateInput.value);
+            if (val > 0.2) {
+                val = parseFloat((val - 0.5).toFixed(1));
+                if (val < 0.1) val = 0.1;
+                bulkRateInput.value = val;
+            }
+        });
+    }
+    if (bulkRatePlus && bulkRateInput) {
+        bulkRatePlus.addEventListener('click', () => {
+            let val = parseFloat(bulkRateInput.value);
+            if (val < 10.0) {
+                val = parseFloat((val + 0.5).toFixed(1));
+                bulkRateInput.value = val;
+            }
+        });
+    }
+
+    if (bulkClearSelectionBtn) {
+        bulkClearSelectionBtn.addEventListener('click', () => {
+            selectedBulkScenarioIds.clear();
+            document.querySelectorAll('.bulk-sc-select-checkbox').forEach(cb => cb.checked = false);
+            updateBulkControllerUI();
+        });
+    }
+
+    if (bulkSelectAllBtn) {
+        bulkSelectAllBtn.addEventListener('click', () => {
+            document.querySelectorAll('.bulk-sc-select-checkbox').forEach(cb => {
+                cb.checked = true;
+                const scId = cb.getAttribute('data-scenario-id');
+                if (scId) selectedBulkScenarioIds.add(scId);
+            });
+            updateBulkControllerUI();
+        });
+    }
+
+    if (bulkTriggerBtn) {
+        bulkTriggerBtn.addEventListener('click', async () => {
+            if (selectedBulkScenarioIds.size === 0) return;
+            const rate = parseFloat(bulkRateInput.value) || 1.0;
+            const stripLabelsCheckbox = document.getElementById('bulk-strip-labels');
+            const stripLabels = stripLabelsCheckbox ? stripLabelsCheckbox.checked : false;
+            const runNameInput = document.getElementById('bulk-run-name-input');
+            const runName = runNameInput.value.trim() || `Bulk Run ${new Date().toLocaleString()}`;
+
+            bulkTriggerBtn.disabled = true;
+            const triggerBtnText = document.getElementById('bulk-trigger-btn-text');
+            if (triggerBtnText) {
+                triggerBtnText.textContent = 'TRIGGERING BULK...';
+            }
+
+            try {
+                const scenarioIds = [...selectedBulkScenarioIds];
+                showNotification(`Triggering bulk evaluation run for ${scenarioIds.length} scenarios...`, 'info');
+                
+                const res = await api.triggerBulkRun(runName, scenarioIds, rate, stripLabels);
+                
+                showNotification(`Successfully started bulk evaluation run!`, 'success');
+                selectedBulkScenarioIds.clear();
+                document.querySelectorAll('.bulk-sc-select-checkbox').forEach(cb => cb.checked = false);
+                runNameInput.value = '';
+                updateBulkControllerUI();
+                
+                if (res.bulk_run_id) {
+                    selectedBulkRunId = res.bulk_run_id;
+                }
+                await loadBulkEvalsData();
+            } catch (err) {
+                showNotification(err.message || 'Failed to trigger bulk evaluation', 'error');
+            } finally {
+                bulkTriggerBtn.disabled = false;
+                updateBulkControllerUI();
+            }
+        });
+    }
+
+    if (bulkRunsRefreshBtn) {
+        bulkRunsRefreshBtn.addEventListener('click', async () => {
+            const table = document.getElementById('bulk-runs-tbody');
+            await fetchWithLoader(
+                { buttons: [bulkRunsRefreshBtn], container: table },
+                async () => {
+                    await loadBulkRunsList();
+                }
+            );
+        });
+    }
 }
 
 function showLoginError(msg) {
@@ -1263,6 +1364,8 @@ function startPeriodicPolling() {
             loadHitlQueue(false);
         } else if (state.activeView === 'simulations') {
             pollSimulationsData();
+        } else if (state.activeView === 'bulk-evals') {
+            pollBulkEvalsData();
         }
     };
     
@@ -1292,6 +1395,8 @@ store.subscribe((state, prevState) => {
             loadPlaybooks();
         } else if (viewName === 'simulations') {
             loadSimulationsData();
+        } else if (viewName === 'bulk-evals') {
+            loadBulkEvalsData();
         } else if (viewName === 'settings') {
             loadSettingsForm();
         }
@@ -1812,6 +1917,402 @@ async function renderRunDetails(runId) {
     } catch (err) {
         console.error('Failed to load run details:', err);
         tbody.innerHTML = '<tr><td colspan="7" class="text-center text-error" style="padding: 20px;">Failed to load run audit sequence.</td></tr>';
+    }
+}
+
+
+// ==========================================
+// 12. Bulk Evaluations View Controller
+// ==========================================
+
+const selectedBulkScenarioIds = new Set();
+let selectedBulkRunId = null;
+
+function updateBulkControllerUI() {
+    const summary = document.getElementById('bulk-selection-summary');
+    const triggerBtn = document.getElementById('bulk-trigger-btn');
+    const triggerBtnText = document.getElementById('bulk-trigger-btn-text');
+    if (!summary || !triggerBtn || !triggerBtnText) return;
+
+    const count = selectedBulkScenarioIds.size;
+    if (count === 0) {
+        summary.textContent = 'No scenarios selected. Select scenarios from the catalog below.';
+        triggerBtn.disabled = true;
+        triggerBtnText.textContent = 'TRIGGER BULK RUN (0)';
+    } else {
+        const names = [];
+        const checkboxes = document.querySelectorAll('.bulk-sc-select-checkbox:checked');
+        const uniqueNames = new Set();
+        checkboxes.forEach(cb => {
+            const name = cb.getAttribute('data-scenario-name');
+            if (name) uniqueNames.add(name);
+        });
+        uniqueNames.forEach(name => names.push(name));
+        
+        if (names.length > 0) {
+            const displayNames = names.slice(0, 3).join(', ');
+            const suffix = names.length > 3 ? ` and ${names.length - 3} more` : '';
+            summary.innerHTML = `<span style="color: var(--text-bright); font-weight: bold;">Selected (${count}):</span> ${escapeHtml(displayNames)}${suffix}`;
+        } else {
+            summary.innerHTML = `<span style="color: var(--text-bright); font-weight: bold;">Selected (${count}) scenarios</span>`;
+        }
+        triggerBtn.disabled = false;
+        triggerBtnText.textContent = `TRIGGER BULK RUN (${count})`;
+    }
+
+    // Update group checkboxes (checked and indeterminate states)
+    const groupNodes = document.querySelectorAll('#bulk-scenario-list .tree-node');
+    groupNodes.forEach(node => {
+        const groupCheckbox = node.querySelector('.bulk-group-select-checkbox');
+        if (!groupCheckbox) return;
+        
+        const childCheckboxes = node.querySelectorAll('.bulk-sc-select-checkbox');
+        let checkedCount = 0;
+        childCheckboxes.forEach(cb => {
+            if (cb.checked) checkedCount++;
+        });
+        
+        if (checkedCount === 0) {
+            groupCheckbox.checked = false;
+            groupCheckbox.indeterminate = false;
+        } else if (checkedCount === childCheckboxes.length) {
+            groupCheckbox.checked = true;
+            groupCheckbox.indeterminate = false;
+        } else {
+            groupCheckbox.checked = false;
+            groupCheckbox.indeterminate = true;
+        }
+    });
+}
+
+async function loadBulkEvalsData() {
+    try {
+        await Promise.all([
+            loadActiveLlmInfo(),
+            loadBulkStats(),
+            loadBulkScenariosList(),
+            loadBulkRunsList()
+        ]);
+        
+        if (selectedBulkRunId) {
+            await renderBulkRunDetails(selectedBulkRunId);
+        }
+    } catch (err) {
+        console.error('Failed to load bulk evaluations data:', err);
+    }
+}
+
+async function pollBulkEvalsData() {
+    try {
+        await Promise.all([
+            loadBulkStats(),
+            loadBulkRunsList()
+        ]);
+        if (selectedBulkRunId) {
+            await renderBulkRunDetails(selectedBulkRunId);
+        }
+    } catch (err) {
+        console.error('Error polling bulk evaluations:', err);
+    }
+}
+
+async function loadActiveLlmInfo() {
+    const activeLlmBadge = document.getElementById('bulk-active-llm');
+    if (!activeLlmBadge) return;
+    try {
+        const info = await api.getActiveLlmInfo();
+        activeLlmBadge.textContent = `🤖 LLM: ${info.provider.toUpperCase()} / ${info.model}`;
+    } catch (err) {
+        console.error('Failed to load active LLM settings:', err);
+        activeLlmBadge.textContent = `🤖 LLM: Error loading settings`;
+    }
+}
+
+async function loadBulkStats() {
+    try {
+        const stats = await api.getSimStats();
+        
+        document.getElementById('bulk-stat-runs').textContent = stats.total_runs || 0;
+        document.getElementById('bulk-stat-matched').textContent = stats.matched || 0;
+        document.getElementById('bulk-stat-mismatched').textContent = stats.mismatched || 0;
+        document.getElementById('bulk-stat-nobook').textContent = stats.no_playbook || 0;
+        
+        const accuracy = stats.accuracy_rate || 0.0;
+        document.getElementById('bulk-accuracy-val').textContent = `${accuracy}%`;
+        
+        const progressCircle = document.getElementById('bulk-gauge-progress');
+        if (progressCircle) {
+            const strokeOffset = 251.2 - (251.2 * accuracy) / 100;
+            progressCircle.setAttribute('stroke-dashoffset', strokeOffset);
+        }
+    } catch (err) {
+        console.error('Failed to load bulk statistics:', err);
+    }
+}
+
+async function loadBulkScenariosList() {
+    const listContainer = document.getElementById('bulk-scenario-list');
+    if (!listContainer) return;
+    
+    try {
+        const dataset = await api.getSimScenarios();
+        
+        if (!dataset || dataset.length === 0) {
+            listContainer.innerHTML = '<div class="tree-empty">No scenarios configured in simulator database.</div>';
+            return;
+        }
+        
+        // Group scenarios by MITRE ID
+        const groups = {}; // mitreId -> Array of scenarios
+        
+        dataset.forEach(sc => {
+            const mitreIds = sc.mitre_ids || [];
+            if (mitreIds.length === 0) {
+                const key = "Other";
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(sc);
+            } else {
+                mitreIds.forEach(id => {
+                    const key = id;
+                    if (!groups[key]) groups[key] = [];
+                    if (!groups[key].some(s => s.id === sc.id)) {
+                        groups[key].push(sc);
+                    }
+                });
+            }
+        });
+        
+        // Sort keys: alphabetically with "Other" last
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === "Other") return 1;
+            if (b === "Other") return -1;
+            return a.localeCompare(b);
+        });
+        
+        listContainer.innerHTML = '';
+        
+        sortedKeys.forEach(techId => {
+            const scList = groups[techId];
+            const node = document.createElement('div');
+            node.className = 'tree-node';
+            
+            const techName = techId === "Other" 
+                ? "Other / Custom Scenarios" 
+                : `${techId} - ${MITRE_NAMES[techId] || 'MITRE Technique'}`;
+                
+            node.innerHTML = `
+                <div class="tree-header" style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-chevron-down tree-toggle-icon" style="cursor: pointer; padding: 4px;"></i>
+                    <input type="checkbox" class="bulk-group-select-checkbox" data-group-id="${escapeHtml(techId)}" style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--primary);">
+                    <span style="flex-grow: 1; cursor: pointer; user-select: none;">${escapeHtml(techName)} (${scList.length})</span>
+                </div>
+                <div class="tree-children"></div>
+            `;
+            
+            const header = node.querySelector('.tree-header');
+            const childrenContainer = node.querySelector('.tree-children');
+            const toggleIcon = node.querySelector('.tree-toggle-icon');
+            const groupCheckbox = node.querySelector('.bulk-group-select-checkbox');
+            
+            header.addEventListener('click', (e) => {
+                if (e.target.closest('.bulk-group-select-checkbox')) {
+                    return;
+                }
+                const isCollapsed = toggleIcon.classList.toggle('collapsed');
+                childrenContainer.classList.toggle('hide');
+            });
+            
+            groupCheckbox.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                const childCheckboxes = childrenContainer.querySelectorAll('.bulk-sc-select-checkbox');
+                childCheckboxes.forEach(cb => {
+                    const scId = cb.getAttribute('data-scenario-id');
+                    if (isChecked) {
+                        selectedBulkScenarioIds.add(scId);
+                    } else {
+                        selectedBulkScenarioIds.delete(scId);
+                    }
+                    
+                    // Sync all checkboxes on the page for this scenario ID
+                    document.querySelectorAll(`.bulk-sc-select-checkbox[data-scenario-id="${scId}"]`).forEach(oCb => {
+                        oCb.checked = isChecked;
+                    });
+                });
+                updateBulkControllerUI();
+            });
+            
+            scList.sort((a,b) => a.name.localeCompare(b.name)).forEach(sc => {
+                const leaf = document.createElement('div');
+                leaf.className = 'tree-leaf';
+                leaf.style.paddingLeft = '32px';
+                
+                const checked = selectedBulkScenarioIds.has(sc.id) ? 'checked' : '';
+                
+                leaf.innerHTML = `
+                    <label style="display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; user-select: none; margin: 0;">
+                        <input type="checkbox" class="bulk-sc-select-checkbox" data-scenario-id="${sc.id}" data-scenario-name="${escapeHtml(sc.name)}" ${checked} style="cursor: pointer; width: 13px; height: 13px; accent-color: var(--primary);">
+                        <div style="min-width: 0; flex-grow: 1;">
+                            <div class="tree-leaf-title" title="${escapeHtml(sc.name)}">${escapeHtml(sc.name)}</div>
+                            <span class="tree-leaf-desc">${escapeHtml(sc.description || 'No description.')}</span>
+                        </div>
+                        <span style="color: var(--text-muted); font-size: 10px; white-space: nowrap; margin-left: auto;">(${sc.total_events || 0} events)</span>
+                    </label>
+                `;
+                
+                const checkbox = leaf.querySelector('.bulk-sc-select-checkbox');
+                checkbox.addEventListener('change', (e) => {
+                    const isChecked = e.target.checked;
+                    if (isChecked) {
+                        selectedBulkScenarioIds.add(sc.id);
+                    } else {
+                        selectedBulkScenarioIds.delete(sc.id);
+                    }
+                    
+                    // Sync all checkboxes on the page for this scenario ID
+                    document.querySelectorAll(`.bulk-sc-select-checkbox[data-scenario-id="${sc.id}"]`).forEach(oCb => {
+                        oCb.checked = isChecked;
+                    });
+                    
+                    updateBulkControllerUI();
+                });
+                
+                childrenContainer.appendChild(leaf);
+            });
+            
+            listContainer.appendChild(node);
+        });
+        
+        updateBulkControllerUI();
+        
+    } catch (err) {
+        console.error('Failed to load scenarios list:', err);
+        listContainer.innerHTML = '<div class="tree-empty text-error">Failed to load scenarios.</div>';
+    }
+}
+
+async function loadBulkRunsList() {
+    const tbody = document.getElementById('bulk-runs-tbody');
+    if (!tbody) return;
+    
+    try {
+        const runs = await api.getBulkRuns({ limit: 10 });
+        
+        if (!runs || runs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No bulk runs recorded.</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        runs.forEach(run => {
+            const tr = document.createElement('tr');
+            if (selectedBulkRunId === run.id) {
+                tr.className = 'active-row';
+            }
+            
+            const statusClass = run.status === 'COMPLETED' 
+                ? 'badge-success' 
+                : run.status === 'RUNNING' 
+                ? 'badge-info' 
+                : run.status === 'FAILED' 
+                ? 'badge-error' 
+                : 'badge-muted';
+                
+            const total = run.total_scenarios || 0;
+            const completed = run.completed_scenarios || 0;
+            
+            // Calculate accuracy rate for completed ones
+            const matched = run.matched_playbooks || 0;
+            const mismatched = run.mismatched_playbooks || 0;
+            const nobook = run.no_playbook || 0;
+            const totalFinished = matched + mismatched + nobook;
+            const accuracy = totalFinished > 0 ? `${Math.round((matched / totalFinished) * 100)}%` : '0%';
+                
+            tr.innerHTML = `
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(run.id.substring(0, 8))}…</td>
+                <td style="font-weight: 500;">${escapeHtml(run.name)}</td>
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(run.llm_model || 'Unknown')}</td>
+                <td><span class="badge ${run.strip_labels ? 'badge-warning' : 'badge-muted'}">${run.strip_labels ? 'YES' : 'NO'}</span></td>
+                <td><span class="badge ${statusClass}">${escapeHtml(run.status)} (${completed}/${total})</span></td>
+                <td style="font-family: var(--font-mono); font-weight: bold; color: ${totalFinished > 0 ? 'var(--secondary)' : 'var(--text-muted)'}">${accuracy}</td>
+                <td>${formatDate(run.created_at)}</td>
+            `;
+            
+            tr.addEventListener('click', () => {
+                tbody.querySelectorAll('tr').forEach(r => r.classList.remove('active-row'));
+                tr.classList.add('active-row');
+                selectedBulkRunId = run.id;
+                renderBulkRunDetails(run.id);
+            });
+            
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Failed to load bulk runs list:', err);
+    }
+}
+
+async function renderBulkRunDetails(bulkRunId) {
+    const tbody = document.getElementById('bulk-detail-tbody');
+    const nameBadge = document.getElementById('bulk-detail-name-badge');
+    if (!tbody || !nameBadge) return;
+    
+    try {
+        const data = await api.getBulkRunResults(bulkRunId);
+        const runs = data.runs || [];
+        const bulk = data.bulk_run || {};
+        
+        nameBadge.textContent = `BULK RUN: ${bulk.name || bulkRunId.substring(0, 8)}`;
+        nameBadge.classList.remove('hide');
+        
+        if (runs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No scenario runs found under this bulk run.</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        runs.forEach(run => {
+            const tr = document.createElement('tr');
+            
+            const statusClass = run.status === 'COMPLETED' 
+                ? 'badge-success' 
+                : run.status === 'RUNNING' 
+                ? 'badge-info' 
+                : run.status === 'FAILED' 
+                ? 'badge-error' 
+                : 'badge-muted';
+                
+            const progress = run.total_events > 0 
+                ? `${run.sent_events}/${run.total_events}`
+                : '0/0';
+                
+            tr.innerHTML = `
+                <td style="font-weight: 500;">${escapeHtml(run.scenario_name || 'Deleted Scenario')}</td>
+                <td><span class="badge ${statusClass}">${escapeHtml(run.status)}</span></td>
+                <td>${progress}</td>
+                <td class="text-emerald" style="font-family: var(--font-mono); font-weight: bold;">${run.matched_playbooks || 0}</td>
+                <td class="text-error" style="font-family: var(--font-mono); font-weight: bold;">${run.mismatched_playbooks || 0}</td>
+                <td class="text-warning" style="font-family: var(--font-mono); font-weight: bold;">${run.no_playbook || 0}</td>
+                <td>
+                    <button type="button" class="btn btn-secondary view-sequence-btn" data-run-id="${run.id}" style="padding: 2px 6px; font-size: 10px; line-height: 1.2;">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i> View Sequence
+                    </button>
+                </td>
+            `;
+            
+            const btn = tr.querySelector('.view-sequence-btn');
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectedRunId = run.id;
+                    switchView('simulations');
+                });
+            }
+            
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Failed to load bulk run details:', err);
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-error" style="padding: 20px;">Failed to load bulk run details.</td></tr>';
     }
 }
 

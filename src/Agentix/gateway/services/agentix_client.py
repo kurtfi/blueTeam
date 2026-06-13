@@ -464,3 +464,70 @@ async def get_sim_stats() -> dict:
             logger.error("gateway.agentix_client.get_sim_stats_failed", error=str(e))
             raise
 
+
+async def get_active_llm_info() -> dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/settings/llm",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_active_llm_info_failed", error=str(e))
+            raise
+
+
+async def trigger_bulk_run(name: str, scenario_ids: list[str], rate: float, strip_labels: bool = False) -> dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{AGENTIX_API_URL}/v1/simulations/bulk-runs",
+                json={
+                    "name": name,
+                    "scenario_ids": scenario_ids,
+                    "send_rate_per_sec": rate,
+                    "strip_labels": strip_labels
+                },
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.trigger_bulk_run_failed", name=name, error=str(e))
+            raise
+
+
+async def list_bulk_runs(limit: int = 20, offset: int = 0) -> list[dict]:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/simulations/bulk-runs",
+                params={"limit": limit, "offset": offset},
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.list_bulk_runs_failed", error=str(e))
+            raise
+
+
+async def get_bulk_run_results(bulk_run_id: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{AGENTIX_API_URL}/v1/simulations/bulk-runs/{bulk_run_id}/results",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.get_bulk_run_results_failed", bulk_run_id=bulk_run_id, error=str(e))
+            raise
+

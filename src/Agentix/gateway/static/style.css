@@ -2790,5 +2790,23 @@ textarea:focus-visible,
     font-size: 11px !important;
 }
 
+/* Benchmark Anonymize Checkbox highlight card */
+.benchmark-highlight-card {
+    padding: 10px 12px;
+    background: rgba(245, 158, 11, 0.04);
+    border: 1px solid rgba(245, 158, 11, 0.15);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--border-radius);
+    margin: 8px 0;
+    transition: all var(--transition-fast);
+}
+
+.benchmark-highlight-card:hover {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.3);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
+}
+
+
 
 
