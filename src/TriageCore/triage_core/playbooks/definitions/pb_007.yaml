@@ -12,6 +12,7 @@ tags:
 - suid
 - linux
 - wazuh-syscheck
+- wazuh-rule-100020
 case_template: MITRE T1548.001 - Privilege Escalation via SUID
 steps:
 - order: 0

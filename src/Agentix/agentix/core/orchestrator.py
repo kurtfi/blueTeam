@@ -194,6 +194,32 @@ class Orchestrator:
 
         rag_context = await self._rag.retrieve_context(user_message, user_id, log)
 
+        # Retrieve and filter allowed playbooks for this agent from DB
+        playbooks_str = None
+        has_playbook_tools = matched_tools and any(
+            t.name in ("trigger_playbook", "list_playbooks", "find_playbook_for_alert") for t in matched_tools
+        )
+        if has_playbook_tools and self._config and self._config.id:
+            try:
+                allowed_ids = await self._db_repo.get_allowed_playbooks_for_agent(self._config.id)
+                raw_json = getattr(self._catalog, "cached_playbooks_json", None)
+                if raw_json and allowed_ids:
+                    import json
+                    all_playbooks = json.loads(raw_json)
+                    allowed_playbooks = [pb for pb in all_playbooks if pb["id"] in allowed_ids]
+                    if allowed_playbooks:
+                        lines = ["# Available SOC Playbooks\n"]
+                        for pb in allowed_playbooks:
+                            lines.append(
+                                f"**{pb['id']}** – {pb['name']}\n"
+                                f"  MITRE: {', '.join(pb['mitre_ids'])} | "
+                                f"Severity: {pb['severity'].upper()} | "
+                                f"Step: {pb['steps']}\n"
+                            )
+                        playbooks_str = "\n".join(lines)
+            except Exception as e:
+                log.warning("orchestrator.filter_playbooks_failed", agent=self._config.id, error=str(e))
+
         base_prompt = (
             self._config.system_prompt_override if self._config and self._config.system_prompt_override else None
         )
@@ -202,7 +228,7 @@ class Orchestrator:
         composer = SystemPromptComposer(base_prompt)
         system_prompt = composer.compose(
             available_tools=matched_tools,
-            playbooks_str=getattr(self._catalog, "cached_playbooks", None),
+            playbooks_str=playbooks_str,
             rag_context=rag_context,
         )
 
@@ -472,6 +498,7 @@ class Orchestrator:
             session_id=session_id,
             parent=trace,
             workspace=self._workspace,
+            agent_id=self._config.id if self._config else None,
         )
 
         # Yield OBSERVE steps and feed results back to the model.

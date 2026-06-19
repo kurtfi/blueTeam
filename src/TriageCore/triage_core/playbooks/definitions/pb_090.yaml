@@ -1,0 +1,25 @@
+id: PB-090
+name: Triage Playbook for Rubeus Userland ASKTGT PTT
+description: 'Playbook for triaging Rubeus Userland ASKTGT PTT alert: This dataset
+  represents adversaries crafting raw AS-REQ (TGT request) traffic for a specific
+  user and encryption key (/rc4, /aes128, /aes256, or /des) to request TGTs without
+  touching lsass.'
+severity: medium
+mitre_ids:
+- T1003.003
+tags:
+- wazuh-rule-100004
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

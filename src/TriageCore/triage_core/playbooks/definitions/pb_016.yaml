@@ -1,0 +1,23 @@
+id: PB-016
+name: Triage Playbook for Covenant PowerShell Remoting Command
+description: 'Playbook for triaging Covenant PowerShell Remoting Command alert: This
+  dataset represents adversaries executing malicious code on remote hosts using PowerShell
+  Remoting (WinRM).'
+severity: medium
+mitre_ids:
+- T1003.001
+- T1021.006
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

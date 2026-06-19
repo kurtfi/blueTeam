@@ -117,7 +117,7 @@ store.subscribe((state, prevState) => {
         if (meta) {
             viewTitle.textContent = meta.title;
             if (viewName === 'session-detail' && state.activeSessionId) {
-                viewDesc.textContent = `Detailed analysis of investigation session ${state.activeSessionId.substring(0,8)}…`;
+                viewDesc.textContent = `Detailed analysis of investigation session ${state.activeSessionId}`;
             } else {
                 viewDesc.textContent = meta.desc;
             }

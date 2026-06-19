@@ -1,0 +1,22 @@
+id: PB-083
+name: Triage Playbook for Psexec Reg LSA Secrets Dump
+description: 'Playbook for triaging Psexec Reg LSA Secrets Dump alert: This dataset
+  represents adversaries using psexec to run reg.exe as system and dump LSA secrets.
+  Location HKLM\security\policy\secrets.'
+severity: medium
+mitre_ids:
+- T1003.004
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

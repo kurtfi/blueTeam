@@ -24,7 +24,9 @@ class AgentLoader:
         with open(path, encoding="utf-8") as f:
             data = safe_load(f)
 
-        return AgentConfig(**data)
+        config = AgentConfig(**data)
+        config.id = path.stem
+        return config
 
     @staticmethod
     def load_by_name(agent_name: str) -> AgentConfig:

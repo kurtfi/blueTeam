@@ -26,6 +26,7 @@ class LLMConfig(BaseModel):
 class AgentConfig(BaseModel):
     """Full configuration for a specialized Agent."""
 
+    id: str | None = None
     name: str
     role: str
     system_prompt_override: str | None = None

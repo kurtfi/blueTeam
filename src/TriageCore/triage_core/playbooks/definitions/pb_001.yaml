@@ -8,7 +8,7 @@ mitre_ids:
 severity: high
 tags:
 - credential-dumping
-- wazuh-rule-100002
+- wazuh-rule-100008
 - linux
 case_template: MITRE T1003.008 - OS Credential Dumping
 soar_workflow_id: agentix-mitre-workflow-v1
@@ -16,11 +16,11 @@ steps:
 - order: 0
   title: Query SIEM – Identify Offending Process
   group: Investigation
-  description: Search Wazuh/Elasticsearch for events matching rule 100002 on the affected
+  description: Search Wazuh/Elasticsearch for events matching rule 100008 on the affected
     agent. Extract process name, PID, and user context.
   tool_hint: query_siem_logs
   parameters:
-    query: rule.id:100002 AND agent.id:ctx.agent_id
+    query: rule.id:100008 AND agent.id:ctx.agent_id
 - order: 1
   title: Enrich Source IP via Cortex
   group: Enrichment

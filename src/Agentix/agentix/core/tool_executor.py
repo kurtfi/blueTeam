@@ -30,6 +30,7 @@ class ToolExecutionEngine:
         session_id: str,
         parent: Any | None = None,
         workspace: Any | None = None,
+        agent_id: str | None = None,
     ) -> list[ToolResult]:
         """
         Execute all tool calls concurrently using asyncio.gather.
@@ -51,6 +52,7 @@ class ToolExecutionEngine:
             "preference_store": self._preference_store,
             "workspace": active_workspace,
             "workspace_path": workspace_path,
+            "agent_id": agent_id,
         }
 
         async def _single(tc: dict) -> ToolResult:

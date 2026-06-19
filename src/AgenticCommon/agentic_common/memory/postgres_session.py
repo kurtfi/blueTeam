@@ -547,6 +547,58 @@ class PostgresSessionRepository:
             "avg_duration_seconds": float(avg_duration_sec),
         }
 
+    async def register_agent_in_db(self, agent_id: str, config_path: str) -> None:
+        """Upsert agent configuration path into agents registry table."""
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO agents (id, config_path)
+                VALUES ($1, $2)
+                ON CONFLICT (id) DO UPDATE SET config_path = EXCLUDED.config_path
+                """,
+                agent_id,
+                config_path,
+            )
+
+    async def register_playbook_in_db(self, playbook_id: str, file_path: str) -> None:
+        """Upsert playbook file path into playbooks registry table."""
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO playbooks (id, file_path)
+                VALUES ($1, $2)
+                ON CONFLICT (id) DO UPDATE SET file_path = EXCLUDED.file_path
+                """,
+                playbook_id,
+                file_path,
+            )
+
+    async def map_agent_to_playbook(self, agent_id: str, playbook_id: str) -> None:
+        """Create mapping relationship between an agent and a playbook."""
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO agent_playbooks (agent_id, playbook_id)
+                VALUES ($1, $2)
+                ON CONFLICT DO NOTHING
+                """,
+                agent_id,
+                playbook_id,
+            )
+
+    async def get_allowed_playbooks_for_agent(self, agent_id: str) -> list[str]:
+        """Get the list of playbook IDs mapped to the given agent ID."""
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT playbook_id FROM agent_playbooks WHERE agent_id = $1",
+                agent_id,
+            )
+            return [row["playbook_id"] for row in rows]
+
     async def close(self) -> None:
         if self._pool:
             await self._pool.close()
@@ -555,3 +607,4 @@ class PostgresSessionRepository:
 
 # Singleton instance helper
 postgres_session_repo = PostgresSessionRepository()
+

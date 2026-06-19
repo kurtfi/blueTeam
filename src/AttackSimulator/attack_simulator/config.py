@@ -17,7 +17,7 @@ DATABASE_URL = os.getenv(
 # Target Agentix Webhook URL
 WEBHOOK_URL = os.getenv(
     "AGENTIX_WEBHOOK_URL", 
-    "http://localhost:8080/v1/webhooks/siem"
+    "http://localhost:8080/v1/webhooks/simulation"
 )
 
 # Internal API Key for webhook authentication bypass

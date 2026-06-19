@@ -11,6 +11,7 @@ tags:
 - exfiltration
 - dns-tunneling
 - covert-channel
+- wazuh-rule-100025
 case_template: MITRE T1048 - Data Exfiltration via DNS
 steps:
 - order: 0

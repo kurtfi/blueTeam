@@ -241,6 +241,7 @@ class PlaybookResult:
     approval_required_steps: list[str]  # titles of steps needing human approval
     case_template: str | None = None  # Template name to use when creating the case
     soar_workflow_id: str | None = None
+    file_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -253,6 +254,7 @@ class PlaybookResult:
             "case_template": self.case_template,
             "soar_workflow_id": self.soar_workflow_id,
             "instructions": self.instructions,
+            "file_path": self.file_path,
         }
 
 
@@ -288,6 +290,7 @@ class Playbook:
         tags: list[str] | None = None,
         case_template: str | None = None,
         soar_workflow_id: str | None = None,
+        file_path: str | None = None,
     ) -> None:
         self.id = id
         self.name = name
@@ -298,6 +301,7 @@ class Playbook:
         self.tags = tags or []
         self.case_template = case_template
         self.soar_workflow_id = soar_workflow_id
+        self.file_path = file_path
 
     def render(self, ctx: PlaybookContext) -> PlaybookResult:
         """
@@ -342,6 +346,7 @@ class Playbook:
             approval_required_steps=approval_steps,
             case_template=self.case_template,
             soar_workflow_id=self.soar_workflow_id,
+            file_path=self.file_path,
         )
 
     def matches(self, rule_id: str = "", mitre_ids: list[str] | None = None) -> bool:

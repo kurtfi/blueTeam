@@ -1,0 +1,24 @@
+id: PB-061
+name: Triage Playbook for Empire Shell Net Domain Admins
+description: 'Playbook for triaging Empire Shell Net Domain Admins alert: This dataset
+  represents adversaries enumerating members of domain groups (i.e. Domain Admins)
+  via RPC SAMR interface over SMB. Some of the main RPC methods captured over the
+  network are SamrLookupNamesInDomain (Opnum 17) and SamrQueryInformationGroup (Opnum
+  20) where there are indicators about the specific group name enumerated.'
+severity: medium
+mitre_ids:
+- T1069.002
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

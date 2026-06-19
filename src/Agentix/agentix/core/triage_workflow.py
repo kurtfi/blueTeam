@@ -22,13 +22,16 @@ def set_shared_catalog(catalog: ToolCatalog) -> None:
     _shared_catalog = catalog
 
 
-async def process_siem_alert(session_id: str, payload: dict):
+async def process_siem_alert(session_id: str, payload: dict, agent_name: str = "soc_analyst"):
     """
     Initiates a SOC Triage agent session using the SOC Analyst agent
     and the shared MCP-connected ToolCatalog.
     """
-    logger.info("triage_workflow.delay_startup", session_id=session_id, delay_seconds=15)
-    await asyncio.sleep(15)
+    if agent_name == "simulation_analyst":
+        logger.info("triage_workflow.delay_startup.skipped", session_id=session_id)
+    else:
+        logger.info("triage_workflow.delay_startup", session_id=session_id, delay_seconds=15)
+        await asyncio.sleep(15)
 
     logger.info("triage_workflow.start", session_id=session_id)
 
@@ -43,8 +46,46 @@ async def process_siem_alert(session_id: str, payload: dict):
     # Convert payload into a prompt for the agent
     alert_details = json.dumps(payload, indent=2)
 
-    # Create a comprehensive prompt for the agent to act as an Autonomous Tier 1 SOC Analyst
-    prompt = f"""
+    if agent_name == "simulation_analyst":
+        # Extract metadata to help the agent directly call the tools
+        rule_id = (
+            payload.get("rule_id")
+            or payload.get("rule", {}).get("id")
+            or payload.get("all_fields", {}).get("rule", {}).get("id")
+        )
+        mitre_ids = (
+            payload.get("mitre_ids")
+            or payload.get("rule", {}).get("mitre", {}).get("id")
+            or payload.get("all_fields", {}).get("rule", {}).get("mitre", {}).get("id")
+        )
+        if mitre_ids and isinstance(mitre_ids, str):
+            mitre_ids = [mitre_ids]
+
+        mitre_str = ", ".join(mitre_ids) if mitre_ids else "None"
+        
+        prompt = f"""
+Identify the correct playbook for this SIEM alert.
+
+ALERT INFO:
+- Rule ID: {rule_id}
+- MITRE IDs: {mitre_str}
+- Description: {payload.get('rule', {}).get('description', '')}
+- Full Payload:
+{alert_details}
+
+YOUR TASK:
+1. Run `find_playbook_for_alert` with rule_id="{rule_id}" and mitre_ids={mitre_ids or []}.
+2. If `find_playbook_for_alert` does not find a playbook, run `list_playbooks` to see all playbooks, find the one that matches the alert description or MITRE ID, and use that.
+3. In your Final Answer, explicitly specify the playbook ID you found (e.g., PB-072). Do NOT trigger it.
+4. Keep it extremely fast. Do NOT query SIEM logs, check IP reputation, or do any other analysis. Return your answer in 1-2 steps.
+5. Your final response MUST end with exactly one of these verdict tags:
+   - VERDICT: TRUE_POSITIVE
+   - VERDICT: FALSE_POSITIVE
+   - VERDICT: UNDETERMINED
+"""
+    else:
+        # Create a comprehensive prompt for the agent to act as an Autonomous Tier 1 SOC Analyst
+        prompt = f"""
 You are an autonomous Tier 1 (T1) SOC Analyst. The following alert dropped from the SIEM:
 
 ALERT DETAILS:
@@ -78,7 +119,7 @@ IMPORTANT NOTE (SIEM QUERIES):
     try:
         # Use the SOC Analyst agent with the shared catalog
         orchestrator = AgentFactory.create(
-            "soc_analyst",
+            agent_name,
             catalog=catalog,
             memory=redis_store,
         )

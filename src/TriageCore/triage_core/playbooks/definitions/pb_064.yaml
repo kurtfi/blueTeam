@@ -1,0 +1,22 @@
+id: PB-064
+name: Triage Playbook for Empire VBS Execution
+description: 'Playbook for triaging Empire VBS Execution alert: This dataset represents
+  adversaries executing a VBS script as a launcher for initial access.'
+severity: medium
+mitre_ids:
+- T1059.005
+- T1003.001
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

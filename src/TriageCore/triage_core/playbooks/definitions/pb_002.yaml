@@ -10,7 +10,7 @@ severity: critical
 tags:
 - reverse-shell
 - c2
-- wazuh-rule-100003
+- wazuh-rule-100015
 - linux
 case_template: MITRE T1059.004 - Suspicious Command Execution
 soar_workflow_id: agentix-mitre-workflow-v1
@@ -18,11 +18,11 @@ steps:
 - order: 0
   title: Query SIEM – Capture Event Details
   group: Investigation
-  description: Retrieve full event data for rule 100003 on the affected agent. Note
+  description: Retrieve full event data for rule 100015 on the affected agent. Note
     command line, destination IP, and destination port.
   tool_hint: query_siem_logs
   parameters:
-    query: rule.id:100003 AND agent.id:ctx.agent_id
+    query: rule.id:100015 AND agent.id:ctx.agent_id
 - order: 1
   title: Enrich Destination IP (C2 Check)
   group: Enrichment

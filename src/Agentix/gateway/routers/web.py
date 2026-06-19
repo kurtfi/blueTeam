@@ -360,3 +360,16 @@ async def web_bulk_run_results(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/simulations/bulk-runs/{bulk_run_id}/cancel", summary="Cancel an active bulk simulation run")
+async def web_cancel_bulk_run(
+    bulk_run_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
+    from gateway.services.agentix_client import cancel_bulk_run
+    try:
+        return await cancel_bulk_run(bulk_run_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+

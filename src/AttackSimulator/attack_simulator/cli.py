@@ -19,12 +19,124 @@ from attack_simulator.correlation.engine import CorrelationEngine
 from attack_simulator.sender.webhook import send_alert_to_webhook
 from attack_simulator.evaluator.playbook_match import evaluate_run
 from attack_simulator.evaluator.gap_analyzer import generate_coverage_report, print_ascii_gap_report
+from attack_simulator.config import WEBHOOK_URL
 
 logger = structlog.get_logger(__name__)
 
 
 def compute_sha256(data: str) -> str:
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+
+def correlate_and_fallback_events(
+    raw_events_gen, 
+    mitre_ids: list[str], 
+    engine: CorrelationEngine
+) -> list[dict[str, Any]]:
+    """
+    Correlates raw events with rules and filters alerts not matching the scenario's techniques.
+    Generates fallback alerts for execution events if no rules match.
+    """
+    from attack_simulator.mapper.wazuh_template import generate_wazuh_alert
+    from attack_simulator.mapper.mitre_catalog import get_mitre_info
+    
+    correlated_events = []
+    seq_order = 1
+    primary_technique = mitre_ids[0] if mitre_ids else "T1059"
+    
+    # Normalize mitre_ids to facilitate easy checking
+    normalized_mitre_ids = {m.upper().strip() for m in mitre_ids}
+    # Also add parent technique IDs for sub-techniques (e.g. T1003 for T1003.001)
+    parent_ids = set()
+    for m in normalized_mitre_ids:
+        if "." in m:
+            parent_ids.add(m.split(".")[0])
+    normalized_mitre_ids.update(parent_ids)
+    
+    first_few_events = []
+    
+    for raw in raw_events_gen:
+        # Keep track of first few events for fail-safe fallback
+        if len(first_few_events) < 3:
+            first_few_events.append(raw)
+            
+        alerts = engine.process_event(raw)
+        matched_any = False
+        
+        # 1. Standard rules processing
+        for alert in alerts:
+            alert_tech = alert["rule"]["mitre"]["id"][0].upper().strip()
+            # ONLY ingest standard correlated alerts if they belong to this scenario's techniques.
+            # This filters out background noise (like LSASS access Event ID 10) in unrelated scenarios.
+            if alert_tech in normalized_mitre_ids:
+                raw_log_str = alert.get("full_log", "")
+                raw_hash = compute_sha256(raw_log_str)
+                correlated_events.append({
+                    "sequence_order": seq_order,
+                    "mitre_technique": alert["rule"]["mitre"]["id"][0],
+                    "mitre_tactic": alert["rule"]["mitre"]["tactic"][0],
+                    "correlation_type": "direct" if "aggregation" not in alert["full_log"].lower() else "aggregation",
+                    "raw_event_count": 1,
+                    "correlation_rule": alert["rule"]["description"],
+                    "wazuh_alert": alert,
+                    "raw_log_hash": raw_hash,
+                })
+                seq_order += 1
+                matched_any = True
+                
+        # 2. Fallback processing:
+        # If no explicit rules matched this event, check if it is a relevant execution/action event
+        if not matched_any:
+            event_id = str(raw.get("EventID") or raw.get("event_id") or raw.get("eventID") or "")
+            command_line = raw.get("CommandLine") or raw.get("message") or ""
+            
+            is_execution = (
+                event_id in ("1", "3", "11", "12", "13", "4104", "4662", "4688", "7045", "5156") 
+                or bool(command_line)
+            )
+            
+            if is_execution:
+                alert = generate_wazuh_alert(primary_technique, raw)
+                raw_log_str = alert.get("full_log", "")
+                raw_hash = compute_sha256(raw_log_str)
+                
+                mitre_info = get_mitre_info(primary_technique)
+                
+                correlated_events.append({
+                    "sequence_order": seq_order,
+                    "mitre_technique": primary_technique,
+                    "mitre_tactic": mitre_info.get("tactic", "Unknown Tactic"),
+                    "correlation_type": "direct",
+                    "raw_event_count": 1,
+                    "correlation_rule": f"Fallback alert for {primary_technique} execution",
+                    "wazuh_alert": alert,
+                    "raw_log_hash": raw_hash,
+                })
+                seq_order += 1
+                
+    # 3. Fail-safe fallback if 0 events matched
+    if not correlated_events and first_few_events:
+        logger.info("correlate_and_fallback.failsafe_triggered", mitre_ids=mitre_ids)
+        for raw in first_few_events:
+            alert = generate_wazuh_alert(primary_technique, raw)
+            raw_log_str = alert.get("full_log", "")
+            raw_hash = compute_sha256(raw_log_str)
+            
+            mitre_info = get_mitre_info(primary_technique)
+            
+            correlated_events.append({
+                "sequence_order": seq_order,
+                "mitre_technique": primary_technique,
+                "mitre_tactic": mitre_info.get("tactic", "Unknown Tactic"),
+                "correlation_type": "direct",
+                "raw_event_count": 1,
+                "correlation_rule": f"Fallback alert for {primary_technique} execution (failsafe)",
+                "wazuh_alert": alert,
+                "raw_log_hash": raw_hash,
+            })
+            seq_order += 1
+            
+    return correlated_events
 
 
 async def download_file(url: str, dest_path: str) -> None:
@@ -128,7 +240,8 @@ async def ingest_command(args: argparse.Namespace) -> None:
 
     print(f"[*] Starting ingestion from {args.source} source: {args.path} ...")
     
-    # 1. Initialize loader
+    # 1. Initialize loader and resolve mitre_ids
+    from attack_simulator.mapper.mordor_filename import get_mordor_file_info, extract_technique_from_path
     if args.source == "mordor":
         loader = MordorLoader()
         # Fallback names
@@ -141,6 +254,12 @@ async def ingest_command(args: argparse.Namespace) -> None:
             print(f"[-] Error: Scenario with name '{scenario_name}' is already ingested. Ingestion blocked.", file=sys.stderr)
             return
 
+        info = get_mordor_file_info(os.path.basename(source_path))
+        if info:
+            mitre_ids = info.get("techniques", [])
+        else:
+            mitre_ids = [extract_technique_from_path(source_path)]
+
         raw_events_gen = loader.load(source_path)
     else:  # custom
         loader_custom = CustomLoader()
@@ -148,6 +267,7 @@ async def ingest_command(args: argparse.Namespace) -> None:
             metadata, raw_events_list = loader_custom.load_scenario_file(source_path)
             scenario_name = args.scenario_name or metadata["name"]
             scenario_desc = args.description or metadata["description"]
+            mitre_ids = metadata.get("mitre_ids", [])
             
             # Check name to block duplicate scenario names
             existing_name = await db_repo.get_scenario_by_name(scenario_name)
@@ -162,45 +282,30 @@ async def ingest_command(args: argparse.Namespace) -> None:
 
     # 2. Correlate raw events on-the-fly
     engine = CorrelationEngine()
-    correlated_events = []
     
     raw_count = 0
-    seq_order = 1
-    
-    # Wrap in tqdm if outputting to terminal
-    print("[*] Processing raw events and running correlation engine...")
-    for raw in raw_events_gen:
-        raw_count += 1
-        alerts = engine.process_event(raw)
-        for alert in alerts:
-            # Generate a unique hash for the alert to prevent duplicate insertions
-            raw_log_str = alert.get("full_log", "")
-            raw_hash = compute_sha256(raw_log_str)
-            
-            correlated_events.append({
-                "sequence_order": seq_order,
-                "mitre_technique": alert["rule"]["mitre"]["id"][0],
-                "mitre_tactic": alert["rule"]["mitre"]["tactic"][0],
-                "correlation_type": "direct" if "aggregation" not in alert["full_log"].lower() else "aggregation",
-                "raw_event_count": 1,  # For simplicity
-                "correlation_rule": alert["rule"]["description"],
-                "wazuh_alert": alert,
-                "raw_log_hash": raw_hash,
-            })
-            seq_order += 1
+    def count_raw_generator(gen):
+        nonlocal raw_count
+        for item in gen:
+            raw_count += 1
+            yield item
+
+    print("[*] Processing raw events and running correlation engine with fallback...")
+    correlated_events = correlate_and_fallback_events(count_raw_generator(raw_events_gen), mitre_ids, engine)
 
     if not correlated_events:
-        print("[-] Ingestion cancelled: Correlation Engine produced 0 alerts from this raw data.")
+        print("[-] Ingestion cancelled: 0 alerts generated from this raw data.")
         return
 
-    # Extract all unique MITRE IDs
-    mitre_ids = list(set(ev["mitre_technique"] for ev in correlated_events))
+    # Extract all unique MITRE IDs from correlated events to combine with mitre_ids
+    event_techs = [ev["mitre_technique"] for ev in correlated_events]
+    combined_mitre_ids = list(set(mitre_ids + event_techs))
 
     # 3. Create Scenario and Events in PostgreSQL
     scenario_id = await db_repo.create_scenario(
         name=scenario_name,
         description=scenario_desc,
-        mitre_ids=mitre_ids,
+        mitre_ids=combined_mitre_ids,
         source_dataset=args.source,
         source_path=args.path,
         total_events=len(correlated_events),
@@ -309,6 +414,7 @@ async def ingest_all_command(args: argparse.Namespace) -> None:
                 if not info:
                     scenario_name = metadata.get("name", scenario_name)[:255]
                     scenario_desc = metadata.get("description", scenario_desc)[:1000]
+                    mitre_ids = metadata.get("mitre_ids", []) or mitre_ids
                 raw_events_gen = (e for e in raw_events_list)
             except Exception as e:
                 logger.error("ingest_all.failed_to_load_custom", path=file_path, error=str(e))
@@ -316,27 +422,8 @@ async def ingest_all_command(args: argparse.Namespace) -> None:
                 continue
 
         # Process and correlate events
-        correlated_events = []
-        seq_order = 1
-        
         try:
-            for raw in raw_events_gen:
-                alerts = engine.process_event(raw)
-                for alert in alerts:
-                    raw_log_str = alert.get("full_log", "")
-                    raw_hash = compute_sha256(raw_log_str)
-                    
-                    correlated_events.append({
-                        "sequence_order": seq_order,
-                        "mitre_technique": alert["rule"]["mitre"]["id"][0],
-                        "mitre_tactic": alert["rule"]["mitre"]["tactic"][0],
-                        "correlation_type": "direct" if "aggregation" not in alert["full_log"].lower() else "aggregation",
-                        "raw_event_count": 1,
-                        "correlation_rule": alert["rule"]["description"],
-                        "wazuh_alert": alert,
-                        "raw_log_hash": raw_hash,
-                    })
-                    seq_order += 1
+            correlated_events = correlate_and_fallback_events(raw_events_gen, mitre_ids, engine)
         except Exception as e:
             logger.error("ingest_all.error_correlating", filename=filename, error=str(e))
             failed += 1
@@ -420,7 +507,10 @@ async def run_command(args: argparse.Namespace) -> None:
     print("[*] Replaying alerts...")
     for idx, ev in enumerate(tqdm(events)):
         # Send alert
-        session_id = await send_alert_to_webhook(ev["wazuh_alert"])
+        import copy
+        alert_payload = copy.deepcopy(ev["wazuh_alert"])
+        alert_payload["simulation_run_id"] = str(run_id)
+        session_id = await send_alert_to_webhook(alert_payload)
         
         # Record result placeholder
         expected_mitre = [ev["mitre_technique"]]
@@ -499,14 +589,14 @@ async def report_command(args: argparse.Namespace) -> None:
     print("-" * 80)
     
     print("\nDETAILED EVENT VERDICTS:")
-    print(f"  {'Seq':<4} | {'MITRE Tech':<12} | {'Session ID':<36} | {'Expected PB':<11} | {'Actual PB':<11} | {'Result':<10}")
-    print("  " + "-" * 98)
+    print(f"  {'Seq':<4} | {'MITRE Tech':<12} | {'Session ID':<36} | {'Expected PB':<25} | {'Actual PB':<11} | {'Result':<10}")
+    print("  " + "-" * 112)
     for res in results:
         actual_str = res["actual_playbook"] or "None"
         expected_str = res["expected_playbook"] or "None"
         session_str = res["session_id"] or "FAILED_SEND"
-        print(f"  {res['sequence_order']:<4} | {res['mitre_technique']:<12} | {session_str:<36} | {expected_str:<11} | {actual_str:<11} | {res['match_result']:<10}")
-    print("=" * 80)
+        print(f"  {res['sequence_order']:<4} | {res['mitre_technique']:<12} | {session_str:<36} | {expected_str:<25} | {actual_str:<11} | {res['match_result']:<10}")
+    print("=" * 115)
 
 
 async def list_command(args: argparse.Namespace) -> None:

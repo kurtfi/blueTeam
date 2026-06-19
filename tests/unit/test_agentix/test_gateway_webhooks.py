@@ -67,3 +67,44 @@ async def test_webhook_forwarding_failure(mock_async_client):
     # Gateway should return 502 Bad Gateway
     assert response.status_code == 502
     assert response.json()["detail"] == "Error forwarding request to agentix-api"
+
+
+@pytest.mark.asyncio
+@patch("gateway.routers.webhooks.httpx.AsyncClient")
+async def test_simulation_webhook_forwarding_success(mock_async_client):
+    mock_response = httpx.Response(
+        status_code=200,
+        content=b'{"status": "received", "session_id": "simulation-123"}',
+        headers={"content-type": "application/json"},
+    )
+    mock_client_instance = AsyncMock()
+    mock_client_instance.post.return_value = mock_response
+    mock_async_client.return_value.__aenter__.return_value = mock_client_instance
+
+    payload = {"alert_id": "888", "rule": {"level": 5}}
+    headers = {"Content-Type": "application/json", "X-Webhook-Signature": "mock-hmac-signature-value"}
+
+    response = client.post("/v1/webhooks/simulation", json=payload, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "received", "session_id": "simulation-123"}
+
+    mock_client_instance.post.assert_called_once()
+    call_args = mock_client_instance.post.call_args
+    assert call_args is not None
+    assert "/v1/webhooks/simulation" in call_args[0][0]
+    assert call_args[1]["headers"]["x-webhook-signature"] == "mock-hmac-signature-value"
+    assert b'"alert_id":"888"' in call_args[1]["content"]
+
+
+@pytest.mark.asyncio
+@patch("gateway.routers.webhooks.httpx.AsyncClient")
+async def test_simulation_webhook_forwarding_failure(mock_async_client):
+    mock_client_instance = AsyncMock()
+    mock_client_instance.post.side_effect = httpx.HTTPError("Connection failed")
+    mock_async_client.return_value.__aenter__.return_value = mock_client_instance
+
+    response = client.post("/v1/webhooks/simulation", json={"test": "data"}, headers={"X-Webhook-Signature": "signature"})
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Error forwarding request to agentix-api"

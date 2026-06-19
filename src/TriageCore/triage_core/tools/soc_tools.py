@@ -119,9 +119,10 @@ async def list_playbooks(filter_mitre: str = "", filter_severity: str = "") -> s
         for pb in playbooks:
             lines.append(
                 f"**{pb['id']}** – {pb['name']}\n"
+                f"  Description: {pb.get('description', 'No description.')}\n"
                 f"  MITRE: {', '.join(pb['mitre_ids'])} | "
                 f"Severity: {pb['severity'].upper()} | "
-                f"Step: {pb['steps']}\n"
+                f"Steps: {pb['steps']}\n"
             )
         return "\n".join(lines)
     except Exception as e:

@@ -1,0 +1,22 @@
+id: PB-034
+name: Triage Playbook for Empire Elevated Registry Run Keys
+description: 'Playbook for triaging Empire Elevated Registry Run Keys alert: This
+  dataset represents adversaries modifying local Run registry keys (i.e. HKLM:SOFTWARE\Microsoft\Windows\CurrentVersion\Run)
+  for persistence. It also captures the execution of the persistence mechanism.'
+severity: medium
+mitre_ids:
+- T1547.001
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

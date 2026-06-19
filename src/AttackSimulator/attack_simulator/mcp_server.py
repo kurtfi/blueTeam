@@ -70,6 +70,7 @@ async def _run_simulation_task(scenario_id: str, run_id: str, delay_seconds: flo
                 alert_payload.pop("mitre_ids", None)
                 alert_payload.pop("rule_id", None)
                 
+            alert_payload["simulation_run_id"] = str(run_id)
             session_id = await send_alert_to_webhook(alert_payload)
             
             # Record result

@@ -126,6 +126,28 @@ class MCPToolAdapter(BaseTool):
         """
         log = logger.bind(tool=self.name, attempt=0)
 
+        # Enforce playbook authorization checks for trigger and details tools
+        if self.name in ("trigger_playbook", "get_playbook_details") and context:
+            agent_id = context.get("agent_id")
+            playbook_id = kwargs.get("playbook_id")
+            if agent_id and playbook_id:
+                from agentic_common.memory import postgres_session_repo
+                try:
+                    allowed_ids = await postgres_session_repo.get_allowed_playbooks_for_agent(agent_id)
+                    if playbook_id not in allowed_ids:
+                        logger.warning(
+                            "mcp_adapter.unauthorized_playbook_access",
+                            agent_id=agent_id,
+                            playbook_id=playbook_id,
+                        )
+                        return ToolResult(
+                            success=False,
+                            error=f"Unauthorized: Agent '{agent_id}' is not authorized to access playbook '{playbook_id}'."
+                        )
+                except Exception as e:
+                    logger.error("mcp_adapter.auth_check_failed", error=str(e))
+                    return ToolResult(success=False, error=f"Playbook authorization check failed: {str(e)}")
+
         # --- interrupt_before hook ---
         if self._interrupt_before is not None:
             try:

@@ -12,6 +12,8 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: agentix_db
     restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   langfuse-db:
     image: postgres:16
@@ -107,7 +109,7 @@ services:
       - THEHIVE_URL=http://thehive:9000
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - LANGFUSE_HOST=http://langfuse:3000
-      - AGENTIX_WEBHOOK_URL=http://localhost:8000/v1/webhooks/siem
+      - AGENTIX_WEBHOOK_URL=http://localhost:8000/v1/webhooks/simulation
     env_file:
       - Agentix/.env
     volumes:
@@ -140,7 +142,7 @@ services:
       - AGENTIX_LOG_LEVEL=DEBUG
       - REDIS_URL=redis://redis:6379
       - ATTACK_SIMULATOR_DATABASE_URL=postgresql://agentix:password@postgres:5432/agentix_db
-      - AGENTIX_WEBHOOK_URL=http://agentix-api:8000/v1/webhooks/siem
+      - AGENTIX_WEBHOOK_URL=http://agentix-api:8000/v1/webhooks/simulation
     volumes:
       - ..:/app
       - /app/.venv
@@ -182,4 +184,5 @@ networks:
 
 volumes:
   langfuse_db_data:
+  postgres_data:
 

@@ -200,3 +200,13 @@ export async function getBulkRunResults(bulkRunId) {
     return response.json();
 }
 
+export async function cancelBulkRun(bulkRunId) {
+    const response = await fetch(`/web/simulations/bulk-runs/${bulkRunId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Failed to cancel bulk run');
+    return response.json();
+}
+
+

@@ -1722,16 +1722,15 @@ async function loadSimRunsList() {
                 ? 'badge-error' 
                 : 'badge-muted';
                 
-            const progress = run.total_events > 0 
-                ? `${run.sent_events}/${run.total_events}`
-                : '0/0';
+            const sessionsCount = (run.matched_playbooks || 0) + (run.mismatched_playbooks || 0) + (run.no_playbook || 0);
+            const progress = `${sessionsCount} sessions`;
                 
-            const stats = run.status === 'COMPLETED' 
+            const stats = run.status !== 'PENDING' 
                 ? `<span class="text-emerald" style="font-family: var(--font-mono); font-weight: bold;">${run.matched_playbooks}M</span> / <span class="text-error" style="font-family: var(--font-mono); font-weight: bold;">${run.mismatched_playbooks}W</span> / <span class="text-amber" style="font-family: var(--font-mono); font-weight: bold;">${run.no_playbook}N</span>`
                 : '-';
                 
             tr.innerHTML = `
-                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(run.id.substring(0, 8))}…</td>
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(run.id)}</td>
                 <td style="font-weight: 500;">${escapeHtml(run.scenario_name || 'Deleted Scenario')}</td>
                 <td><span class="badge ${statusClass}">${escapeHtml(run.status)}</span></td>
                 <td style="font-family: var(--font-mono);">${escapeHtml(run.send_rate_per_sec)}/s</td>
@@ -1759,23 +1758,19 @@ async function renderRunDetails(runId) {
     const detailIdBadge = document.getElementById('sim-run-detail-id');
     const detailSessionBadge = document.getElementById('sim-run-detail-session');
     const detailVerdictBadge = document.getElementById('sim-run-detail-verdict');
-    const thSession = document.getElementById('sim-results-th-session');
-    const thVerdict = document.getElementById('sim-results-th-verdict');
     if (!tbody || !detailIdBadge) return;
     
     try {
         const data = await api.getSimRunResults(runId);
         const results = data.results || [];
         
-        detailIdBadge.textContent = `RUN: ${runId.substring(0, 18)}…`;
+        detailIdBadge.textContent = `RUN: ${runId}`;
         detailIdBadge.classList.remove('hide');
         
         if (results.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No sequence events logged for this run.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 20px; color: var(--text-muted);">No sequence events logged for this run.</td></tr>';
             if (detailSessionBadge) detailSessionBadge.classList.add('hide');
             if (detailVerdictBadge) detailVerdictBadge.classList.add('hide');
-            if (thSession) thSession.classList.remove('hide');
-            if (thVerdict) thVerdict.classList.remove('hide');
             return;
         }
 
@@ -1790,7 +1785,7 @@ async function renderRunDetails(runId) {
 
         if (detailSessionBadge) {
             if (singleSessionId) {
-                detailSessionBadge.innerHTML = `SESSION: <a href="#" class="view-single-session text-cyan" data-session-id="${singleSessionId}" style="text-decoration: underline; font-family: var(--font-mono);">${escapeHtml(singleSessionId.substring(0, 8))}…</a>`;
+                detailSessionBadge.innerHTML = `SESSION: <a href="#" class="view-single-session text-cyan" data-session-id="${singleSessionId}" style="text-decoration: underline; font-family: var(--font-mono);">${escapeHtml(singleSessionId)}</a>`;
                 detailSessionBadge.classList.remove('hide');
                 
                 const singleLink = detailSessionBadge.querySelector('.view-single-session');
@@ -1813,7 +1808,7 @@ async function renderRunDetails(runId) {
             if (singleVerdict) {
                 const verdictClass = singleVerdict === 'CORRECT' 
                     ? 'badge-success' 
-                    : singleVerdict === 'WRONG' 
+                    : singleVerdict === 'WRONG' || singleVerdict === 'FAILED'
                     ? 'badge-error' 
                     : singleVerdict === 'NO_PLAYBOOK' 
                     ? 'badge-warning' 
@@ -1829,67 +1824,215 @@ async function renderRunDetails(runId) {
                 detailVerdictBadge.classList.add('hide');
             }
         }
-
-        if (thSession) {
-            if (hasSingleSession) {
-                thSession.classList.add('hide');
+        
+        // Group results by session_id
+        const sessionsMap = {}; // session_id -> list of results
+        const noSessionResults = [];
+        
+        results.forEach(res => {
+            if (res.session_id) {
+                if (!sessionsMap[res.session_id]) {
+                    sessionsMap[res.session_id] = [];
+                }
+                sessionsMap[res.session_id].push(res);
             } else {
-                thSession.classList.remove('hide');
+                noSessionResults.push(res);
             }
-        }
-
-        if (thVerdict) {
-            if (hasSingleVerdict) {
-                thVerdict.classList.add('hide');
-            } else {
-                thVerdict.classList.remove('hide');
-            }
-        }
+        });
         
         tbody.innerHTML = '';
-        results.forEach(res => {
-            const tr = document.createElement('tr');
+        let sessionIndex = 0;
+        
+        // Render unique sessions
+        Object.entries(sessionsMap).forEach(([sessionId, resList]) => {
+            const sessionRowId = `session-row-${sessionIndex}`;
+            const detailRowId = `detail-row-${sessionIndex}`;
+            sessionIndex++;
             
-            const verdictClass = res.match_result === 'CORRECT' 
+            const sampleRes = resList[0];
+            const verdictClass = sampleRes.match_result === 'CORRECT' 
                 ? 'badge-success' 
-                : res.match_result === 'WRONG' 
+                : sampleRes.match_result === 'WRONG' || sampleRes.match_result === 'FAILED'
                 ? 'badge-error' 
-                : res.match_result === 'NO_PLAYBOOK' 
+                : sampleRes.match_result === 'NO_PLAYBOOK' 
                 ? 'badge-warning' 
                 : 'badge-info';
                 
-            const sessionLink = res.session_id 
-                ? `<a href="#" class="view-agent-session" data-session-id="${res.session_id}" style="color: var(--primary); font-family: var(--font-mono); font-size: 11px;">${escapeHtml(res.session_id.substring(0, 8))}…</a>`
-                : '-';
-
-            const sessionCell = hasSingleSession ? '' : `<td>${sessionLink}</td>`;
-            const verdictCell = hasSingleVerdict ? '' : `<td><span class="badge ${verdictClass}">${escapeHtml(res.match_result)}</span></td>`;
-                
+            const actualPlaybook = sampleRes.actual_playbook || 'None';
+            const expectedPlaybook = sampleRes.expected_playbook || 'None';
+            
+            const tr = document.createElement('tr');
+            tr.id = sessionRowId;
+            
             tr.innerHTML = `
                 <td>
-                    #${res.sequence_order}
-                    <span class="view-raw-json-btn" style="cursor: pointer; margin-left: 6px;" title="View Raw Wazuh Alert Payload">
-                        <i class="fa-solid fa-eye text-cyan"></i>
-                    </span>
+                    <a href="#" class="view-agent-session text-cyan" data-session-id="${sessionId}" style="font-family: var(--font-mono); font-size: 11px; text-decoration: underline;">
+                        ${escapeHtml(sessionId)}
+                    </a>
                 </td>
-                <td style="font-family: var(--font-mono);">${escapeHtml(res.mitre_technique || '-')}</td>
-                <td style="font-family: var(--font-mono); font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(res.correlation_rule || '')}">${escapeHtml(res.correlation_rule || '-')}</td>
-                ${sessionCell}
-                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(res.expected_playbook || 'None')}</td>
-                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(res.actual_playbook || 'None')}</td>
-                ${verdictCell}
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(expectedPlaybook)}</td>
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(actualPlaybook)}</td>
+                <td><span class="badge ${verdictClass}">${escapeHtml(sampleRes.match_result)}</span></td>
+                <td>
+                    <button class="btn btn-secondary btn-xs-padding-review toggle-events-btn" data-target="${detailRowId}" style="font-size: 10px; padding: 2px 6px;">
+                        Events (${resList.length}) <i class="fa-solid fa-chevron-down toggle-icon" style="transition: transform 0.2s;"></i>
+                    </button>
+                </td>
             `;
             
-            const link = tr.querySelector('.view-agent-session');
-            if (link) {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openSessionDetail(res.session_id);
-                });
-            }
-
-            const jsonBtn = tr.querySelector('.view-raw-json-btn');
+            const sessionLink = tr.querySelector('.view-agent-session');
+            sessionLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openSessionDetail(sessionId);
+            });
+            
+            tbody.appendChild(tr);
+            
+            // Collapsible detail row containing events sub-table
+            const detailTr = document.createElement('tr');
+            detailTr.id = detailRowId;
+            detailTr.className = 'events-detail-row hide';
+            
+            const eventRowsHtml = resList.map(ev => {
+                return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.02);">
+                        <td style="padding: 6px 8px;">#${ev.sequence_order}</td>
+                        <td style="font-family: var(--font-mono); padding: 6px 8px;">${escapeHtml(ev.mitre_technique || '-')}</td>
+                        <td style="font-family: var(--font-mono); font-size: 11px; padding: 6px 8px;" title="${escapeHtml(ev.correlation_rule || '')}">
+                            ${escapeHtml(ev.correlation_rule || '-')}
+                        </td>
+                        <td style="font-family: var(--font-mono); font-size: 11px; padding: 6px 8px;">${escapeHtml(ev.expected_playbook || 'None')}</td>
+                        <td style="padding: 6px 8px;">
+                            <span class="view-raw-json-btn" style="cursor: pointer;" title="View Raw Wazuh Alert Payload">
+                                <i class="fa-solid fa-eye text-cyan"></i>
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            detailTr.innerHTML = `
+                <td colspan="5" style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <div style="font-weight: bold; margin-bottom: 8px; font-size: 11px; color: var(--text-bright);">EVENTS IN THIS SESSION:</div>
+                    <table class="sim-table" style="margin: 0; background: transparent; border: none; box-shadow: none; width: 100%;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.03);">
+                                <th style="padding: 6px 8px; font-size: 10px;">SEQ</th>
+                                <th style="padding: 6px 8px; font-size: 10px;">MITRE TECHNIQUE</th>
+                                <th style="padding: 6px 8px; font-size: 10px;">CORRELATION RULE</th>
+                                <th style="padding: 6px 8px; font-size: 10px;">EXPECTED PLAYBOOK</th>
+                                <th style="padding: 6px 8px; font-size: 10px;">RAW PAYLOAD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${eventRowsHtml}
+                        </tbody>
+                    </table>
+                </td>
+            `;
+            
+            resList.forEach((ev, idx) => {
+                const jsonBtn = detailTr.querySelectorAll('.view-raw-json-btn')[idx];
+                if (jsonBtn) {
+                    jsonBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const codeBlock = document.getElementById('sim-json-code-block');
+                        const modal = document.getElementById('sim-json-modal');
+                        if (codeBlock && modal) {
+                            let alertObj = ev.wazuh_alert;
+                            if (typeof alertObj === 'string') {
+                                try {
+                                    alertObj = JSON.parse(alertObj);
+                                } catch (err) {
+                                    console.error('Failed to parse wazuh_alert JSON string:', err);
+                                }
+                            }
+                            codeBlock.textContent = alertObj 
+                                ? JSON.stringify(alertObj, null, 2) 
+                                : 'No wazuh alert payload recorded for this event.';
+                            modal.classList.remove('hide');
+                        }
+                    });
+                }
+            });
+            
+            tbody.appendChild(detailTr);
+            
+            const toggleBtn = tr.querySelector('.toggle-events-btn');
+            const toggleIcon = toggleBtn.querySelector('.toggle-icon');
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const targetRow = document.getElementById(detailRowId);
+                if (targetRow) {
+                    const isHidden = targetRow.classList.toggle('hide');
+                    if (isHidden) {
+                        toggleIcon.style.transform = 'rotate(0deg)';
+                    } else {
+                        toggleIcon.style.transform = 'rotate(180deg)';
+                    }
+                }
+            });
+        });
+        
+        // Render events that failed to create a session
+        noSessionResults.forEach((res, idx) => {
+            const detailRowId = `no-session-detail-row-${idx}`;
+            const tr = document.createElement('tr');
+            
+            const expectedPlaybook = res.expected_playbook || 'None';
+            
+            tr.innerHTML = `
+                <td style="color: var(--text-muted); font-style: italic;">Failed to Create Session</td>
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(expectedPlaybook)}</td>
+                <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">-</td>
+                <td><span class="badge badge-error">FAILED</span></td>
+                <td>
+                    <button class="btn btn-secondary btn-xs-padding-review toggle-events-btn" data-target="${detailRowId}" style="font-size: 10px; padding: 2px 6px;">
+                        Event Details <i class="fa-solid fa-chevron-down toggle-icon" style="transition: transform 0.2s;"></i>
+                    </button>
+                </td>
+            `;
+            
+            tbody.appendChild(tr);
+            
+            const detailTr = document.createElement('tr');
+            detailTr.id = detailRowId;
+            detailTr.className = 'events-detail-row hide';
+            
+            detailTr.innerHTML = `
+                <td colspan="5" style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <div style="font-weight: bold; margin-bottom: 8px; font-size: 11px; color: var(--text-bright);">EVENT DETAILS:</div>
+                    <table class="sim-table" style="margin: 0; background: transparent; border: none; box-shadow: none; width: 100%;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.03);">
+                                <th style="padding: 6px 8px; font-size: 10px;">SEQ</th>
+                                <th style="padding: 6px 8px; font-size: 10px;">MITRE TECHNIQUE</th>
+                                <th style="padding: 6px 8px; font-size: 10px;">CORRELATION RULE</th>
+                                <th style="padding: 6px 8px; font-size: 10px;">EXPECTED PLAYBOOK</th>
+                                <th style="padding: 6px 8px; font-size: 10px;">RAW PAYLOAD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.02);">
+                                <td style="padding: 6px 8px;">#${res.sequence_order}</td>
+                                <td style="font-family: var(--font-mono); padding: 6px 8px;">${escapeHtml(res.mitre_technique || '-')}</td>
+                                <td style="font-family: var(--font-mono); font-size: 11px; padding: 6px 8px;" title="${escapeHtml(res.correlation_rule || '')}">
+                                    ${escapeHtml(res.correlation_rule || '-')}
+                                </td>
+                                <td style="font-family: var(--font-mono); font-size: 11px; padding: 6px 8px;">${escapeHtml(res.expected_playbook || 'None')}</td>
+                                <td style="padding: 6px 8px;">
+                                    <span class="view-raw-json-btn" style="cursor: pointer;" title="View Raw Wazuh Alert Payload">
+                                        <i class="fa-solid fa-eye text-cyan"></i>
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </td>
+            `;
+            
+            const jsonBtn = detailTr.querySelector('.view-raw-json-btn');
             if (jsonBtn) {
                 jsonBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -1912,11 +2055,26 @@ async function renderRunDetails(runId) {
                 });
             }
             
-            tbody.appendChild(tr);
+            tbody.appendChild(detailTr);
+            
+            const toggleBtn = tr.querySelector('.toggle-events-btn');
+            const toggleIcon = toggleBtn.querySelector('.toggle-icon');
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const targetRow = document.getElementById(detailRowId);
+                if (targetRow) {
+                    const isHidden = targetRow.classList.toggle('hide');
+                    if (isHidden) {
+                        toggleIcon.style.transform = 'rotate(0deg)';
+                    } else {
+                        toggleIcon.style.transform = 'rotate(180deg)';
+                    }
+                }
+            });
         });
     } catch (err) {
         console.error('Failed to load run details:', err);
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-error" style="padding: 20px;">Failed to load run audit sequence.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-error" style="padding: 20px;">Failed to load run audit sequence.</td></tr>';
     }
 }
 
@@ -2198,7 +2356,7 @@ async function loadBulkRunsList() {
         const runs = await api.getBulkRuns({ limit: 10 });
         
         if (!runs || runs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No bulk runs recorded.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding: 20px; color: var(--text-muted);">No bulk runs recorded.</td></tr>';
             return;
         }
         
@@ -2213,6 +2371,10 @@ async function loadBulkRunsList() {
                 ? 'badge-success' 
                 : run.status === 'RUNNING' 
                 ? 'badge-info' 
+                : run.status === 'PARTIALLY_COMPLETED' 
+                ? 'badge-warning' 
+                : run.status === 'CANCELLED' 
+                ? 'badge-muted' 
                 : run.status === 'FAILED' 
                 ? 'badge-error' 
                 : 'badge-muted';
@@ -2228,14 +2390,41 @@ async function loadBulkRunsList() {
             const accuracy = totalFinished > 0 ? `${Math.round((matched / totalFinished) * 100)}%` : '0%';
                 
             tr.innerHTML = `
-                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(run.id.substring(0, 8))}…</td>
+                <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(run.id)}</td>
                 <td style="font-weight: 500;">${escapeHtml(run.name)}</td>
                 <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(run.llm_model || 'Unknown')}</td>
                 <td><span class="badge ${run.strip_labels ? 'badge-warning' : 'badge-muted'}">${run.strip_labels ? 'YES' : 'NO'}</span></td>
                 <td><span class="badge ${statusClass}">${escapeHtml(run.status)} (${completed}/${total})</span></td>
                 <td style="font-family: var(--font-mono); font-weight: bold; color: ${totalFinished > 0 ? 'var(--secondary)' : 'var(--text-muted)'}">${accuracy}</td>
                 <td>${formatDate(run.created_at)}</td>
+                <td>
+                    ${run.status === 'RUNNING' ? `
+                        <button class="btn btn-error btn-xs-padding cancel-bulk-btn" data-bulk-id="${run.id}" style="padding: 2px 6px; font-size: 9.5px; line-height: 1.2;">
+                            <i class="fa-solid fa-ban"></i> Cancel
+                        </button>
+                    ` : ''}
+                </td>
             `;
+            
+            const cancelBtn = tr.querySelector('.cancel-bulk-btn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (confirm('Are you sure you want to cancel the remaining unstarted tasks in this bulk run?')) {
+                        try {
+                            cancelBtn.disabled = true;
+                            cancelBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cancelling...';
+                            await api.cancelBulkRun(run.id);
+                            showNotification('Bulk run cancelled successfully.', 'success');
+                            await loadBulkRunsList();
+                        } catch (err) {
+                            showNotification(err.message || 'Failed to cancel bulk run', 'error');
+                            cancelBtn.disabled = false;
+                            cancelBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Cancel';
+                        }
+                    }
+                });
+            }
             
             tr.addEventListener('click', () => {
                 tbody.querySelectorAll('tr').forEach(r => r.classList.remove('active-row'));
@@ -2261,7 +2450,7 @@ async function renderBulkRunDetails(bulkRunId) {
         const runs = data.runs || [];
         const bulk = data.bulk_run || {};
         
-        nameBadge.textContent = `BULK RUN: ${bulk.name || bulkRunId.substring(0, 8)}`;
+        nameBadge.textContent = `BULK RUN: ${bulk.name || bulkRunId}`;
         nameBadge.classList.remove('hide');
         
         if (runs.length === 0) {
@@ -2281,9 +2470,10 @@ async function renderBulkRunDetails(bulkRunId) {
                 ? 'badge-error' 
                 : 'badge-muted';
                 
-            const progress = run.total_events > 0 
-                ? `${run.sent_events}/${run.total_events}`
-                : '0/0';
+            const sessionsCount = (run.matched_playbooks || 0) + (run.mismatched_playbooks || 0) + (run.no_playbook || 0);
+            const progress = run.status === 'RUNNING' && sessionsCount === 0
+                ? 'Pending'
+                : `${sessionsCount} sessions`;
                 
             tr.innerHTML = `
                 <td style="font-weight: 500;">${escapeHtml(run.scenario_name || 'Deleted Scenario')}</td>

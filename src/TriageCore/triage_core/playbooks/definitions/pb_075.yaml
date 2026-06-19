@@ -1,0 +1,25 @@
+id: PB-075
+name: Triage Playbook for Mimikatz Netlogon Unauthenticated NetrServerAuthenticate2
+description: 'Playbook for triaging Mimikatz Netlogon Unauthenticated NetrServerAuthenticate2
+  alert: This dataset represents adversaries leveraging a vulnerability (CVE-2020-1472)
+  in a cryptographic authentication scheme used by the Netlogon Remote Protocol, which
+  among other things can be used to update computer passwords. This vulnerability
+  was discovered by [@@SecuraBV](https://twitter.com/SecuraBV).'
+severity: medium
+mitre_ids:
+- T1003.001
+- T1210
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

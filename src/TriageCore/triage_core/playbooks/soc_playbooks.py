@@ -50,7 +50,11 @@ class PlaybookLoader:
                     if not data:
                         continue
 
-                    playbook = PlaybookLoader.parse_playbook(data)
+                    # Extract relative path from src/ for registration
+                    idx = entry.path.find("src/")
+                    rel_path = entry.path[idx:] if idx != -1 else entry.path
+
+                    playbook = PlaybookLoader.parse_playbook(data, file_path=rel_path)
                     registry.register(playbook)
                     loaded_count += 1
                     logger.debug("playbook_loader.loaded", playbook_id=playbook.id, path=entry.path)
@@ -66,7 +70,7 @@ class PlaybookLoader:
         logger.info("playbook_loader.completed", loaded_count=loaded_count, directory=str(directory))
 
     @staticmethod
-    def parse_playbook(data: dict) -> Playbook:
+    def parse_playbook(data: dict, file_path: str | None = None) -> Playbook:
         """
         Parses a playbook dictionary into a concrete Playbook instance.
         """
@@ -110,6 +114,7 @@ class PlaybookLoader:
             tags=tags,
             case_template=case_template,
             soar_workflow_id=soar_workflow_id,
+            file_path=file_path,
         )
 
 

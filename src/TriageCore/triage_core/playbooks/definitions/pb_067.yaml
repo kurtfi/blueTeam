@@ -1,0 +1,23 @@
+id: PB-067
+name: Triage Playbook for HH Execution of Local Compiled HTML Payload
+description: 'Playbook for triaging HH Execution of Local Compiled HTML Payload alert:
+  This dataset represents threat actors executing local compiled HTML Help payloads
+  via hh.exe.'
+severity: medium
+mitre_ids:
+- T1218.001
+- T1003.001
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

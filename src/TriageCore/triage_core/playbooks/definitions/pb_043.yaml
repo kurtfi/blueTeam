@@ -1,0 +1,22 @@
+id: PB-043
+name: Triage Playbook for Empire Invoke PsExec
+description: 'Playbook for triaging Empire Invoke PsExec alert: This dataset represents
+  adversaries remotely creating and starting a service via RPC methods over TCP.'
+severity: medium
+mitre_ids:
+- T1021
+- T1003.001
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

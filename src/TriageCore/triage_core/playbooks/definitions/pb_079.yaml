@@ -1,0 +1,22 @@
+id: PB-079
+name: Triage Playbook for Mshta VBScript Execute PowerShell
+description: 'Playbook for triaging Mshta VBScript Execute PowerShell alert: This
+  dataset represents threat actors leveraging mshta.exe to proxy execute malicious
+  powershell commands via vbscript.'
+severity: medium
+mitre_ids:
+- T1218.005
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

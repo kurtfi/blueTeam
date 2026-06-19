@@ -1,0 +1,23 @@
+id: PB-040
+name: Triage Playbook for Empire Invoke DLLInjection
+description: 'Playbook for triaging Empire Invoke DLLInjection alert: This dataset
+  represents a threat actor injecting a Dll (On Disk) into an arbitrary process via
+  LoadLibrary and executd by CreateRemoteThread APIs'
+severity: medium
+mitre_ids:
+- T1055.001
+- T1003.001
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

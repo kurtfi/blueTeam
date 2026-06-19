@@ -13,9 +13,20 @@ logger = structlog.get_logger(__name__)
 
 async def send_alert_to_webhook(alert_payload: dict[str, Any]) -> str | None:
     """
-    Sends a single alert payload to the /v1/webhooks/siem endpoint.
+    Sends a single alert payload to the configured Agentix webhook endpoint.
     Returns the created session_id from Agentix on success, or None on failure.
     """
+    from attack_simulator.mapper.wazuh_template import strip_information_leakage
+    
+    # Safeguard: strip any information leakage before posting
+    tech_id = "T1059"
+    if "rule" in alert_payload and "mitre" in alert_payload["rule"]:
+        ids = alert_payload["rule"]["mitre"].get("id", [])
+        if ids:
+            tech_id = ids[0]
+            
+    alert_payload = strip_information_leakage(alert_payload, tech_id)
+
     headers = {
         "Content-Type": "application/json",
     }

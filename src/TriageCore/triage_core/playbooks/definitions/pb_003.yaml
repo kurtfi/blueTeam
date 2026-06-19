@@ -13,6 +13,7 @@ tags:
 - authentication
 - linux
 - ssh
+- wazuh-rule-5712
 case_template: MITRE T1110 - Brute Force Attack
 soar_workflow_id: agentix-brute-force-workflow-v1
 steps:

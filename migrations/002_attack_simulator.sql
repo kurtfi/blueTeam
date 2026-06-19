@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS simulation_results (
     session_id      VARCHAR(255),                   -- Webhook'un döndürdüğü session_id
     expected_mitre  TEXT[],
     actual_playbook VARCHAR(255),                   -- Agent'ın seçtiği playbook ID
-    expected_playbook VARCHAR(255),                 -- Beklenen playbook ID (varsa)
+    expected_playbook TEXT,                         -- Beklenen playbook ID (varsa)
     match_result    VARCHAR(100),                   -- CORRECT, WRONG, NO_PLAYBOOK, PENDING
     response_time_ms INT,
     created_at      TIMESTAMPTZ DEFAULT NOW()

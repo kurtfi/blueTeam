@@ -135,11 +135,14 @@ class DatabaseRepository:
         if not events:
             return
 
+        from attack_simulator.mapper.wazuh_template import strip_information_leakage
+
         pool = await self.get_pool()
         async with pool.acquire() as conn:
             async with conn.transaction():
                 for ev in events:
-                    wazuh_alert_str = json.dumps(ev["wazuh_alert"])
+                    clean_alert = strip_information_leakage(ev["wazuh_alert"], ev["mitre_technique"])
+                    wazuh_alert_str = json.dumps(clean_alert)
                     sc_uuid = uuid.UUID(ev["scenario_id"])
                     
                     # Truncate string inputs to fit VARCHAR limits
@@ -457,7 +460,7 @@ class DatabaseRepository:
         pool = await self.get_pool()
         bulk_uuid = uuid.UUID(bulk_run_id)
         status = status[:50]
-        completed_at = datetime.now() if status in ("COMPLETED", "FAILED") else None
+        completed_at = datetime.now() if status in ("COMPLETED", "FAILED", "CANCELLED", "PARTIALLY_COMPLETED") else None
 
         async with pool.acquire() as conn:
             await conn.execute(
@@ -476,6 +479,45 @@ class DatabaseRepository:
                 completed_at,
             )
         logger.info("db.bulk_run_updated", bulk_run_id=bulk_run_id, status=status)
+
+    async def cancel_bulk_run(self, bulk_run_id: str) -> None:
+        """
+        Cancels a bulk run by setting its status to CANCELLED (or PARTIALLY_COMPLETED
+        if some scenarios are already done) and computing statistics up to the point of cancellation.
+        """
+        pool = await self.get_pool()
+        bulk_uuid = uuid.UUID(bulk_run_id)
+        async with pool.acquire() as conn:
+            # Fetch current sub-run statistics
+            runs = await self.get_runs_for_bulk(bulk_run_id)
+            completed_scenarios = 0
+            matched = 0
+            mismatched = 0
+            nobook = 0
+            for r in runs:
+                if r["status"] in ("COMPLETED", "FAILED"):
+                    completed_scenarios += 1
+                    matched += r.get("matched_playbooks", 0)
+                    mismatched += r.get("mismatched_playbooks", 0)
+                    nobook += r.get("no_playbook", 0)
+
+            final_status = "PARTIALLY_COMPLETED" if completed_scenarios > 0 else "CANCELLED"
+
+            await conn.execute(
+                """
+                UPDATE simulation_bulk_runs
+                SET status = $2, completed_scenarios = $3, matched_playbooks = $4,
+                    mismatched_playbooks = $5, no_playbook = $6, completed_at = NOW()
+                WHERE id = $1 AND status = 'RUNNING'
+                """,
+                bulk_uuid,
+                final_status,
+                completed_scenarios,
+                matched,
+                mismatched,
+                nobook,
+            )
+        logger.info("db.bulk_run_cancelled", bulk_run_id=bulk_run_id, final_status=final_status)
 
     async def get_runs_for_bulk(self, bulk_run_id: str) -> list[dict[str, Any]]:
         pool = await self.get_pool()

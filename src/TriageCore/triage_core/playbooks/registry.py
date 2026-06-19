@@ -67,6 +67,7 @@ class PlaybookRegistry:
             {
                 "id": pb.id,
                 "name": pb.name,
+                "description": pb.description,
                 "mitre_ids": pb.mitre_ids,
                 "severity": pb.severity.value,
                 "steps": len(pb.steps),
@@ -76,6 +77,7 @@ class PlaybookRegistry:
             }
             for pb in sorted(self._playbooks.values(), key=lambda p: p.id)
         ]
+
 
     def find_for_alert(
         self,

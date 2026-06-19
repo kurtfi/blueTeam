@@ -69,4 +69,36 @@ async def test_alert_deduplication_flow():
         assert is_dup4
         assert sid4 == "session-3"
 
+        # 4. Simulation run isolation check
+        payload_sim1_runA = {
+            "rule": {"id": "999999"},
+            "data": {"srcip": "10.0.2.15"},
+            "simulation_run_id": "run-A"
+        }
+        payload_sim2_runA = {
+            "rule": {"id": "999999"},
+            "data": {"srcip": "10.0.2.15"},
+            "simulation_run_id": "run-A"
+        }
+        payload_sim_runB = {
+            "rule": {"id": "999999"},
+            "data": {"srcip": "10.0.2.15"},
+            "simulation_run_id": "run-B"
+        }
+
+        # First alert in Run A should not be duplicate
+        is_dup_sim1, sid_sim1 = await dedup.check_and_register(payload_sim1_runA, "session-sim-1")
+        assert not is_dup_sim1
+        assert sid_sim1 is None
+
+        # Second alert in Run A should be duplicate
+        is_dup_sim2, sid_sim2 = await dedup.check_and_register(payload_sim2_runA, "session-sim-2")
+        assert is_dup_sim2
+        assert sid_sim2 == "session-sim-1"
+
+        # Alert in Run B should NOT be duplicate, even though rule and IP are identical
+        is_dup_simB, sid_simB = await dedup.check_and_register(payload_sim_runB, "session-sim-3")
+        assert not is_dup_simB
+        assert sid_simB is None
+
         await dedup.aclose()

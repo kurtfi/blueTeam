@@ -1,0 +1,22 @@
+id: PB-027
+name: Triage Playbook for Covenant ShellCmd InstallUtil
+description: 'Playbook for triaging Covenant ShellCmd InstallUtil alert: This dataset
+  represents adversaries proxy executing code through InstallUtil, a trusted Windows
+  utility.'
+severity: medium
+mitre_ids:
+- T1218.004
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

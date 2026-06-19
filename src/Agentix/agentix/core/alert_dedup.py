@@ -49,12 +49,18 @@ class AlertKeyExtractor:
     def extract_key(cls, payload: dict) -> str | None:
         """
         Derives the deduplication key string.
-        Format: "rule_id:src_ip"
+        Format: "rule_id:src_ip" or "run_id:rule_id:src_ip"
         """
         rule_id = cls.extract_rule_id(payload)
         if not rule_id:
             return None
         src_ip = cls.extract_src_ip(payload)
+        
+        # Prepend simulation run ID if present to isolate deduplication scopes
+        run_id = payload.get("simulation_run_id")
+        if run_id:
+            return f"{run_id}:{rule_id}:{src_ip or 'unknown'}"
+            
         return f"{rule_id}:{src_ip or 'unknown'}"
 
 

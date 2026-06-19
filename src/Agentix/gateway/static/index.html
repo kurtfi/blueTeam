@@ -622,7 +622,7 @@
                                             <th>SCENARIO</th>
                                             <th>STATUS</th>
                                             <th>RATE</th>
-                                            <th>PROGRESS</th>
+                                            <th>SESSIONS</th>
                                             <th>VERDICT STATS</th>
                                             <th>STARTED AT</th>
                                         </tr>
@@ -639,7 +639,7 @@
                         <!-- Bottom: Detailed Event Results -->
                         <div class="glass-panel simulations-run-detail">
                             <div class="panel-header">
-                                <h3><i class="fa-solid fa-fingerprint text-cyan" aria-hidden="true"></i> RUN EVENT AUDIT SEQUENCE</h3>
+                                <h3><i class="fa-solid fa-fingerprint text-cyan" aria-hidden="true"></i> RUN SESSION AUDIT SEQUENCE</h3>
                                 <div style="display: flex; gap: 8px; align-items: center;">
                                     <span id="sim-run-detail-verdict" class="badge hide" style="font-family: var(--font-mono); font-size: 10px;">-</span>
                                     <span id="sim-run-detail-session" class="badge badge-info hide" style="font-family: var(--font-mono); font-size: 10px;">-</span>
@@ -650,13 +650,11 @@
                                 <table class="sim-table">
                                     <thead>
                                         <tr>
-                                            <th>SEQ</th>
-                                            <th>MITRE TECHNIQUE</th>
-                                            <th>CORRELATION RULE</th>
                                             <th id="sim-results-th-session">SESSION ID</th>
-                                            <th>EXPECTED PLAYBOOK</th>
+                                            <th>EXPECTED PLAYBOOKS</th>
                                             <th>ACTUAL PLAYBOOK</th>
                                             <th id="sim-results-th-verdict">VERDICT</th>
+                                            <th>DETAILS</th>
                                         </tr>
                                     </thead>
                                     <tbody id="sim-results-tbody">
@@ -789,11 +787,12 @@
                                             <th>STATUS</th>
                                             <th>ACCURACY</th>
                                             <th>CREATED AT</th>
+                                            <th>ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody id="bulk-runs-tbody">
                                         <tr>
-                                            <td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No bulk runs recorded.</td>
+                                            <td colspan="8" class="text-center" style="padding: 20px; color: var(--text-muted);">No bulk runs recorded.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -812,7 +811,7 @@
                                         <tr>
                                             <th>SCENARIO</th>
                                             <th>STATUS</th>
-                                            <th>EVENTS</th>
+                                            <th>SESSIONS</th>
                                             <th>MATCH</th>
                                             <th>WRONG</th>
                                             <th>NO PLAYBOOK</th>

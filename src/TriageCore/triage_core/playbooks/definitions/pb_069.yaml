@@ -1,0 +1,22 @@
+id: PB-069
+name: Triage Playbook for Internet Explorer Version Discovery
+description: 'Playbook for triaging Internet Explorer Version Discovery alert: This
+  dataset represents threat actors querying HKEY_LOCAL_MACHINE\Software\Microsoft\Internet
+  Explorer to get the version of internet explorer installed on the system.'
+severity: medium
+mitre_ids:
+- T1518
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

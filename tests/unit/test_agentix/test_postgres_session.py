@@ -154,3 +154,70 @@ async def test_get_pool_retry_behavior(mock_logger, mock_create_pool):
             alert=True,
             db_failure=True,
         )
+
+
+@pytest.mark.asyncio
+async def test_register_agent_in_db():
+    conn_mock = AsyncMock()
+    pool_mock = create_mock_pool(conn_mock)
+    repo = PostgresSessionRepository(pool=pool_mock)
+
+    await repo.register_agent_in_db("test_agent", "configs/test_agent.yaml")
+
+    conn_mock.execute.assert_called_once()
+    args, _ = conn_mock.execute.call_args
+    assert "INSERT INTO agents" in args[0]
+    assert args[1] == "test_agent"
+    assert args[2] == "configs/test_agent.yaml"
+
+
+@pytest.mark.asyncio
+async def test_register_playbook_in_db():
+    conn_mock = AsyncMock()
+    pool_mock = create_mock_pool(conn_mock)
+    repo = PostgresSessionRepository(pool=pool_mock)
+
+    await repo.register_playbook_in_db("PB-999", "definitions/pb_999.yaml")
+
+    conn_mock.execute.assert_called_once()
+    args, _ = conn_mock.execute.call_args
+    assert "INSERT INTO playbooks" in args[0]
+    assert args[1] == "PB-999"
+    assert args[2] == "definitions/pb_999.yaml"
+
+
+@pytest.mark.asyncio
+async def test_map_agent_to_playbook():
+    conn_mock = AsyncMock()
+    pool_mock = create_mock_pool(conn_mock)
+    repo = PostgresSessionRepository(pool=pool_mock)
+
+    await repo.map_agent_to_playbook("test_agent", "PB-999")
+
+    conn_mock.execute.assert_called_once()
+    args, _ = conn_mock.execute.call_args
+    assert "INSERT INTO agent_playbooks" in args[0]
+    assert args[1] == "test_agent"
+    assert args[2] == "PB-999"
+
+
+@pytest.mark.asyncio
+async def test_get_allowed_playbooks_for_agent():
+    conn_mock = AsyncMock()
+    pool_mock = create_mock_pool(conn_mock)
+    repo = PostgresSessionRepository(pool=pool_mock)
+
+    mock_rows = [
+        {"playbook_id": "PB-001"},
+        {"playbook_id": "PB-003"},
+    ]
+    conn_mock.fetch.return_value = mock_rows
+
+    res = await repo.get_allowed_playbooks_for_agent("test_agent")
+
+    assert res == ["PB-001", "PB-003"]
+    conn_mock.fetch.assert_called_once_with(
+        "SELECT playbook_id FROM agent_playbooks WHERE agent_id = $1",
+        "test_agent",
+    )
+

@@ -1,0 +1,23 @@
+id: PB-086
+name: Triage Playbook for Register-CimProvider Execute Dll
+description: 'Playbook for triaging Register-CimProvider Execute Dll alert: This dataset
+  represents threat actors leveraging Register-Cimprovider to execute a malicious
+  Dll.'
+severity: medium
+mitre_ids:
+- T1218
+- T1003.001
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

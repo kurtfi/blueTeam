@@ -147,6 +147,21 @@ async def startup_event():
             # Sync TriageCore Tools into our Catalog
             await app.state.catalog.register_mcp_client(app.state.triage_core_session)
 
+            # Sync Agents in Database
+            try:
+                from pathlib import Path
+                configs_dir = Path(__file__).parent.parent / "agents" / "configs"
+                if configs_dir.exists():
+                    for yaml_file in configs_dir.glob("*.yaml"):
+                        agent_id = yaml_file.stem
+                        rel_path = f"agentix/agents/configs/{yaml_file.name}"
+                        await postgres_session_repo.register_agent_in_db(agent_id, rel_path)
+                    logger.info("Successfully synced agent configurations to DB.")
+                else:
+                    logger.warning(f"Configs directory not found for sync: {configs_dir}")
+            except Exception as e:
+                logger.warning("Failed to sync agent configurations to DB at startup", error=str(e))
+
             # Sync TriageCore Playbooks into our Catalog
             try:
                 result = await app.state.triage_core_session.call_tool("list_playbooks")
@@ -158,16 +173,30 @@ async def startup_event():
             except Exception as e:
                 logger.warning("Failed to fetch and cache playbooks at startup", error=str(e))
 
-            # Sync TriageCore Playbooks JSON into our Catalog
+            # Sync TriageCore Playbooks JSON into our Catalog & DB
             try:
                 json_result = await app.state.triage_core_session.call_tool("list_playbooks_json")
                 from agentix.tools.mcp_adapter import MCPToolAdapter
 
                 playbooks_json_str = MCPToolAdapter._parse_result(json_result)
+                import json
+                if not isinstance(playbooks_json_str, str):
+                    playbooks_json_str = json.dumps(playbooks_json_str)
                 app.state.catalog.cached_playbooks_json = playbooks_json_str
                 logger.info("Successfully fetched and cached playbooks JSON from TriageCore.")
+
+                # Register playbooks and seed default mappings
+                playbooks_list = json.loads(playbooks_json_str)
+                for pb in playbooks_list:
+                    pb_id = pb["id"]
+                    file_path = pb.get("file_path") or ""
+                    await postgres_session_repo.register_playbook_in_db(pb_id, file_path)
+                    # Auto-seed: map 'soc_analyst' and 'simulation_analyst' to all playbooks
+                    await postgres_session_repo.map_agent_to_playbook("soc_analyst", pb_id)
+                    await postgres_session_repo.map_agent_to_playbook("simulation_analyst", pb_id)
+                logger.info("Successfully registered playbooks and mapped soc_analyst and simulation_analyst to DB.")
             except Exception as e:
-                logger.warning("Failed to fetch and cache playbooks JSON at startup", error=str(e))
+                logger.warning("Failed to fetch, cache, and register playbooks JSON at startup", error=str(e))
 
             # Connect and Sync Attack Simulator MCP Server (optional/best effort at startup)
             try:
@@ -1151,6 +1180,12 @@ async def _run_bulk_simulation_task(
         try:
             pool = await postgres_session_repo.get_pool()
             async with pool.acquire() as conn:
+                # Check if bulk run was cancelled by user
+                bulk_row = await conn.fetchrow("SELECT status FROM simulation_bulk_runs WHERE id = $1", uuid.UUID(bulk_run_id))
+                if bulk_row and bulk_row["status"] in ("CANCELLED", "PARTIALLY_COMPLETED"):
+                    logger.info("bulk_run.loop_interrupted_due_to_cancellation", bulk_run_id=bulk_run_id, status=bulk_row["status"])
+                    break
+
                 row = await conn.fetchrow("SELECT total_events FROM attack_scenarios WHERE id = $1", uuid.UUID(sc_id))
                 if not row:
                     logger.warning("bulk_run.scenario_not_found", scenario_id=sc_id)
@@ -1321,4 +1356,39 @@ async def get_bulk_run_results(bulk_run_id: str = Path(..., max_length=100)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/simulations/bulk-runs/{bulk_run_id}/cancel")
+async def cancel_bulk_run_endpoint(bulk_run_id: str = Path(..., max_length=100)):
+    """
+    Cancels a bulk run, skipping remaining scenarios.
+    """
+    try:
+        bulk_uuid = uuid.UUID(bulk_run_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid bulk run UUID format")
+
+    try:
+        from attack_simulator.models import db_repo
+        
+        # Check if bulk run exists
+        bulk_meta = await db_repo.get_bulk_run(bulk_run_id)
+        if not bulk_meta:
+            raise HTTPException(status_code=404, detail="Bulk run not found")
+        
+        if bulk_meta["status"] != "RUNNING":
+            raise HTTPException(status_code=400, detail=f"Bulk run is in '{bulk_meta['status']}' state and cannot be cancelled.")
+        
+        await db_repo.cancel_bulk_run(bulk_run_id)
+        
+        return {
+            "status": "success",
+            "message": "Bulk run cancellation processed successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("api.cancel_bulk_run.error", bulk_run_id=bulk_run_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
 

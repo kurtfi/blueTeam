@@ -1,0 +1,28 @@
+id: PB-055
+name: Triage Playbook for Empire Powerview Add-DomainObjectAcl
+description: 'Playbook for triaging Empire Powerview Add-DomainObjectAcl alert: This
+  datasets represent adversaries with enough permissions (i.e. domain admin) adding
+  an access control entry (ACE) to the discretionary access control list (DACL) of
+  an Active Directory object (i.e Root Domain). One example could be adversaries modifying
+  the root domain DACL to allow a specific domain user, despite being in no privileged
+  groups and not having local admin rights on the domain controller itself, to use
+  Active Directory replication services and obtain secret domain data (i.e. Other
+  user NTLM Hashes)'
+severity: medium
+mitre_ids:
+- T1003.001
+- T1222.001
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

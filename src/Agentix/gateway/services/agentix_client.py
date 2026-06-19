@@ -531,3 +531,19 @@ async def get_bulk_run_results(bulk_run_id: str) -> dict:
             logger.error("gateway.agentix_client.get_bulk_run_results_failed", bulk_run_id=bulk_run_id, error=str(e))
             raise
 
+
+async def cancel_bulk_run(bulk_run_id: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{AGENTIX_API_URL}/v1/simulations/bulk-runs/{bulk_run_id}/cancel",
+                headers=_internal_headers(),
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("gateway.agentix_client.cancel_bulk_run_failed", bulk_run_id=bulk_run_id, error=str(e))
+            raise
+
+

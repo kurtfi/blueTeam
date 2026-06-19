@@ -1,0 +1,23 @@
+id: PB-081
+name: Triage Playbook for PowerShell HTTP Listener
+description: 'Playbook for triaging PowerShell HTTP Listener alert: This dataset represents
+  a threat actor using PowerShell to start an HTTP Listener on a compromised endpoint'
+severity: medium
+mitre_ids:
+- T1059.001
+tags:
+- wazuh-rule-100016
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'

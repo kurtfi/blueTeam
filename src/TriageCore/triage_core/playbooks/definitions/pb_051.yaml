@@ -1,0 +1,21 @@
+id: PB-051
+name: Triage Playbook for Empire Net Domain Users
+description: 'Playbook for triaging Empire Net Domain Users alert: This dataset represents
+  adversaries enumerating all users that belong to a domain via RPC SAMR EnumDomainUsers.'
+severity: medium
+mitre_ids:
+- T1087.002
+steps:
+- order: 1
+  title: Search for related SIEM logs
+  group: analysis
+  description: Retrieve SIEM logs related to the MITRE techniques to understand event
+    scope.
+  tool_hint: query_siem_logs
+- order: 2
+  title: Confirm verdict
+  group: analysis
+  description: Determine if the alert is a True Positive or False Positive.
+  approval_gate:
+    message: Please confirm if this is a True Positive
+    requires_confirmation_for: 'VERDICT: TRUE_POSITIVE'
