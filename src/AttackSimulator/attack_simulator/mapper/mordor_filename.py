@@ -2,9 +2,9 @@
 Extracts MITRE ATT&CK Technique IDs from Mordor zip/json paths and filenames.
 """
 
+import json
 import os
 import re
-import json
 
 # Static filename mapping for common Mordor files (fallback)
 FILENAME_TO_MITRE = {
@@ -27,7 +27,7 @@ FILENAME_TO_MITRE = {
 }
 
 # Regex to extract MITRE technique ID (Txxxx or Txxxx.xxx)
-MITRE_PATTERN = re.compile(r'(t\d{4}(?:\.\d{3})?)', re.IGNORECASE)
+MITRE_PATTERN = re.compile(r"(t\d{4}(?:\.\d{3})?)", re.IGNORECASE)
 
 # Load compiled mappings if present
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -35,7 +35,7 @@ mappings_file = os.path.join(current_dir, "mordor_mappings.json")
 MORDOR_MAPPINGS = {}
 if os.path.exists(mappings_file):
     try:
-        with open(mappings_file, "r", encoding="utf-8") as f:
+        with open(mappings_file, encoding="utf-8") as f:
             MORDOR_MAPPINGS = json.load(f)
     except Exception:
         pass
@@ -56,14 +56,14 @@ def extract_technique_from_path(filepath: str) -> str:
         "/data/small/windows/credential_access/host/cmd_lsass_memory_dumpert.zip" -> "T1003.001"
     """
     filename = os.path.basename(filepath)
-    
+
     # 1. Look up in compiled JSON mappings
     info = get_mordor_file_info(filename)
     if info and info.get("techniques"):
         return info["techniques"][0]
 
     name_without_ext = os.path.splitext(filename)[0].lower()
-    
+
     # 2. Exact match on static filename mapping (without extension)
     if name_without_ext in FILENAME_TO_MITRE:
         return FILENAME_TO_MITRE[name_without_ext]
@@ -92,6 +92,5 @@ def extract_technique_from_path(filepath: str) -> str:
         return "T1547"  # General Registry Run keys
     elif "discovery" in normalized_path:
         return "T1082"  # General System Info Discovery
-        
-    return "T1059"  # Fallback to execution/command interpreter
 
+    return "T1059"  # Fallback to execution/command interpreter

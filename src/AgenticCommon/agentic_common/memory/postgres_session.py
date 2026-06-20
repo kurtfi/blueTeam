@@ -88,7 +88,7 @@ class PostgresSessionRepository:
             for file_name in files:
                 file_path = os.path.join(migration_dir, file_name)
                 logger.info("postgres_session.running_migration", file=file_name)
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     sql = f.read()
                 try:
                     async with conn.transaction():

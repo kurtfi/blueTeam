@@ -62,14 +62,14 @@ async def process_siem_alert(session_id: str, payload: dict, agent_name: str = "
             mitre_ids = [mitre_ids]
 
         mitre_str = ", ".join(mitre_ids) if mitre_ids else "None"
-        
+
         prompt = f"""
 Identify the correct playbook for this SIEM alert.
 
 ALERT INFO:
 - Rule ID: {rule_id}
 - MITRE IDs: {mitre_str}
-- Description: {payload.get('rule', {}).get('description', '')}
+- Description: {payload.get("rule", {}).get("description", "")}
 - Full Payload:
 {alert_details}
 

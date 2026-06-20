@@ -1,5 +1,5 @@
 -- Toplu çalıştırma (bulk run) tablosu
-CREATE TABLE IF NOT EXISTS simulation_bulk_runs (
+CREATE TABLE IF NOT EXISTS simulator.simulation_bulk_runs (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name                  VARCHAR(255) NOT NULL,
     llm_provider          VARCHAR(50),        -- 'ollama', 'openai', 'gemini'
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS simulation_bulk_runs (
 );
 
 -- Mevcut simulation_runs tablosuna bulk_run_id FK sütunu ekle
-ALTER TABLE simulation_runs
-    ADD COLUMN IF NOT EXISTS bulk_run_id UUID REFERENCES simulation_bulk_runs(id) ON DELETE SET NULL;
+ALTER TABLE simulator.simulation_runs
+    ADD COLUMN IF NOT EXISTS bulk_run_id UUID REFERENCES simulator.simulation_bulk_runs(id) ON DELETE SET NULL;
 
-CREATE INDEX IF NOT EXISTS idx_simulation_runs_bulk ON simulation_runs(bulk_run_id);
+CREATE INDEX IF NOT EXISTS idx_simulation_runs_bulk ON simulator.simulation_runs(bulk_run_id);

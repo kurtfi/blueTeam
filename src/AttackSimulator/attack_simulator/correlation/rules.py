@@ -2,11 +2,13 @@
 Parses and loads YAML correlation rules for AttackSimulator.
 """
 
-import os
 import glob
+import os
+import re
 from typing import Any
-import yaml
+
 import structlog
+import yaml
 
 logger = structlog.get_logger(__name__)
 
@@ -52,27 +54,24 @@ class CorrelationRule:
             if not filters:
                 # If there are filters in the criteria itself (older schema style)
                 filters = {k: v for k, v in criteria.items() if k not in ("event_id", "channel")}
-                
+
             match_failed = False
             for field, val in filters.items():
                 actual_val = event.get(field)
                 if actual_val is None:
                     match_failed = True
                     break
-                
+
                 # Check wildcard string
                 pattern = str(val).lower().replace("*", ".*")
                 if not re.search(f"^{pattern}$", str(actual_val).lower()):
                     match_failed = True
                     break
-            
+
             if not match_failed:
                 return True
 
         return False
-
-
-import re  # needed for regex matching in matches_event
 
 
 def load_rules(rules_dir: str | None = None) -> list[CorrelationRule]:
@@ -85,17 +84,15 @@ def load_rules(rules_dir: str | None = None) -> list[CorrelationRule]:
         rules_dir = os.path.join(current_dir, "../correlation_rules")
         rules_dir = os.path.abspath(rules_dir)
 
-    rules = []
+    rules: list[CorrelationRule] = []
     if not os.path.exists(rules_dir):
         logger.warning("correlation.rules_directory_missing", path=rules_dir)
         return rules
 
-    yaml_files = glob.glob(os.path.join(rules_dir, "*.yaml")) + glob.glob(
-        os.path.join(rules_dir, "*.yml")
-    )
+    yaml_files = glob.glob(os.path.join(rules_dir, "*.yaml")) + glob.glob(os.path.join(rules_dir, "*.yml"))
     for path in yaml_files:
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 if data and "technique_id" in data:
                     rules.append(CorrelationRule(data))

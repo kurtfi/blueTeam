@@ -3,7 +3,8 @@ Abstract base class for dataset loaders.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 
 class DatasetLoader(ABC):

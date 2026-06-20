@@ -2,13 +2,12 @@
 Orchestrates correlation rules and aggregation logic over raw security events.
 """
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-
-from attack_simulator.correlation.rules import CorrelationRule, load_rules
 from attack_simulator.correlation.aggregator import EventAggregator
+from attack_simulator.correlation.rules import CorrelationRule, load_rules
 from attack_simulator.mapper.wazuh_template import generate_wazuh_alert
 
 logger = structlog.get_logger(__name__)
@@ -22,7 +21,7 @@ class CorrelationEngine:
     def __init__(self, rules: list[CorrelationRule] | None = None) -> None:
         self.rules = rules if rules is not None else load_rules()
         self.aggregators: dict[str, EventAggregator] = {}
-        
+
         # Instantiate aggregators for rules requiring them
         for rule in self.rules:
             if rule.correlation_type == "aggregation":
@@ -68,9 +67,7 @@ class CorrelationEngine:
                     alert["rule"].update(rule.output_alert)
                 alerts.append(alert)
                 logger.debug(
-                    "correlation.direct_match_triggered", 
-                    technique_id=rule.technique_id, 
-                    rule_id=alert["rule"]["id"]
+                    "correlation.direct_match_triggered", technique_id=rule.technique_id, rule_id=alert["rule"]["id"]
                 )
 
             elif rule.correlation_type == "aggregation":
@@ -89,9 +86,9 @@ class CorrelationEngine:
                         )
                         alerts.append(alert)
                         logger.info(
-                            "correlation.aggregation_triggered", 
-                            technique_id=rule.technique_id, 
-                            rule_id=alert["rule"]["id"]
+                            "correlation.aggregation_triggered",
+                            technique_id=rule.technique_id,
+                            rule_id=alert["rule"]["id"],
                         )
 
         return alerts

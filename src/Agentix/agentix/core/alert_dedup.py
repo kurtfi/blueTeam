@@ -55,12 +55,12 @@ class AlertKeyExtractor:
         if not rule_id:
             return None
         src_ip = cls.extract_src_ip(payload)
-        
+
         # Prepend simulation run ID if present to isolate deduplication scopes
         run_id = payload.get("simulation_run_id")
         if run_id:
             return f"{run_id}:{rule_id}:{src_ip or 'unknown'}"
-            
+
         return f"{rule_id}:{src_ip or 'unknown'}"
 
 

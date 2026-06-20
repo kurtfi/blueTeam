@@ -2,12 +2,13 @@
 Loads custom YAML/JSON attack scenario definitions.
 """
 
-import os
-from typing import Any, Generator
-import yaml
 import json
-import structlog
+import os
+from collections.abc import Generator
+from typing import Any
 
+import structlog
+import yaml
 from attack_simulator.loader.base import DatasetLoader
 
 logger = structlog.get_logger(__name__)
@@ -28,7 +29,7 @@ class CustomLoader(DatasetLoader):
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Scenario file not found: {filepath}")
 
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             if filepath.endswith(".json"):
                 data = json.load(f)
             else:
@@ -41,7 +42,7 @@ class CustomLoader(DatasetLoader):
             "source_dataset": "custom",
             "source_path": filepath,
         }
-        
+
         events = data.get("events", [])
         return self.metadata, events
 
@@ -51,7 +52,6 @@ class CustomLoader(DatasetLoader):
         """
         try:
             _, events = self.load_scenario_file(source_path)
-            for event in events:
-                yield event
+            yield from events
         except Exception as e:
             logger.error("custom_loader.failed_to_load", path=source_path, error=str(e))

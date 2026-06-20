@@ -205,6 +205,7 @@ class Orchestrator:
                 raw_json = getattr(self._catalog, "cached_playbooks_json", None)
                 if raw_json and allowed_ids:
                     import json
+
                     all_playbooks = json.loads(raw_json)
                     allowed_playbooks = [pb for pb in all_playbooks if pb["id"] in allowed_ids]
                     if allowed_playbooks:

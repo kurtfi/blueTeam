@@ -40,7 +40,6 @@ MITRE_CATALOG = {
         "name": "Kerberoasting",
         "tactic": "Credential Access",
     },
-
     # Privilege Escalation
     "T1548": {
         "name": "Abuse Elevation Control Mechanism",
@@ -54,7 +53,6 @@ MITRE_CATALOG = {
         "name": "Exploitation for Privilege Escalation",
         "tactic": "Privilege Escalation",
     },
-
     # Defense Evasion
     "T1562": {
         "name": "Impair Defenses",
@@ -72,7 +70,6 @@ MITRE_CATALOG = {
         "name": "Clear Windows Event Logs",
         "tactic": "Defense Evasion",
     },
-
     # Lateral Movement
     "T1021": {
         "name": "Remote Services",
@@ -90,7 +87,6 @@ MITRE_CATALOG = {
         "name": "Windows Management Instrumentation",
         "tactic": "Execution",
     },
-
     # Command and Control
     "T1071": {
         "name": "Application Layer Protocol",
@@ -100,13 +96,11 @@ MITRE_CATALOG = {
         "name": "Web Protocols",
         "tactic": "Command and Control",
     },
-
     # Exfiltration
     "T1048": {
         "name": "Exfiltration Over Alternative Protocol",
         "tactic": "Exfiltration",
     },
-
     # Execution
     "T1059": {
         "name": "Command and Scripting Interpreter",
@@ -130,17 +124,14 @@ def get_mitre_info(technique_id: str) -> dict[str, str]:
     cleaned_id = technique_id.upper().strip()
     if cleaned_id in MITRE_CATALOG:
         return MITRE_CATALOG[cleaned_id]
-        
+
     # If it is a sub-technique (e.g. T1003.001), try parent technique
     if "." in cleaned_id:
         parent_id = cleaned_id.split(".")[0]
         if parent_id in MITRE_CATALOG:
             return {
                 "name": f"{MITRE_CATALOG[parent_id]['name']} (Sub-technique)",
-                "tactic": MITRE_CATALOG[parent_id]["tactic"]
+                "tactic": MITRE_CATALOG[parent_id]["tactic"],
             }
-            
-    return {
-        "name": f"Technique {technique_id}",
-        "tactic": "Unknown Tactic"
-    }
+
+    return {"name": f"Technique {technique_id}", "tactic": "Unknown Tactic"}

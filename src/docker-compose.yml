@@ -101,6 +101,7 @@ services:
       - AGENTIX_LOG_LEVEL=DEBUG
       - AGENTIX_TRIAGE_CORE_URL=http://triage-core:8081/sse
       - AGENTIX_ATTACK_SIMULATOR_URL=http://attack-simulator:8082/sse
+      - AGENTIX_ATTACK_SIMULATOR_API_URL=http://attack-simulator:8083
       - REDIS_URL=redis://redis:6379
       - AGENTIX_POSTGRES_URL=postgresql+asyncpg://agentix:password@postgres:5432/agentix_db
       - WAZUH_API_URL=https://wazuh-manager:55000
@@ -136,6 +137,7 @@ services:
     restart: always
     ports:
       - "8082:8082"
+      - "8083:8083"
     environment:
       - FASTMCP_TRANSPORT=sse
       - FASTMCP_PORT=8082

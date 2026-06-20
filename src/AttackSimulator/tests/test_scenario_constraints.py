@@ -2,10 +2,9 @@
 Tests for character length validations, scenario activation constraints, and duplication checks.
 """
 
-import os
 import uuid
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch
 
 from attack_simulator.models import db_repo
 from attack_simulator import mcp_server
@@ -23,7 +22,7 @@ async def test_single_active_scenario_constraint() -> None:
         mitre_ids=["T1003"],
         source_dataset="mordor",
         source_path="/path/to/a",
-        status="passive"
+        status="passive",
     )
     scenario_b_id = await db_repo.create_scenario(
         name="Scenario B Test",
@@ -31,33 +30,37 @@ async def test_single_active_scenario_constraint() -> None:
         mitre_ids=["T1027"],
         source_dataset="mordor",
         source_path="/path/to/b",
-        status="passive"
+        status="passive",
     )
 
     try:
         # Create events for both scenarios
-        events_a = [{
-            "scenario_id": scenario_a_id,
-            "sequence_order": 1,
-            "mitre_technique": "T1003",
-            "mitre_tactic": "Credential Access",
-            "correlation_type": "direct",
-            "raw_event_count": 1,
-            "correlation_rule": "Rule A",
-            "wazuh_alert": {},
-            "raw_log_hash": "hash_a"
-        }]
-        events_b = [{
-            "scenario_id": scenario_b_id,
-            "sequence_order": 1,
-            "mitre_technique": "T1027",
-            "mitre_tactic": "Defense Evasion",
-            "correlation_type": "direct",
-            "raw_event_count": 1,
-            "correlation_rule": "Rule B",
-            "wazuh_alert": {},
-            "raw_log_hash": "hash_b"
-        }]
+        events_a = [
+            {
+                "scenario_id": scenario_a_id,
+                "sequence_order": 1,
+                "mitre_technique": "T1003",
+                "mitre_tactic": "Credential Access",
+                "correlation_type": "direct",
+                "raw_event_count": 1,
+                "correlation_rule": "Rule A",
+                "wazuh_alert": {},
+                "raw_log_hash": "hash_a",
+            }
+        ]
+        events_b = [
+            {
+                "scenario_id": scenario_b_id,
+                "sequence_order": 1,
+                "mitre_technique": "T1027",
+                "mitre_tactic": "Defense Evasion",
+                "correlation_type": "direct",
+                "raw_event_count": 1,
+                "correlation_rule": "Rule B",
+                "wazuh_alert": {},
+                "raw_log_hash": "hash_b",
+            }
+        ]
         await db_repo.insert_attack_events(events_a, status="passive")
         await db_repo.insert_attack_events(events_b, status="passive")
 
@@ -126,18 +129,18 @@ async def test_download_mordor_scenario_duplicate_checks() -> None:
     Verifies that download_mordor_scenario blocks downloads if the file or scenario already exists.
     """
     url = "https://example.com/test_duplicate_scenario.zip"
-    dest_path = os.path.abspath(os.path.join("data", "test_duplicate_scenario.zip"))
 
     # Test Case 1: Local file already exists (size > 100)
-    with patch("os.path.exists", return_value=True), \
-         patch("os.path.getsize", return_value=150):
+    with patch("os.path.exists", return_value=True), patch("os.path.getsize", return_value=150):
         res = await mcp_server.download_mordor_scenario(url)
         assert "already downloaded" in res
 
     # Test Case 2: Scenario and events already exist in DB
     scenario_id = str(uuid.uuid4())
-    with patch("os.path.exists", return_value=False), \
-         patch.object(db_repo, "get_scenario_by_path", return_value={"id": scenario_id, "name": "Test"}), \
-         patch.object(db_repo, "get_scenario_events", return_value=[{"id": "event_id"}]):
+    with (
+        patch("os.path.exists", return_value=False),
+        patch.object(db_repo, "get_scenario_by_path", return_value={"id": scenario_id, "name": "Test"}),
+        patch.object(db_repo, "get_scenario_events", return_value=[{"id": "event_id"}]),
+    ):
         res = await mcp_server.download_mordor_scenario(url)
         assert "already ingested and has events" in res

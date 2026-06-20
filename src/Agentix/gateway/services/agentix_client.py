@@ -358,13 +358,12 @@ async def reject_session(session_id: str) -> dict:
 
 # --- Simulations Client Proxy Functions ---
 
+
 async def list_sim_scenarios() -> list[dict]:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(
-                f"{AGENTIX_API_URL}/v1/simulations/scenarios",
-                headers=_internal_headers(),
-                timeout=10.0
+                f"{AGENTIX_API_URL}/v1/simulations/scenarios", headers=_internal_headers(), timeout=10.0
             )
             response.raise_for_status()
             return response.json()
@@ -379,7 +378,7 @@ async def get_sim_scenario_events(scenario_id: str) -> list[dict]:
             response = await client.get(
                 f"{AGENTIX_API_URL}/v1/simulations/scenarios/{scenario_id}/events",
                 headers=_internal_headers(),
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
@@ -394,7 +393,7 @@ async def activate_sim_scenario(scenario_id: str) -> dict:
             response = await client.post(
                 f"{AGENTIX_API_URL}/v1/simulations/scenarios/{scenario_id}/activate",
                 headers=_internal_headers(),
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
@@ -410,12 +409,18 @@ async def run_sim_scenario(scenario_id: str, rate: float, strip_labels: bool = F
                 f"{AGENTIX_API_URL}/v1/simulations/scenarios/{scenario_id}/run",
                 params={"send_rate_per_sec": rate, "strip_labels": strip_labels},
                 headers=_internal_headers(),
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            logger.error("gateway.agentix_client.run_sim_scenario_failed", scenario_id=scenario_id, rate=rate, strip_labels=strip_labels, error=str(e))
+            logger.error(
+                "gateway.agentix_client.run_sim_scenario_failed",
+                scenario_id=scenario_id,
+                rate=rate,
+                strip_labels=strip_labels,
+                error=str(e),
+            )
             raise
 
 
@@ -426,7 +431,7 @@ async def list_sim_runs(limit: int = 20, offset: int = 0) -> list[dict]:
                 f"{AGENTIX_API_URL}/v1/simulations/runs",
                 params={"limit": limit, "offset": offset},
                 headers=_internal_headers(),
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
@@ -439,9 +444,7 @@ async def get_sim_run_results(run_id: str) -> dict:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(
-                f"{AGENTIX_API_URL}/v1/simulations/runs/{run_id}/results",
-                headers=_internal_headers(),
-                timeout=10.0
+                f"{AGENTIX_API_URL}/v1/simulations/runs/{run_id}/results", headers=_internal_headers(), timeout=10.0
             )
             response.raise_for_status()
             return response.json()
@@ -454,9 +457,7 @@ async def get_sim_stats() -> dict:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(
-                f"{AGENTIX_API_URL}/v1/simulations/stats",
-                headers=_internal_headers(),
-                timeout=10.0
+                f"{AGENTIX_API_URL}/v1/simulations/stats", headers=_internal_headers(), timeout=10.0
             )
             response.raise_for_status()
             return response.json()
@@ -468,11 +469,7 @@ async def get_sim_stats() -> dict:
 async def get_active_llm_info() -> dict:
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(
-                f"{AGENTIX_API_URL}/v1/settings/llm",
-                headers=_internal_headers(),
-                timeout=10.0
-            )
+            response = await client.get(f"{AGENTIX_API_URL}/v1/settings/llm", headers=_internal_headers(), timeout=10.0)
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -489,10 +486,10 @@ async def trigger_bulk_run(name: str, scenario_ids: list[str], rate: float, stri
                     "name": name,
                     "scenario_ids": scenario_ids,
                     "send_rate_per_sec": rate,
-                    "strip_labels": strip_labels
+                    "strip_labels": strip_labels,
                 },
                 headers=_internal_headers(),
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
@@ -508,7 +505,7 @@ async def list_bulk_runs(limit: int = 20, offset: int = 0) -> list[dict]:
                 f"{AGENTIX_API_URL}/v1/simulations/bulk-runs",
                 params={"limit": limit, "offset": offset},
                 headers=_internal_headers(),
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
@@ -523,7 +520,7 @@ async def get_bulk_run_results(bulk_run_id: str) -> dict:
             response = await client.get(
                 f"{AGENTIX_API_URL}/v1/simulations/bulk-runs/{bulk_run_id}/results",
                 headers=_internal_headers(),
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
@@ -538,12 +535,10 @@ async def cancel_bulk_run(bulk_run_id: str) -> dict:
             response = await client.post(
                 f"{AGENTIX_API_URL}/v1/simulations/bulk-runs/{bulk_run_id}/cancel",
                 headers=_internal_headers(),
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
         except Exception as e:
             logger.error("gateway.agentix_client.cancel_bulk_run_failed", bulk_run_id=bulk_run_id, error=str(e))
             raise
-
-

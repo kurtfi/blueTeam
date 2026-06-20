@@ -1,4 +1,3 @@
-import json
 import uuid
 import pytest
 
@@ -17,7 +16,7 @@ async def cleanup_db_pools():
         except Exception:
             pass
         postgres_session_repo._pool = None
-        
+
     if db_repo._pool:
         try:
             await db_repo._pool.close()
@@ -34,7 +33,7 @@ async def cleanup_db_pools():
         except Exception:
             pass
         postgres_session_repo._pool = None
-        
+
     if db_repo._pool:
         try:
             await db_repo._pool.close()

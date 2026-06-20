@@ -3,6 +3,7 @@ Wrapper module to transform correlated events to Wazuh alert payloads.
 """
 
 from typing import Any
+
 from attack_simulator.mapper.wazuh_template import generate_wazuh_alert
 
 

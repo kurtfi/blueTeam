@@ -49,7 +49,9 @@ async def simulation_webhook(request: Request):
     # Forward the POST request to agentix-api
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.post(f"{AGENTIX_API_URL}/v1/webhooks/simulation", content=body, headers=headers, timeout=10.0)
+            resp = await client.post(
+                f"{AGENTIX_API_URL}/v1/webhooks/simulation", content=body, headers=headers, timeout=10.0
+            )
             # Return the exact response from agentix-api
             return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
         except httpx.HTTPError as e:

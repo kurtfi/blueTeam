@@ -2,7 +2,6 @@
 Unit tests for Bulk Run Cancellation and Partial Completion states.
 """
 
-import uuid
 import pytest
 from attack_simulator.models import db_repo
 from agentic_common.memory import postgres_session_repo
@@ -17,7 +16,7 @@ async def cleanup_db_pools():
         except Exception:
             pass
         postgres_session_repo._pool = None
-        
+
     if db_repo._pool:
         try:
             await db_repo._pool.close()
@@ -33,7 +32,7 @@ async def cleanup_db_pools():
         except Exception:
             pass
         postgres_session_repo._pool = None
-        
+
     if db_repo._pool:
         try:
             await db_repo._pool.close()
@@ -70,6 +69,7 @@ async def test_bulk_run_cancellation_states() -> None:
         )
 
         bulk_a = await db_repo.get_bulk_run(bulk_run_id_a)
+        assert bulk_a is not None
         assert bulk_a["status"] == "RUNNING"
         assert bulk_a["completed_at"] is None
 
@@ -77,6 +77,7 @@ async def test_bulk_run_cancellation_states() -> None:
         await db_repo.cancel_bulk_run(bulk_run_id_a)
 
         bulk_a_after = await db_repo.get_bulk_run(bulk_run_id_a)
+        assert bulk_a_after is not None
         assert bulk_a_after["status"] == "CANCELLED"
         assert bulk_a_after["completed_scenarios"] == 0
         assert bulk_a_after["completed_at"] is not None
@@ -105,11 +106,11 @@ async def test_bulk_run_cancellation_states() -> None:
             sent_events=1,
             matched_playbooks=1,
             mismatched_playbooks=0,
-            no_playbook=0
+            no_playbook=0,
         )
 
         # Create another run under bulk B which is still RUNNING
-        run_id_2 = await db_repo.create_run(
+        await db_repo.create_run(
             scenario_id=scenario_id,
             total_events=1,
             send_rate_per_sec=1.0,
@@ -120,6 +121,7 @@ async def test_bulk_run_cancellation_states() -> None:
         await db_repo.cancel_bulk_run(bulk_run_id_b)
 
         bulk_b_after = await db_repo.get_bulk_run(bulk_run_id_b)
+        assert bulk_b_after is not None
         assert bulk_b_after["status"] == "PARTIALLY_COMPLETED"
         assert bulk_b_after["completed_scenarios"] == 1
         assert bulk_b_after["matched_playbooks"] == 1

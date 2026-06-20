@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from agentic_common.base_tool import ToolResult
 from agentix.core.orchestrator import Orchestrator
 from agentix.tools.mcp_adapter import MCPToolAdapter
 from agentix.agents.schema import AgentConfig, ToolFilter

@@ -1,7 +1,9 @@
 -- AttackSimulator Database Tables
 
+CREATE SCHEMA IF NOT EXISTS simulator;
+
 -- Saldırı senaryosu tanımları
-CREATE TABLE IF NOT EXISTS attack_scenarios (
+CREATE TABLE IF NOT EXISTS simulator.attack_scenarios (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name            VARCHAR(255) NOT NULL,
     description     VARCHAR(1000),
@@ -14,9 +16,9 @@ CREATE TABLE IF NOT EXISTS attack_scenarios (
 );
 
 -- İşlenmiş attack event kayıtları (Korelasyon motoru çıktısı → Wazuh alert)
-CREATE TABLE IF NOT EXISTS attack_events (
+CREATE TABLE IF NOT EXISTS simulator.attack_events (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scenario_id     UUID REFERENCES attack_scenarios(id) ON DELETE CASCADE,
+    scenario_id     UUID REFERENCES simulator.attack_scenarios(id) ON DELETE CASCADE,
     sequence_order  INT NOT NULL,
     mitre_technique VARCHAR(255) NOT NULL,     -- T1003.008
     mitre_tactic    VARCHAR(255),              -- Credential Access
@@ -30,9 +32,9 @@ CREATE TABLE IF NOT EXISTS attack_events (
 );
 
 -- Simülasyon çalıştırma kayıtları
-CREATE TABLE IF NOT EXISTS simulation_runs (
+CREATE TABLE IF NOT EXISTS simulator.simulation_runs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scenario_id     UUID REFERENCES attack_scenarios(id) ON DELETE SET NULL,
+    scenario_id     UUID REFERENCES simulator.attack_scenarios(id) ON DELETE SET NULL,
     status          VARCHAR(50) DEFAULT 'PENDING',  -- PENDING, RUNNING, COMPLETED, FAILED
     total_events    INT DEFAULT 0,
     sent_events     INT DEFAULT 0,
@@ -46,10 +48,10 @@ CREATE TABLE IF NOT EXISTS simulation_runs (
 );
 
 -- Her gönderilen event'ın sonucu
-CREATE TABLE IF NOT EXISTS simulation_results (
+CREATE TABLE IF NOT EXISTS simulator.simulation_results (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    run_id          UUID REFERENCES simulation_runs(id) ON DELETE CASCADE,
-    event_id        UUID REFERENCES attack_events(id) ON DELETE SET NULL,
+    run_id          UUID REFERENCES simulator.simulation_runs(id) ON DELETE CASCADE,
+    event_id        UUID REFERENCES simulator.attack_events(id) ON DELETE SET NULL,
     session_id      VARCHAR(255),                   -- Webhook'un döndürdüğü session_id
     expected_mitre  TEXT[],
     actual_playbook VARCHAR(255),                   -- Agent'ın seçtiği playbook ID
@@ -59,7 +61,7 @@ CREATE TABLE IF NOT EXISTS simulation_results (
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_attack_events_scenario ON attack_events(scenario_id);
-CREATE INDEX IF NOT EXISTS idx_simulation_results_run ON simulation_results(run_id);
-CREATE INDEX IF NOT EXISTS idx_simulation_results_match ON simulation_results(match_result);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_only_one_active_scenario ON attack_scenarios(status) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_attack_events_scenario ON simulator.attack_events(scenario_id);
+CREATE INDEX IF NOT EXISTS idx_simulation_results_run ON simulator.simulation_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_simulation_results_match ON simulator.simulation_results(match_result);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_only_one_active_scenario ON simulator.attack_scenarios(status) WHERE status = 'active';

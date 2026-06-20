@@ -1,16 +1,12 @@
-#!/usr/import/env python3
+#!/usr/bin/env python3
 """
 Simulate T1548.001 - Privilege Escalation via SUID/SGID Abuse
 """
 
-import sys
-import time
-
-from utils import LOG_FILE, ensure_log_file, timestamp, verify_log_contents, verify_wazuh_alerts, write_log_entry
+from utils import LOG_FILE, SimulationRunner, timestamp, write_log_entry
 
 
 def simulate_t1548_001():
-    print("\n[T1548.001] Simulating SUID Privilege Escalation...")
     ts = timestamp()
 
     log_entry = (
@@ -50,11 +46,10 @@ def simulate_t1548_001():
 
 
 if __name__ == "__main__":
-    ensure_log_file()
-    if simulate_t1548_001():
-        verify_log_contents()
-        # Note: syscheck rules might have different IDs in your setup. Add them if needed.
-        if "--verify" in sys.argv:
-            print("\n  Waiting 5s for Wazuh to process logs...")
-            time.sleep(5)
-            verify_wazuh_alerts(["100004"])
+    runner = SimulationRunner(
+        name="T1548.001",
+        description="Privilege Escalation via SUID/SGID Abuse",
+        expected_rules=["100004"]
+    )
+    runner.run(simulate_t1548_001)
+

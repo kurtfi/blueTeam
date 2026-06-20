@@ -3,11 +3,12 @@ Memory-efficient streaming reader for Mordor ZIP/JSONL files.
 """
 
 import json
-import zipfile
 import os
-from typing import Any, Generator
-import structlog
+import zipfile
+from collections.abc import Generator
+from typing import Any
 
+import structlog
 from attack_simulator.loader.base import DatasetLoader
 
 logger = structlog.get_logger(__name__)

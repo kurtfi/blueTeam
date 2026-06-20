@@ -1,17 +1,14 @@
-#!/usr/import/env python3
+#!/usr/bin/env python3
 """
 Simulate T1110 - Brute Force / Password Spray
 """
 
-import sys
 import time
 
-from utils import LOG_FILE, ensure_log_file, timestamp, verify_log_contents, verify_wazuh_alerts, write_log_entry
+from utils import LOG_FILE, SimulationRunner, timestamp, write_log_entry
 
 
 def simulate_t1110():
-    print("\n[T1110] Simulating Brute Force Login Attack...")
-
     success_count = 0
     # Write 10 failed attempts with dynamic timestamps
     for i in range(1, 11):
@@ -54,10 +51,10 @@ def simulate_t1110():
 
 
 if __name__ == "__main__":
-    ensure_log_file()
-    if simulate_t1110():
-        verify_log_contents()
-        if "--verify" in sys.argv:
-            print("\n  Waiting 5s for Wazuh to process logs...")
-            time.sleep(5)
-            verify_wazuh_alerts(["100011"])
+    runner = SimulationRunner(
+        name="T1110",
+        description="Brute Force / Password Spray",
+        expected_rules=["100011"]
+    )
+    runner.run(simulate_t1110)
+

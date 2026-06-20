@@ -52,7 +52,7 @@ class DatabaseRepository:
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO attack_scenarios (
+                INSERT INTO simulator.attack_scenarios (
                     id, name, description, mitre_ids, source_dataset, source_path, total_events, status, created_at
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
                 """,
@@ -71,9 +71,7 @@ class DatabaseRepository:
     async def get_scenario_by_name(self, name: str) -> dict[str, Any] | None:
         pool = await self.get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM attack_scenarios WHERE name = $1", name
-            )
+            row = await conn.fetchrow("SELECT * FROM simulator.attack_scenarios WHERE name = $1", name)
             if row:
                 d = dict(row)
                 d["id"] = str(d["id"])
@@ -83,9 +81,7 @@ class DatabaseRepository:
     async def get_scenario_by_path(self, source_path: str) -> dict[str, Any] | None:
         pool = await self.get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM attack_scenarios WHERE source_path = $1", source_path
-            )
+            row = await conn.fetchrow("SELECT * FROM simulator.attack_scenarios WHERE source_path = $1", source_path)
             if row:
                 d = dict(row)
                 d["id"] = str(d["id"])
@@ -102,18 +98,20 @@ class DatabaseRepository:
         async with pool.acquire() as conn:
             async with conn.transaction():
                 # 1. Reset all to passive
-                await conn.execute("UPDATE attack_scenarios SET status = 'passive'")
-                await conn.execute("UPDATE attack_events SET status = 'passive'")
+                await conn.execute("UPDATE simulator.attack_scenarios SET status = 'passive'")
+                await conn.execute("UPDATE simulator.attack_events SET status = 'passive'")
                 # 2. Activate target scenario
-                await conn.execute("UPDATE attack_scenarios SET status = 'active' WHERE id = $1", sc_uuid)
+                await conn.execute("UPDATE simulator.attack_scenarios SET status = 'active' WHERE id = $1", sc_uuid)
                 # 3. Activate target events
-                await conn.execute("UPDATE attack_events SET status = 'active' WHERE scenario_id = $1", sc_uuid)
+                await conn.execute(
+                    "UPDATE simulator.attack_events SET status = 'active' WHERE scenario_id = $1", sc_uuid
+                )
         logger.info("db.scenario_activated", scenario_id=scenario_id)
 
     async def list_scenarios(self) -> list[dict[str, Any]]:
         pool = await self.get_pool()
         async with pool.acquire() as conn:
-            rows = await conn.fetch("SELECT * FROM attack_scenarios ORDER BY created_at DESC")
+            rows = await conn.fetch("SELECT * FROM simulator.attack_scenarios ORDER BY created_at DESC")
             results = []
             for row in rows:
                 d = dict(row)
@@ -125,7 +123,7 @@ class DatabaseRepository:
         pool = await self.get_pool()
         sc_uuid = uuid.UUID(scenario_id)
         async with pool.acquire() as conn:
-            await conn.execute("DELETE FROM attack_scenarios WHERE id = $1", sc_uuid)
+            await conn.execute("DELETE FROM simulator.attack_scenarios WHERE id = $1", sc_uuid)
         logger.info("db.scenario_deleted", scenario_id=scenario_id)
 
     async def insert_attack_events(self, events: list[dict[str, Any]], status: str = "passive") -> None:
@@ -135,16 +133,13 @@ class DatabaseRepository:
         if not events:
             return
 
-        from attack_simulator.mapper.wazuh_template import strip_information_leakage
-
         pool = await self.get_pool()
         async with pool.acquire() as conn:
             async with conn.transaction():
                 for ev in events:
-                    clean_alert = strip_information_leakage(ev["wazuh_alert"], ev["mitre_technique"])
-                    wazuh_alert_str = json.dumps(clean_alert)
+                    wazuh_alert_str = json.dumps(ev["wazuh_alert"])
                     sc_uuid = uuid.UUID(ev["scenario_id"])
-                    
+
                     # Truncate string inputs to fit VARCHAR limits
                     mitre_technique = ev["mitre_technique"][:255]
                     mitre_tactic = ev["mitre_tactic"][:255] if ev.get("mitre_tactic") else None
@@ -155,7 +150,7 @@ class DatabaseRepository:
 
                     await conn.execute(
                         """
-                        INSERT INTO attack_events (
+                        INSERT INTO simulator.attack_events (
                             scenario_id, sequence_order, mitre_technique, mitre_tactic,
                             correlation_type, raw_event_count, correlation_rule,
                             wazuh_alert, raw_log_hash, status, created_at
@@ -178,7 +173,7 @@ class DatabaseRepository:
         sc_uuid = uuid.UUID(scenario_id)
         async with pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM attack_events WHERE scenario_id = $1 ORDER BY sequence_order ASC",
+                "SELECT * FROM simulator.attack_events WHERE scenario_id = $1 ORDER BY sequence_order ASC",
                 sc_uuid,
             )
             results = []
@@ -192,7 +187,9 @@ class DatabaseRepository:
                 results.append(d)
             return results
 
-    async def create_run(self, scenario_id: str, total_events: int, send_rate_per_sec: float, bulk_run_id: str | None = None) -> str:
+    async def create_run(
+        self, scenario_id: str, total_events: int, send_rate_per_sec: float, bulk_run_id: str | None = None
+    ) -> str:
         pool = await self.get_pool()
         sc_uuid = uuid.UUID(scenario_id)
         run_id = uuid.uuid4()
@@ -201,7 +198,7 @@ class DatabaseRepository:
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO simulation_runs (
+                INSERT INTO simulator.simulation_runs (
                     id, scenario_id, status, total_events, sent_events, send_rate_per_sec, bulk_run_id, started_at, created_at
                 ) VALUES ($1, $2, 'RUNNING', $3, 0, $4, $5, NOW(), NOW())
                 """,
@@ -232,7 +229,7 @@ class DatabaseRepository:
             if completed_at:
                 await conn.execute(
                     """
-                    UPDATE simulation_runs 
+                    UPDATE simulator.simulation_runs 
                     SET status = $2, sent_events = $3, matched_playbooks = $4,
                         mismatched_playbooks = $5, no_playbook = $6, completed_at = $7
                     WHERE id = $1
@@ -248,7 +245,7 @@ class DatabaseRepository:
             else:
                 await conn.execute(
                     """
-                    UPDATE simulation_runs 
+                    UPDATE simulator.simulation_runs 
                     SET status = $2, sent_events = $3, matched_playbooks = $4,
                         mismatched_playbooks = $5, no_playbook = $6
                     WHERE id = $1
@@ -265,9 +262,7 @@ class DatabaseRepository:
         pool = await self.get_pool()
         run_uuid = uuid.UUID(run_id)
         async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM simulation_runs WHERE id = $1", run_uuid
-            )
+            row = await conn.fetchrow("SELECT * FROM simulator.simulation_runs WHERE id = $1", run_uuid)
             if row:
                 d = dict(row)
                 d["id"] = str(d["id"])
@@ -282,8 +277,8 @@ class DatabaseRepository:
             rows = await conn.fetch(
                 """
                 SELECT r.*, s.name as scenario_name 
-                FROM simulation_runs r 
-                LEFT JOIN attack_scenarios s ON r.scenario_id = s.id 
+                FROM simulator.simulation_runs r 
+                LEFT JOIN simulator.attack_scenarios s ON r.scenario_id = s.id 
                 ORDER BY r.created_at DESC LIMIT $1
                 """,
                 limit,
@@ -325,7 +320,7 @@ class DatabaseRepository:
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO simulation_results (
+                INSERT INTO simulator.simulation_results (
                     id, run_id, event_id, session_id, expected_mitre, expected_playbook,
                     actual_playbook, match_result, response_time_ms, created_at
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
@@ -349,8 +344,8 @@ class DatabaseRepository:
             rows = await conn.fetch(
                 """
                 SELECT res.*, ev.mitre_technique, ev.sequence_order
-                FROM simulation_results res
-                JOIN attack_events ev ON res.event_id = ev.id
+                FROM simulator.simulation_results res
+                JOIN simulator.attack_events ev ON res.event_id = ev.id
                 WHERE res.run_id = $1
                 ORDER BY ev.sequence_order ASC
                 """,
@@ -403,7 +398,7 @@ class DatabaseRepository:
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO simulation_bulk_runs (
+                INSERT INTO simulator.simulation_bulk_runs (
                     id, name, llm_provider, llm_model, strip_labels, send_rate_per_sec,
                     status, total_scenarios, completed_scenarios, matched_playbooks,
                     mismatched_playbooks, no_playbook, created_at
@@ -424,7 +419,7 @@ class DatabaseRepository:
         pool = await self.get_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM simulation_bulk_runs ORDER BY created_at DESC LIMIT $1",
+                "SELECT * FROM simulator.simulation_bulk_runs ORDER BY created_at DESC LIMIT $1",
                 limit,
             )
             results = []
@@ -439,7 +434,7 @@ class DatabaseRepository:
         bulk_uuid = uuid.UUID(bulk_run_id)
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM simulation_bulk_runs WHERE id = $1",
+                "SELECT * FROM simulator.simulation_bulk_runs WHERE id = $1",
                 bulk_uuid,
             )
             if row:
@@ -465,7 +460,7 @@ class DatabaseRepository:
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                UPDATE simulation_bulk_runs
+                UPDATE simulator.simulation_bulk_runs
                 SET status = $2, completed_scenarios = $3, matched_playbooks = $4,
                     mismatched_playbooks = $5, no_playbook = $6, completed_at = $7
                 WHERE id = $1
@@ -505,7 +500,7 @@ class DatabaseRepository:
 
             await conn.execute(
                 """
-                UPDATE simulation_bulk_runs
+                UPDATE simulator.simulation_bulk_runs
                 SET status = $2, completed_scenarios = $3, matched_playbooks = $4,
                     mismatched_playbooks = $5, no_playbook = $6, completed_at = NOW()
                 WHERE id = $1 AND status = 'RUNNING'
@@ -526,8 +521,8 @@ class DatabaseRepository:
             rows = await conn.fetch(
                 """
                 SELECT r.*, s.name as scenario_name
-                FROM simulation_runs r
-                LEFT JOIN attack_scenarios s ON r.scenario_id = s.id
+                FROM simulator.simulation_runs r
+                LEFT JOIN simulator.attack_scenarios s ON r.scenario_id = s.id
                 WHERE r.bulk_run_id = $1
                 ORDER BY r.created_at ASC
                 """,
@@ -541,6 +536,45 @@ class DatabaseRepository:
                 d["bulk_run_id"] = str(d["bulk_run_id"]) if d.get("bulk_run_id") else None
                 results.append(d)
             return results
+
+    async def get_scenario_by_id(self, scenario_id: uuid.UUID) -> dict[str, Any] | None:
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM simulator.attack_scenarios WHERE id = $1",
+                scenario_id,
+            )
+            return dict(row) if row else None
+
+    async def get_active_simulation_runs(self) -> list[str]:
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch("SELECT id FROM simulator.simulation_runs WHERE status = 'RUNNING'")
+            return [str(r["id"]) for r in rows]
+
+    async def get_active_bulk_runs(self) -> list[dict[str, Any]]:
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, total_scenarios FROM simulator.simulation_bulk_runs WHERE status = 'RUNNING'"
+            )
+            return [dict(r) for r in rows]
+
+    async def get_bulk_run_status(self, bulk_run_id: uuid.UUID) -> str | None:
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            return await conn.fetchval(
+                "SELECT status FROM simulator.simulation_bulk_runs WHERE id = $1",
+                bulk_run_id,
+            )
+
+    async def get_scenario_total_events(self, scenario_id: uuid.UUID) -> int | None:
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            return await conn.fetchval(
+                "SELECT total_events FROM simulator.attack_scenarios WHERE id = $1",
+                scenario_id,
+            )
 
     async def close(self) -> None:
         if self._pool:

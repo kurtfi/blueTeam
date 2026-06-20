@@ -7,6 +7,7 @@ from attack_simulator.mcp_server import mcp
 
 import pytest
 
+
 @pytest.mark.asyncio
 async def test_mcp_tools_registration() -> None:
     """
@@ -14,7 +15,7 @@ async def test_mcp_tools_registration() -> None:
     """
     tools = await mcp.list_tools()
     tool_names = [t.name for t in tools]
-    
+
     assert "list_simulation_scenarios" in tool_names
     assert "trigger_attack_simulation" in tool_names
     assert "get_simulation_run_status" in tool_names

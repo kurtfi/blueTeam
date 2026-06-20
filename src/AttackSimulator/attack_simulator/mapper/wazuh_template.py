@@ -2,8 +2,9 @@
 Generates structured Wazuh alert payloads from raw events.
 """
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
+
 from attack_simulator.mapper.mitre_catalog import get_mitre_info
 
 # Static rule templates keyed by technique (internal use only – the technique key
@@ -104,7 +105,7 @@ def generate_wazuh_alert(technique_id: str, raw_event: dict[str, Any] | None = N
         # Try base match (e.g. T1110.003 -> T1110)
         base_tech = technique_id.split(".")[0]
         template = TECHNIQUE_RULES.get(base_tech)
-        
+
         # Try matching any registered subtechnique of the same base (e.g. T1003 -> T1003.001)
         if not template:
             for key, val in TECHNIQUE_RULES.items():
@@ -129,17 +130,12 @@ def generate_wazuh_alert(technique_id: str, raw_event: dict[str, Any] | None = N
         or raw_event.get("IpAddress")
         or "10.0.2.15"  # default local subnet IP
     )
-    dst_user = (
-        raw_event.get("User")
-        or raw_event.get("TargetUserName")
-        or raw_event.get("dstuser")
-        or "SYSTEM"
-    )
-    
+    dst_user = raw_event.get("User") or raw_event.get("TargetUserName") or raw_event.get("dstuser") or "SYSTEM"
+
     timestamp = raw_event.get("TimeCreated") or raw_event.get("@timestamp")
     if not timestamp:
         timestamp = datetime.now(UTC).isoformat()
-        
+
     full_log_str = raw_event.get("CommandLine") or raw_event.get("message")
     if not full_log_str:
         # Serialise raw event if no specific log message
@@ -166,7 +162,7 @@ def generate_wazuh_alert(technique_id: str, raw_event: dict[str, Any] | None = N
             "mitre": {
                 "id": [technique_id],
                 "tactic": [tactic],
-            }
+            },
         },
         "data": {
             "srcip": src_ip,
@@ -178,7 +174,7 @@ def generate_wazuh_alert(technique_id: str, raw_event: dict[str, Any] | None = N
         },
         "full_log": full_log_str,
     }
-    
+
     return alert
 
 
@@ -189,17 +185,17 @@ def strip_information_leakage(alert: dict[str, Any], technique_id: str) -> dict[
     """
     import copy
     import re
-    
+
     clean_alert = copy.deepcopy(alert)
     if "rule" not in clean_alert:
         return clean_alert
-        
+
     rule = clean_alert["rule"]
-    
+
     # 1. Remove mitre block
     if "mitre" in rule:
         del rule["mitre"]
-        
+
     # 2. Clean description
     desc = rule.get("description", "")
     if desc.startswith("MITRE ATT&CK") or "LSASS" in desc or "Credential Dumping" in desc:
@@ -211,14 +207,13 @@ def strip_information_leakage(alert: dict[str, Any], technique_id: str) -> dict[
             rule["description"] = "Suspicious security event detected"
     else:
         # Strip any parenthesized MITRE ID like (T1003.001)
-        rule["description"] = re.sub(r'\s*\([Tt]\d+(?:\.\d+)?\)\s*$', '', desc).strip()
-        
+        rule["description"] = re.sub(r"\s*\([Tt]\d+(?:\.\d+)?\)\s*$", "", desc).strip()
+
     # 3. Clean groups
     groups = rule.get("groups", [])
     new_groups = [g for g in groups if not g.startswith("mitre") and g != "mitre"]
     if not new_groups:
         new_groups = ["generic"]
     rule["groups"] = new_groups
-    
-    return clean_alert
 
+    return clean_alert

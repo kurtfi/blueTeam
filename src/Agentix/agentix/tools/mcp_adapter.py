@@ -132,6 +132,7 @@ class MCPToolAdapter(BaseTool):
             playbook_id = kwargs.get("playbook_id")
             if agent_id and playbook_id:
                 from agentic_common.memory import postgres_session_repo
+
                 try:
                     allowed_ids = await postgres_session_repo.get_allowed_playbooks_for_agent(agent_id)
                     if playbook_id not in allowed_ids:
@@ -142,7 +143,7 @@ class MCPToolAdapter(BaseTool):
                         )
                         return ToolResult(
                             success=False,
-                            error=f"Unauthorized: Agent '{agent_id}' is not authorized to access playbook '{playbook_id}'."
+                            error=f"Unauthorized: Agent '{agent_id}' is not authorized to access playbook '{playbook_id}'.",
                         )
                 except Exception as e:
                     logger.error("mcp_adapter.auth_check_failed", error=str(e))

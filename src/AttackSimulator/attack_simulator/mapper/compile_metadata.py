@@ -1,13 +1,15 @@
-import os
 import json
+import os
 import urllib.request
-import yaml
+
 import structlog
+import yaml
 
 logger = structlog.get_logger(__name__)
 
 API_URL = "https://api.github.com/repos/UraSecTeam/mordor/contents/datasets/metadata"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
 
 def fetch_metadata_list():
     logger.info("compile_metadata.fetching_list_from_github", url=API_URL)
@@ -15,15 +17,17 @@ def fetch_metadata_list():
     with urllib.request.urlopen(req) as response:
         return json.loads(response.read().decode("utf-8"))
 
+
 def fetch_yaml_content(download_url):
     req = urllib.request.Request(download_url, headers=HEADERS)
     with urllib.request.urlopen(req) as response:
         return response.read().decode("utf-8")
 
+
 def compile_mappings():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     output_path = os.path.join(current_dir, "mordor_mappings.json")
-    
+
     try:
         files_list = fetch_metadata_list()
     except Exception as e:
@@ -55,7 +59,7 @@ def compile_mappings():
                 if tech:
                     full_tech = f"{tech}.{sub_tech}" if sub_tech else tech
                     techniques.append(full_tech)
-                
+
                 tacts = mapping.get("tactics", [])
                 for t in tacts:
                     if t not in tactics:
@@ -76,7 +80,7 @@ def compile_mappings():
                             "techniques": list(set(techniques)),
                             "tactics": tactics,
                             "title": title,
-                            "description": description
+                            "description": description,
                         }
 
         except Exception as e:
@@ -88,6 +92,7 @@ def compile_mappings():
 
     logger.info("compile_metadata.success", output_file=output_path, unique_files_mapped=len(mappings))
     return True
+
 
 if __name__ == "__main__":
     compile_mappings()

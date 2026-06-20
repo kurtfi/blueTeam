@@ -1,16 +1,12 @@
-#!/usr/import/env python3
+#!/usr/bin/env python3
 """
 Simulate T1048 - Data Exfiltration via DNS Tunneling
 """
 
-import sys
-import time
-
-from utils import LOG_FILE, ensure_log_file, timestamp, verify_log_contents, verify_wazuh_alerts, write_log_entry
+from utils import LOG_FILE, SimulationRunner, timestamp, write_log_entry
 
 
 def simulate_t1048():
-    print("\n[T1048] Simulating DNS Exfiltration Tunnel...")
     ts = timestamp()
 
     dns_domain = "exfil-c2.attacker-controlled.xyz"
@@ -47,10 +43,10 @@ def simulate_t1048():
 
 
 if __name__ == "__main__":
-    ensure_log_file()
-    if simulate_t1048():
-        verify_log_contents()
-        if "--verify" in sys.argv:
-            print("\n  Waiting 5s for Wazuh to process logs...")
-            time.sleep(5)
-            verify_wazuh_alerts(["100005"])
+    runner = SimulationRunner(
+        name="T1048",
+        description="Data Exfiltration via DNS Tunneling",
+        expected_rules=["100005"]
+    )
+    runner.run(simulate_t1048)
+
