@@ -71,7 +71,7 @@ async def ingest_all_command(args: argparse.Namespace) -> None:
 
 
 async def run_command(args: argparse.Namespace) -> None:
-    """Runs a simulation scenario by sending events to the Agentix webhook."""
+    """Runs a simulation scenario by replaying alerts."""
     service = SimulationService()
 
     scenario_name = args.scenario
@@ -85,21 +85,39 @@ async def run_command(args: argparse.Namespace) -> None:
 
     print(f"[*] Starting attack simulation for: '{scenario_name}'")
     print(f"[*] Total correlated alerts to send: {len(events)}")
-    print(f"[*] Target Webhook URL: {WEBHOOK_URL}")
+    print(f"[*] Timing mode: {args.timing_mode}")
+    print(f"[*] Sender type: {args.sender}")
 
     # Create run
     run_id = await db_repo.create_run(sc["id"], len(events), args.rate)
 
+    # Resolve sender and timing strategy
+    from attack_simulator.sender.factory import get_sender
+    from attack_simulator.services.timing import get_timing_strategy
+
+    sender = get_sender(
+        args.sender,
+        syslog_host=args.syslog_host,
+        syslog_port=args.syslog_port,
+        syslog_protocol=args.syslog_protocol,
+        syslog_rfc5424=args.syslog_rfc5424,
+    )
+    timing_strategy = get_timing_strategy(
+        mode=args.timing_mode,
+        base_delay=args.delay,
+        max_delay=args.max_original_delay,
+    )
+
     sent_events = 0
     print("[*] Replaying alerts...")
     for idx, ev in enumerate(tqdm(events)):
-        # Send alert using the service's alert sender
+        # Send alert using the resolved sender
         import copy
 
         alert_payload = copy.deepcopy(ev["wazuh_alert"])
         alert_payload["simulation_run_id"] = str(run_id)
 
-        session_id = await service.alert_sender.send(alert_payload, ev["mitre_technique"])
+        session_id = await sender.send(alert_payload, ev["mitre_technique"])
 
         # Record result placeholder using the service's playbook registry gateway
         expected_mitre = [ev["mitre_technique"]]
@@ -124,9 +142,10 @@ async def run_command(args: argparse.Namespace) -> None:
         await db_repo.update_run_stats(run_id, "RUNNING", sent_events)
 
         if idx < len(events) - 1:
-            await asyncio.sleep(args.delay)
+            next_ev = events[idx + 1]
+            await timing_strategy.wait_before_next(ev, next_ev)
 
-    print("\n[*] All alerts sent to webhook. Waiting 8s for Agentix triage pipeline to process playbooks...")
+    print("\n[*] All alerts sent. Waiting 8s for Agentix triage pipeline to process playbooks...")
     await asyncio.sleep(8)
 
     # Evaluate run
@@ -271,6 +290,13 @@ def main() -> None:
     parser_run.add_argument("--scenario", required=True, help="Name of the scenario to run")
     parser_run.add_argument("--delay", type=float, default=1.0, help="Delay (in seconds) between sending alerts")
     parser_run.add_argument("--rate", type=float, default=1.0, help="Send rate per second (default: 1.0)")
+    parser_run.add_argument("--sender", choices=["webhook", "syslog", "file"], default="webhook", help="Sender backend")
+    parser_run.add_argument("--timing-mode", choices=["constant", "original"], default="constant", help="Replay timing mode")
+    parser_run.add_argument("--max-original-delay", type=float, default=30.0, help="Maximum delay for original timing")
+    parser_run.add_argument("--syslog-host", default="localhost", help="Syslog target host")
+    parser_run.add_argument("--syslog-port", type=int, default=514, help="Syslog target port")
+    parser_run.add_argument("--syslog-protocol", choices=["UDP", "TCP"], default="UDP", help="Syslog protocol")
+    parser_run.add_argument("--syslog-rfc5424", action="store_true", default=True, help="Use RFC 5424 standard syslog formatting")
 
     # Activate subcommand
     parser_activate = subparsers.add_parser("activate", help="Activate a specific scenario (passive others).")
@@ -334,3 +360,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

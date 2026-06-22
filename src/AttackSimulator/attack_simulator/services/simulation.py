@@ -36,6 +36,10 @@ class SimulationService:
         delay_between_events: float = 1.0,
         strip_labels: bool = False,
         bulk_run_id: str | None = None,
+        sender_type: str = "webhook",
+        timing_mode: str = "constant",
+        max_original_delay: float = 30.0,
+        **kwargs: Any,
     ) -> str:
         """
         Creates a simulation run and spawns execution in a background task.
@@ -56,6 +60,17 @@ class SimulationService:
         rate = 1.0 / delay_between_events if delay_between_events > 0 else 1.0
         run_id = await db_repo.create_run(scenario_id, len(events), rate, bulk_run_id=bulk_run_id)
 
+        # Resolve sender and timing strategy
+        from attack_simulator.sender.factory import get_sender
+        from attack_simulator.services.timing import get_timing_strategy
+
+        sender = get_sender(sender_type, **kwargs)
+        timing_strategy = get_timing_strategy(
+            mode=timing_mode,
+            base_delay=delay_between_events,
+            max_delay=max_original_delay,
+        )
+
         # Spawn execution in the background
         asyncio.create_task(
             self.execute_simulation(
@@ -64,6 +79,8 @@ class SimulationService:
                 events=events,
                 delay_between_events=delay_between_events,
                 strip_labels=strip_labels,
+                timing_strategy=timing_strategy,
+                sender=sender,
             )
         )
         return run_id
@@ -75,11 +92,21 @@ class SimulationService:
         events: list[dict[str, Any]],
         delay_between_events: float = 1.0,
         strip_labels: bool = False,
+        timing_strategy: Any = None,
+        sender: Any = None,
     ) -> None:
         """
         Replays scenario events one by one, dispatches alerts, and updates run stats.
         Evaluates run outcomes upon completion.
         """
+        # Backwards compatibility fallbacks
+        if timing_strategy is None:
+            from attack_simulator.services.timing import ConstantDelayStrategy
+
+            timing_strategy = ConstantDelayStrategy(delay_seconds=delay_between_events)
+        if sender is None:
+            sender = self.alert_sender
+
         sent_events = 0
         try:
             for idx, ev in enumerate(events):
@@ -103,7 +130,7 @@ class SimulationService:
                     alert_payload.pop("rule_id", None)
 
                 alert_payload["simulation_run_id"] = str(run_id)
-                session_id = await self.alert_sender.send(alert_payload, ev["mitre_technique"])
+                session_id = await sender.send(alert_payload, ev["mitre_technique"])
 
                 # Resolve expected playbook
                 expected_mitre = [ev["mitre_technique"]]
@@ -129,7 +156,8 @@ class SimulationService:
                 await db_repo.update_run_stats(run_id=run_id, status="RUNNING", sent_events=sent_events)
 
                 if idx < len(events) - 1:
-                    await asyncio.sleep(delay_between_events)
+                    next_ev = events[idx + 1]
+                    await timing_strategy.wait_before_next(ev, next_ev)
 
             # Wait 8s for the async agent triage workflow to finish matching playbooks
             logger.info("simulation.sleeping_for_eval", run_id=run_id)
@@ -160,6 +188,10 @@ class SimulationService:
         strip_labels: bool,
         llm_provider: str,
         llm_model: str,
+        sender_type: str = "webhook",
+        timing_mode: str = "constant",
+        max_original_delay: float = 30.0,
+        **kwargs: Any,
     ) -> str:
         """
         Create the bulk run record and spawn background sequential execution task.
@@ -179,6 +211,10 @@ class SimulationService:
                 scenario_ids=scenario_ids,
                 send_rate_per_sec=send_rate_per_sec,
                 strip_labels=strip_labels,
+                sender_type=sender_type,
+                timing_mode=timing_mode,
+                max_original_delay=max_original_delay,
+                **kwargs,
             )
         )
 
@@ -190,6 +226,10 @@ class SimulationService:
         scenario_ids: list[str],
         send_rate_per_sec: float,
         strip_labels: bool,
+        sender_type: str = "webhook",
+        timing_mode: str = "constant",
+        max_original_delay: float = 30.0,
+        **kwargs: Any,
     ) -> None:
         """
         Background task running scenarios sequentially for a bulk simulation run.
@@ -230,6 +270,17 @@ class SimulationService:
                     run_id=run_id,
                 )
 
+                # Resolve sender and timing strategy
+                from attack_simulator.sender.factory import get_sender
+                from attack_simulator.services.timing import get_timing_strategy
+
+                sender = get_sender(sender_type, **kwargs)
+                timing_strategy = get_timing_strategy(
+                    mode=timing_mode,
+                    base_delay=delay,
+                    max_delay=max_original_delay,
+                )
+
                 # Execute sequentially
                 events = await db_repo.get_scenario_events(sc_id)
                 await self.execute_simulation(
@@ -238,6 +289,8 @@ class SimulationService:
                     events=events,
                     delay_between_events=delay,
                     strip_labels=strip_labels,
+                    timing_strategy=timing_strategy,
+                    sender=sender,
                 )
 
                 logger.info(
@@ -316,3 +369,4 @@ class SimulationService:
         Cancel bulk run status and compute stats up to the point of cancellation.
         """
         await db_repo.cancel_bulk_run(bulk_run_id)
+

@@ -7,12 +7,14 @@ import uuid
 from typing import Any
 
 import structlog
+from attack_simulator.evaluator.agentix_gateway import AgentixSessionGateway
 from attack_simulator.evaluator.gateway import PlaybookRegistryGateway
 from attack_simulator.models import db_repo
 
 logger = structlog.get_logger(__name__)
 
 gateway = PlaybookRegistryGateway()
+agentix_gateway = AgentixSessionGateway()
 
 # In-memory lookup cache to prevent redundant scans
 _expected_playbooks_cache: dict[tuple[str, ...], list[str]] = {}
@@ -69,30 +71,7 @@ async def check_actual_playbook(session_id: str, conn: Any | None = None) -> str
     """
     import re
 
-    sess_uuid = uuid.UUID(session_id)
-
-    if conn is not None:
-        rows = await conn.fetch(
-            """
-            SELECT event_type, actor, content, metadata 
-            FROM session_events 
-            WHERE session_id = $1 
-            ORDER BY id ASC
-            """,
-            sess_uuid,
-        )
-    else:
-        pool = await db_repo.get_pool()
-        async with pool.acquire() as c:
-            rows = await c.fetch(
-                """
-                SELECT event_type, actor, content, metadata 
-                FROM session_events 
-                WHERE session_id = $1 
-                ORDER BY id ASC
-                """,
-                sess_uuid,
-            )
+    rows = await agentix_gateway.get_session_events(session_id, conn)
 
     triggered_pbs = []
     detailed_pbs = []
@@ -194,9 +173,10 @@ async def evaluate_run(run_id: str) -> dict[str, Any]:
         # Check actual playbook and status for the session
         async with pool.acquire() as conn:
             actual = await check_actual_playbook(session_id, conn)
-            sess_row = await conn.fetchrow("SELECT status FROM sessions WHERE id = $1", uuid.UUID(session_id))
+            sess_status = await agentix_gateway.get_session_status(session_id, conn)
 
-        sess_status = sess_row["status"] if sess_row else "FAILED"
+        if not sess_status:
+            sess_status = "FAILED"
 
         # Determine session verdict
         if sess_status in ("ACTIVE", "WAITING_APPROVAL") and actual is None:

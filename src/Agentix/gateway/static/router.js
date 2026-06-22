@@ -11,7 +11,6 @@ const navItems = {
     personas: document.getElementById('nav-personas'),
     playbooks: document.getElementById('nav-playbooks'),
     simulations: document.getElementById('nav-simulations'),
-    'bulk-evals': document.getElementById('nav-bulk-evals'),
     settings: document.getElementById('nav-settings')
 };
 
@@ -23,7 +22,6 @@ const panels = {
     personas: document.getElementById('panel-personas'),
     playbooks: document.getElementById('panel-playbooks'),
     simulations: document.getElementById('panel-simulations'),
-    'bulk-evals': document.getElementById('panel-bulk-evals'),
     settings: document.getElementById('panel-settings')
 };
 
@@ -62,19 +60,14 @@ const viewMeta = {
         desc: "Browse mapped incident triage checklists and response procedures",
         showControls: false
     },
-    simulations: {
-        title: "Attack Simulations & Telemetry",
-        desc: "Simulate advanced persistent threats, evaluate AI analyst playbook accuracy, and visualize detection gaps.",
-        showControls: false
-    },
-    'bulk-evals': {
-        title: "Bulk Evaluations & Benchmarks",
-        desc: "Compare playbook match rates across different LLM models and anonymized telemetry streams.",
-        showControls: false
-    },
     settings: {
         title: "System Configurations",
         desc: "Manage endpoint connections, storage quotas, and security logging settings",
+        showControls: false
+    },
+    simulations: {
+        title: "Attack Simulation Panel",
+        desc: "Standalone SecOps alert generator, coverage analysis, and playbook accuracy benchmarking",
         showControls: false
     }
 };

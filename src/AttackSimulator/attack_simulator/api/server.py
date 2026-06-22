@@ -5,6 +5,9 @@ from attack_simulator.api.routes import router, simulation_service
 from attack_simulator.models import db_repo
 from fastapi import FastAPI
 
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
 logger = structlog.get_logger(__name__)
 
 app = FastAPI(
@@ -12,6 +15,10 @@ app = FastAPI(
     description="Standalone REST API for simulating security alerts",
     version="1.0.0",
 )
+
+# Mount static files for Web UI
+static_dir = Path(__file__).parent.parent / "static"
+app.mount("/ui", StaticFiles(directory=str(static_dir), html=True), name="ui")
 
 # Mount the routes
 app.include_router(router, prefix="/v1")

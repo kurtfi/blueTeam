@@ -64,20 +64,26 @@ async def _run_simulation_task(scenario_id: str, run_id: str, delay_seconds: flo
     except Exception as e:
         logger.exception("mcp.simulation_run_worker.error", run_id=run_id, error=str(e))
         await db_repo.update_run_stats(run_id=run_id, status="FAILED", sent_events=0)
-
-
 @mcp.tool()
 async def trigger_attack_simulation(
-    scenario_name: str, delay_between_events: float = 1.0, strip_labels: bool = False
+    scenario_name: str,
+    delay_between_events: float = 1.0,
+    strip_labels: bool = False,
+    sender_type: str = "webhook",
+    timing_mode: str = "constant",
+    max_original_delay: float = 30.0,
 ) -> str:
     """
     Triggers an attack simulation scenario by name.
-    Sends correlated events to the SIEM webhook in the background.
+    Sends correlated events to the SIEM webhook or other configured sender in the background.
 
     Args:
         scenario_name: The name of the scenario to execute (e.g. 'Credential Access Attacks').
         delay_between_events: Seconds of delay to wait between sending each alert (default: 1.0).
         strip_labels: If True, strips MITRE technique/tactic IDs and rule IDs from the alert payload (default: False).
+        sender_type: Sender backend to use ('webhook', 'syslog', 'file', default: 'webhook').
+        timing_mode: Replay timing strategy ('constant' or 'original', default: 'constant').
+        max_original_delay: Maximum delay in seconds for original timing (default: 30.0).
     """
     if not scenario_name or len(scenario_name) > 255:
         return "Error: Scenario name exceeds 255 characters limit."
@@ -92,7 +98,12 @@ async def trigger_attack_simulation(
             return f"Scenario '{scenario_name}' not found."
 
         run_id = await service.run_simulation(
-            scenario_name=scenario_name, delay_between_events=delay_between_events, strip_labels=strip_labels
+            scenario_name=scenario_name,
+            delay_between_events=delay_between_events,
+            strip_labels=strip_labels,
+            sender_type=sender_type,
+            timing_mode=timing_mode,
+            max_original_delay=max_original_delay,
         )
 
         import json

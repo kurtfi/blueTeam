@@ -21,12 +21,11 @@ from agentic_common.memory.redis_preferences import RedisPreferenceStore
 from agentic_common.memory.redis_store import RedisSessionStore
 from agentic_common.settings import settings
 from agentix.api.internal_auth import InternalApiKeyMiddleware
-from agentix.api.routes import chat, playbooks, sessions, simulations, webhooks
+from agentix.api.routes import chat, playbooks, sessions, webhooks
 from agentix.core.alert_dedup import AlertDeduplicator
 from agentix.core.cleanup import run_periodic_cleanup
 from agentix.core.orchestrator import Orchestrator
 from agentix.registry.catalog import ToolCatalog
-from agentix.services.simulation import SimulationService
 
 logger = structlog.get_logger(__name__)
 
@@ -194,7 +193,6 @@ async def startup_event():
     app.state.pref_store = RedisPreferenceStore(redis_url=settings.redis_url)
     app.state.deduplicator = AlertDeduplicator(redis_url=settings.redis_url, window_seconds=120)
     app.state.mcp_stack = AsyncExitStack()
-    app.state.simulation_service = SimulationService()
 
     # 2. Initialize SOC MCP Server Connection with retry logic
     max_retries = 15
@@ -268,25 +266,7 @@ async def startup_event():
             except Exception as e:
                 logger.warning("Failed to fetch, cache, and register playbooks JSON at startup", error=str(e))
 
-            # Connect and Sync Attack Simulator MCP Server (optional/best effort at startup)
-            try:
-                logger.info("Connecting to Attack Simulator MCP Server...", url=settings.agentix_attack_simulator_url)
-                sim_transport = await app.state.mcp_stack.enter_async_context(
-                    sse_client(settings.agentix_attack_simulator_url)
-                )
-                sim_read, sim_write = sim_transport
-                app.state.attack_simulator_session = await app.state.mcp_stack.enter_async_context(
-                    ClientSession(sim_read, sim_write)
-                )
-                await app.state.attack_simulator_session.initialize()
-                await app.state.catalog.register_mcp_client(app.state.attack_simulator_session)
-                logger.info("Successfully connected to Attack Simulator MCP Server and registered tools.")
-            except Exception as e:
-                logger.warning(
-                    "Failed to connect to Attack Simulator MCP server at startup (Simulator might not be running)",
-                    url=settings.agentix_attack_simulator_url,
-                    error=str(e),
-                )
+            # Attack Simulator MCP Server connection is decoupled and handled directly by standalone simulator client.
 
             logger.info("Successfully connected to SOC MCP Server and synced tools.")
             break
@@ -350,4 +330,3 @@ app.include_router(webhooks.router)
 app.include_router(sessions.router, prefix="/v1")
 app.include_router(playbooks.router, prefix="/v1")
 app.include_router(chat.router, prefix="/v1")
-app.include_router(simulations.router, prefix="/v1")
