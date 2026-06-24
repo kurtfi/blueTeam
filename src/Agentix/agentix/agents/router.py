@@ -141,7 +141,11 @@ class AgentRouter:
             return None
 
         agent_name = parsed.get("agent", "none").lower().strip()
-        confidence = float(parsed.get("confidence", 0.0))
+        try:
+            confidence = float(parsed.get("confidence", 0.0))
+        except (ValueError, TypeError) as e:
+            logger.warning("router.confidence_parse_failed", raw_confidence=parsed.get("confidence"), error=str(e))
+            confidence = 0.0
 
         logger.info(
             "router.classification_result",

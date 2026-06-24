@@ -126,6 +126,33 @@ class MCPToolAdapter(BaseTool):
         """
         log = logger.bind(tool=self.name, attempt=0)
 
+        # Get or initialize shared circuit state on client instance
+        if not hasattr(self._client, "_circuit_state"):
+            self._client._circuit_state = {
+                "consecutive_failures": 0,
+                "open": False,
+                "open_until": 0.0,
+            }
+        circuit = self._client._circuit_state
+
+        import time
+
+        if circuit["open"]:
+            now = time.time()
+            if now < circuit["open_until"]:
+                logger.warning(
+                    "mcp_adapter.circuit_breaker.open",
+                    tool=self.name,
+                    remaining_seconds=round(circuit["open_until"] - now, 1),
+                )
+                return ToolResult(
+                    success=False,
+                    error=f"Circuit breaker is OPEN for tool '{self.name}'. Downstream MCP connection is currently down.",
+                )
+            else:
+                logger.info("mcp_adapter.circuit_breaker.half_open", tool=self.name)
+                circuit["open"] = False
+
         # Enforce playbook authorization checks for trigger and details tools
         if self.name in ("trigger_playbook", "get_playbook_details") and context:
             agent_id = context.get("agent_id")
@@ -196,6 +223,10 @@ class MCPToolAdapter(BaseTool):
                         result = await self._client.call_tool(self.name, arguments=kwargs)
                         output = self._parse_result(result)
 
+                        # Reset circuit state on success
+                        circuit["consecutive_failures"] = 0
+                        circuit["open"] = False
+
                         # --- interrupt_after hook ---
                         if self._interrupt_after is not None:
                             try:
@@ -215,6 +246,17 @@ class MCPToolAdapter(BaseTool):
 
         except Exception as exc:
             logger.error("mcp_adapter.max_retries_exceeded", tool=self.name, error=str(exc))
+            # Trip circuit breaker
+            circuit["consecutive_failures"] += 1
+            if circuit["consecutive_failures"] >= 5:
+                circuit["open"] = True
+                circuit["open_until"] = time.time() + 30.0
+                logger.error(
+                    "mcp_adapter.circuit_breaker.tripped",
+                    tool=self.name,
+                    consecutive_failures=circuit["consecutive_failures"],
+                    cooldown_seconds=30.0,
+                )
             return ToolResult(
                 success=False,
                 error=f"Tool '{self.name}' failed after {self._max_retries + 1} attempts: {exc}",

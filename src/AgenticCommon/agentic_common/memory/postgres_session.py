@@ -78,24 +78,39 @@ class PostgresSessionRepository:
         logger.info("postgres_session.found_migrations", files=files)
 
         async with pool.acquire() as conn:
-            # ALTER TYPE ... ADD VALUE cannot be executed inside a transaction block, so run it beforehand
+            # Session-level advisory lock to serialize migrations across multiple containers.
+            # Using key 42424242.
+            logger.info("postgres_session.acquiring_migration_lock")
+            await conn.execute("SELECT pg_advisory_lock(42424242);")
             try:
-                await conn.execute("ALTER TYPE session_source ADD VALUE 'SIEM';")
-            except Exception:
-                # Ignore if it already exists or type is not created yet
-                pass
-
-            for file_name in files:
-                file_path = os.path.join(migration_dir, file_name)
-                logger.info("postgres_session.running_migration", file=file_name)
-                with open(file_path, encoding="utf-8") as f:
-                    sql = f.read()
+                # ALTER TYPE ... ADD VALUE cannot be executed inside a transaction block, so run it beforehand
                 try:
-                    async with conn.transaction():
-                        await conn.execute(sql)
-                except Exception as e:
-                    logger.error("postgres_session.migration_failed", file=file_name, error=str(e))
-                    raise
+                    await conn.execute("ALTER TYPE session_source ADD VALUE 'SIEM';")
+                except Exception:
+                    # Ignore if it already exists or type is not created yet
+                    pass
+
+                for file_name in files:
+                    file_path = os.path.join(migration_dir, file_name)
+                    logger.info("postgres_session.running_migration", file=file_name)
+                    with open(file_path, encoding="utf-8") as f:
+                        sql = f.read()
+                    try:
+                        async with conn.transaction():
+                            await conn.execute(sql)
+                    except Exception as e:
+                        logger.error("postgres_session.migration_failed", file=file_name, error=str(e))
+                        raise
+            finally:
+                logger.info("postgres_session.releasing_migration_lock")
+                try:
+                    await conn.execute("SELECT pg_advisory_unlock(42424242);")
+                except Exception as unlock_err:
+                    logger.warning(
+                        "postgres_session.release_migration_lock_failed",
+                        error=str(unlock_err),
+                        message="Connection might be severed; PostgreSQL will release session lock automatically."
+                    )
         logger.info("postgres_session.migrations_completed")
 
     async def create_session(

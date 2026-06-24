@@ -194,96 +194,104 @@ async def startup_event():
     app.state.deduplicator = AlertDeduplicator(redis_url=settings.redis_url, window_seconds=120)
     app.state.mcp_stack = AsyncExitStack()
 
-    # 2. Initialize SOC MCP Server Connection with retry logic
-    max_retries = 15
-    retry_delay = 5  # seconds
-    for attempt in range(1, max_retries + 1):
-        try:
-            logger.info("Connecting to SOC MCP Server...", attempt=attempt, url=settings.agentix_triage_core_url)
-            # Recreate stack for this attempt to ensure clean state
-            app.state.mcp_stack = AsyncExitStack()
+    # 2. Initialize SOC MCP Server Connection asynchronously in background
+    app.state.triage_core_session = None
 
-            soc_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_triage_core_url))
-            soc_read, soc_write = soc_transport
-            app.state.triage_core_session = await app.state.mcp_stack.enter_async_context(
-                ClientSession(soc_read, soc_write)
-            )
-            await app.state.triage_core_session.initialize()
-
-            # Sync TriageCore Tools into our Catalog
-            await app.state.catalog.register_mcp_client(app.state.triage_core_session)
-
-            # Sync Agents in Database
+    async def connect_mcp_background() -> None:
+        max_retries = 15
+        retry_delay = 5  # seconds
+        for attempt in range(1, max_retries + 1):
             try:
-                from pathlib import Path
+                logger.info("Connecting to SOC MCP Server...", attempt=attempt, url=settings.agentix_triage_core_url)
+                # Recreate stack for this attempt to ensure clean state
+                app.state.mcp_stack = AsyncExitStack()
 
-                configs_dir = Path(__file__).parent.parent / "agents" / "configs"
-                if configs_dir.exists():
-                    for yaml_file in configs_dir.glob("*.yaml"):
-                        agent_id = yaml_file.stem
-                        rel_path = f"agentix/agents/configs/{yaml_file.name}"
-                        await postgres_session_repo.register_agent_in_db(agent_id, rel_path)
-                    logger.info("Successfully synced agent configurations to DB.")
+                soc_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_triage_core_url))
+                soc_read, soc_write = soc_transport
+                app.state.triage_core_session = await app.state.mcp_stack.enter_async_context(
+                    ClientSession(soc_read, soc_write)
+                )
+                await app.state.triage_core_session.initialize()
+
+                # Sync TriageCore Tools into our Catalog
+                await app.state.catalog.register_mcp_client(app.state.triage_core_session)
+
+                # Sync Agents in Database
+                try:
+                    from pathlib import Path
+
+                    configs_dir = Path(__file__).parent.parent / "agents" / "configs"
+                    if configs_dir.exists():
+                        for yaml_file in configs_dir.glob("*.yaml"):
+                            agent_id = yaml_file.stem
+                            rel_path = f"agentix/agents/configs/{yaml_file.name}"
+                            await postgres_session_repo.register_agent_in_db(agent_id, rel_path)
+                        logger.info("Successfully synced agent configurations to DB.")
+                    else:
+                        logger.warning(f"Configs directory not found for sync: {configs_dir}")
+                except Exception as e:
+                    logger.warning("Failed to sync agent configurations to DB at startup", error=str(e))
+
+                # Sync TriageCore Playbooks into our Catalog
+                try:
+                    result = await app.state.triage_core_session.call_tool("list_playbooks")
+                    from agentix.tools.mcp_adapter import MCPToolAdapter
+
+                    playbooks_str = MCPToolAdapter._parse_result(result)
+                    app.state.catalog.cached_playbooks = playbooks_str
+                    logger.info("Successfully fetched and cached playbooks from TriageCore.")
+                except Exception as e:
+                    logger.warning("Failed to fetch and cache playbooks at startup", error=str(e))
+
+                # Sync TriageCore Playbooks JSON into our Catalog & DB
+                try:
+                    json_result = await app.state.triage_core_session.call_tool("list_playbooks_json")
+                    from agentix.tools.mcp_adapter import MCPToolAdapter
+
+                    playbooks_json_str = MCPToolAdapter._parse_result(json_result)
+                    import json
+
+                    if not isinstance(playbooks_json_str, str):
+                        playbooks_json_str = json.dumps(playbooks_json_str)
+                    app.state.catalog.cached_playbooks_json = playbooks_json_str
+                    logger.info("Successfully fetched and cached playbooks JSON from TriageCore.")
+
+                    # Register playbooks and seed default mappings
+                    playbooks_list = json.loads(playbooks_json_str)
+                    for pb in playbooks_list:
+                        pb_id = pb["id"]
+                        file_path = pb.get("file_path") or ""
+                        await postgres_session_repo.register_playbook_in_db(pb_id, file_path)
+                        # Auto-seed: map 'soc_analyst' and 'simulation_analyst' to all playbooks
+                        await postgres_session_repo.map_agent_to_playbook("soc_analyst", pb_id)
+                        await postgres_session_repo.map_agent_to_playbook("simulation_analyst", pb_id)
+                    logger.info("Successfully registered playbooks and mapped soc_analyst and simulation_analyst to DB.")
+                except Exception as e:
+                    logger.warning("Failed to fetch, cache, and register playbooks JSON at startup", error=str(e))
+
+                # Attack Simulator MCP Server connection is decoupled and handled directly by standalone simulator client.
+
+                logger.info("Successfully connected to SOC MCP Server and synced tools.")
+                break
+            except asyncio.CancelledError:
+                logger.info("SOC MCP Server connection background task was cancelled.")
+                raise
+            except Exception as e:
+                # Clean up the stack of this failed attempt
+                await app.state.mcp_stack.aclose()
+                logger.warning(
+                    "Failed to connect to SOC MCP server, retrying...",
+                    attempt=attempt,
+                    max_retries=max_retries,
+                    error=str(e),
+                )
+                if attempt == max_retries:
+                    logger.error("Failed to connect to SOC MCP server after maximum retries", error=str(e))
+                    app.state.triage_core_session = None
                 else:
-                    logger.warning(f"Configs directory not found for sync: {configs_dir}")
-            except Exception as e:
-                logger.warning("Failed to sync agent configurations to DB at startup", error=str(e))
+                    await asyncio.sleep(retry_delay)
 
-            # Sync TriageCore Playbooks into our Catalog
-            try:
-                result = await app.state.triage_core_session.call_tool("list_playbooks")
-                from agentix.tools.mcp_adapter import MCPToolAdapter
-
-                playbooks_str = MCPToolAdapter._parse_result(result)
-                app.state.catalog.cached_playbooks = playbooks_str
-                logger.info("Successfully fetched and cached playbooks from TriageCore.")
-            except Exception as e:
-                logger.warning("Failed to fetch and cache playbooks at startup", error=str(e))
-
-            # Sync TriageCore Playbooks JSON into our Catalog & DB
-            try:
-                json_result = await app.state.triage_core_session.call_tool("list_playbooks_json")
-                from agentix.tools.mcp_adapter import MCPToolAdapter
-
-                playbooks_json_str = MCPToolAdapter._parse_result(json_result)
-                import json
-
-                if not isinstance(playbooks_json_str, str):
-                    playbooks_json_str = json.dumps(playbooks_json_str)
-                app.state.catalog.cached_playbooks_json = playbooks_json_str
-                logger.info("Successfully fetched and cached playbooks JSON from TriageCore.")
-
-                # Register playbooks and seed default mappings
-                playbooks_list = json.loads(playbooks_json_str)
-                for pb in playbooks_list:
-                    pb_id = pb["id"]
-                    file_path = pb.get("file_path") or ""
-                    await postgres_session_repo.register_playbook_in_db(pb_id, file_path)
-                    # Auto-seed: map 'soc_analyst' and 'simulation_analyst' to all playbooks
-                    await postgres_session_repo.map_agent_to_playbook("soc_analyst", pb_id)
-                    await postgres_session_repo.map_agent_to_playbook("simulation_analyst", pb_id)
-                logger.info("Successfully registered playbooks and mapped soc_analyst and simulation_analyst to DB.")
-            except Exception as e:
-                logger.warning("Failed to fetch, cache, and register playbooks JSON at startup", error=str(e))
-
-            # Attack Simulator MCP Server connection is decoupled and handled directly by standalone simulator client.
-
-            logger.info("Successfully connected to SOC MCP Server and synced tools.")
-            break
-        except Exception as e:
-            # Clean up the stack of this failed attempt
-            await app.state.mcp_stack.aclose()
-            logger.warning(
-                "Failed to connect to SOC MCP server, retrying...",
-                attempt=attempt,
-                max_retries=max_retries,
-                error=str(e),
-            )
-            if attempt == max_retries:
-                logger.error("Failed to connect to SOC MCP server after maximum retries", error=str(e))
-                app.state.triage_core_session = None
-            else:
-                await asyncio.sleep(retry_delay)
+    app.state.mcp_connect_task = asyncio.create_task(connect_mcp_background())
 
     # 3. Share catalog with background triage workflows
     try:
@@ -293,7 +301,7 @@ async def startup_event():
     except Exception as e:
         logger.error("Failed to share catalog with triage workflows", error=str(e))
 
-    # 3. Start periodic workspace cleanup background task
+    # 4. Start periodic workspace cleanup background task
     if settings.agentix_session_cleanup_on_expire:
         app.state.cleanup_task = asyncio.create_task(run_periodic_cleanup(interval_seconds=3600))
         logger.info("Session workspace cleanup task started.")
@@ -304,6 +312,15 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Shutting down Agentix Service and closing connections...")
+    # Cancel connection task
+    mcp_connect_task = getattr(app.state, "mcp_connect_task", None)
+    if mcp_connect_task and not mcp_connect_task.done():
+        mcp_connect_task.cancel()
+        try:
+            await mcp_connect_task
+        except asyncio.CancelledError:
+            pass
+
     # Cancel cleanup task
     cleanup_task = getattr(app.state, "cleanup_task", None)
     if cleanup_task and not cleanup_task.done():

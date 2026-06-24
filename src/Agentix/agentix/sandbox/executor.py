@@ -57,11 +57,18 @@ async def run_command(command: str, timeout: int = 30) -> ToolResult:
             *args[1:],
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            process_group=0,  # Starts a new process group to group child processes
         )
         try:
             stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=effective_timeout)
         except TimeoutError:
-            proc.kill()
+            import os
+            import signal
+
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
             await proc.communicate()
             return ToolResult(
                 success=False,

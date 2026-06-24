@@ -13,6 +13,21 @@ def _validate_len(val: str | None, max_len: int, name: str) -> None:
         raise ValueError(f"Input '{name}' exceeds maximum length of {max_len} characters.")
 
 
+def _validate_dict_size(val: Any, max_bytes: int, name: str) -> None:
+    if val is not None:
+        if not isinstance(val, dict):
+            raise ValueError(f"Input '{name}' must be a dictionary.")
+        import json
+        try:
+            size = len(json.dumps(val))
+            if size > max_bytes:
+                raise ValueError(f"Input dict '{name}' exceeds maximum serialized size of {max_bytes} bytes.")
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            raise ValueError(f"Input dict '{name}' failed serialization validation: {e}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Playbook Tools
 # ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +57,7 @@ async def trigger_playbook(
     _validate_len(agent_name, 255, "agent_name")
     _validate_len(src_ip, 255, "src_ip")
     _validate_len(rule_id, 255, "rule_id")
+    _validate_dict_size(extra_context, 65536, "extra_context")
 
     logger.info(
         "tool.trigger_playbook",
@@ -398,5 +414,6 @@ async def trigger_soar_workflow(workflow_id: str, data: dict[str, Any] | None = 
     """Triggers a workflow on SOAR."""
     _validate_len(workflow_id, 255, "workflow_id")
     _validate_len(webhook_url, 1000, "webhook_url")
+    _validate_dict_size(data, 65536, "data")
     provider = registry.get_soar_provider()
     return await provider.trigger_workflow(workflow_id, data, webhook_url)
