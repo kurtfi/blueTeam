@@ -1,0 +1,46 @@
+name: "Web Server Exploit and Exfiltration"
+description: "Simulates a web application vulnerability exploitation followed by system discovery and exfiltration of sensitive data to an external server."
+type: "dag"
+initial_step: "web_rce"
+steps:
+  web_rce:
+    name: "Web ProxyLogon RCE Exploit"
+    mitre_technique: "T1190"
+    log_source: "data/proxylogon_ssrf_rce_poc.zip"
+    next:
+      TRUE_POSITIVE: "exit_mitigated" # Exploit blocked
+      FALSE_POSITIVE: "system_discovery" # Exploit succeeded
+      NO_PLAYBOOK: "system_discovery"
+      TIMEOUT: "system_discovery"
+
+  system_discovery:
+    name: "Registry & System Discovery"
+    mitre_technique: "T1012"
+    log_source: "data/cmd_discover_iexplorer_version_registry.zip"
+    next:
+      TRUE_POSITIVE: "exfiltrate_data" # Discovery blocked, but attacker rushes to exfiltration
+      FALSE_POSITIVE: "exfiltrate_data" # Discovery succeeded
+      NO_PLAYBOOK: "exfiltrate_data"
+      TIMEOUT: "exfiltrate_data"
+
+  exfiltrate_data:
+    name: "Data Exfiltration Over HTTPS/S3"
+    mitre_technique: "T1048"
+    log_source: "data/ec2_proxy_s3_exfiltration.zip"
+    next:
+      TRUE_POSITIVE: "exit_mitigated"
+      FALSE_POSITIVE: "exit_compromised"
+      NO_PLAYBOOK: "exit_compromised"
+      TIMEOUT: "exit_compromised"
+
+  exit_mitigated:
+    name: "Attack Mitigated"
+    mitre_technique: "T1190"
+    log_source: null
+    next: null
+
+  exit_compromised:
+    name: "Data Exfiltrated Successfully"
+    mitre_technique: "T1048"
+    log_source: null
+    next: null

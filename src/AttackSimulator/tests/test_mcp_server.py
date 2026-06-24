@@ -21,4 +21,3 @@ async def test_mcp_tools_registration() -> None:
     assert "get_simulation_run_status" in tool_names
     assert "get_playbook_coverage_gaps" in tool_names
     assert "activate_scenario" in tool_names
-    assert "download_mordor_scenario" in tool_names

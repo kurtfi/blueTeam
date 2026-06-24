@@ -9,7 +9,7 @@ from collections.abc import Generator
 from typing import Any
 
 import structlog
-from attack_simulator.loader.base import DatasetLoader
+from dataset_ingestor.loader.base import DatasetLoader
 
 logger = structlog.get_logger(__name__)
 

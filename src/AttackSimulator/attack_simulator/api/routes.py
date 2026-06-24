@@ -14,6 +14,115 @@ class BulkRunRequest(BaseModel):
     scenario_ids: list[str]
     send_rate_per_sec: float = Field(1.0, ge=0.1, le=10.0)
     strip_labels: bool = False
+    timing_mode: str = "constant"
+    max_original_delay: float = 30.0
+    sender_type: str = "webhook"
+
+
+class ScenarioEventCreate(BaseModel):
+    sequence_order: int
+    mitre_technique: str
+    mitre_tactic: str | None = None
+    correlation_type: str = "direct"
+    raw_event_count: int = 1
+    correlation_rule: str | None = None
+    wazuh_alert: dict
+    raw_log_hash: str | None = None
+
+
+class LinearScenarioCreate(BaseModel):
+    name: str = Field(..., max_length=255)
+    description: str | None = Field(None, max_length=1000)
+    mitre_ids: list[str]
+    source_dataset: str = Field(..., max_length=100)
+    source_path: str = Field(..., max_length=1000)
+    events: list[ScenarioEventCreate]
+
+
+class DagScenarioCreate(BaseModel):
+    name: str = Field(..., max_length=255)
+    description: str | None = Field(None, max_length=1000)
+    mitre_ids: list[str]
+    source_dataset: str = Field(..., max_length=100)
+    source_path: str = Field(..., max_length=1000)
+    total_events: int = 0
+    dag_structure: dict
+
+
+@router.post("/simulations/scenarios/linear")
+async def create_linear_scenario(payload: LinearScenarioCreate):
+    """
+    Ingest a new linear scenario along with its pre-correlated events.
+    """
+    try:
+        # Check if already exists
+        existing = await db_repo.get_scenario_by_name(payload.name)
+        if existing:
+            # Delete to recreate (matches the loader's behavior of clean seeding)
+            await db_repo.delete_scenario(existing["id"])
+
+        # Create scenario record
+        scenario_id = await db_repo.create_scenario(
+            name=payload.name,
+            description=payload.description,
+            mitre_ids=payload.mitre_ids,
+            source_dataset=payload.source_dataset,
+            source_path=payload.source_path,
+            total_events=len(payload.events),
+            status="passive",
+            type="linear",
+        )
+
+        # Insert events
+        db_events = []
+        for ev in payload.events:
+            db_ev = ev.dict()
+            db_ev["scenario_id"] = scenario_id
+            db_events.append(db_ev)
+
+        await db_repo.insert_attack_events(db_events, status="passive")
+
+        return {
+            "status": "success",
+            "scenario_id": scenario_id,
+            "total_events": len(db_events),
+            "message": f"Linear scenario '{payload.name}' ingested successfully."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/simulations/scenarios/dag")
+async def create_dag_scenario(payload: DagScenarioCreate):
+    """
+    Ingest a new DAG scenario with its dynamic state structure.
+    """
+    try:
+        # Check if already exists
+        existing = await db_repo.get_scenario_by_name(payload.name)
+        if existing:
+            await db_repo.delete_scenario(existing["id"])
+
+        scenario_id = await db_repo.create_scenario(
+            name=payload.name,
+            description=payload.description,
+            mitre_ids=payload.mitre_ids,
+            source_dataset=payload.source_dataset,
+            source_path=payload.source_path,
+            total_events=payload.total_events,
+            status="passive",
+            type="dag",
+            dag_structure=payload.dag_structure,
+        )
+
+        return {
+            "status": "success",
+            "scenario_id": scenario_id,
+            "message": f"DAG scenario '{payload.name}' ingested successfully."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.get("/simulations/scenarios")
@@ -33,12 +142,38 @@ async def get_simulation_scenario_events(scenario_id: str = Path(..., max_length
     Get the event sequence preview for a scenario.
     """
     try:
-        uuid.UUID(scenario_id)
+        sc_uuid = uuid.UUID(scenario_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid scenario UUID format")
 
     try:
+        sc = await db_repo.get_scenario_by_id(sc_uuid)
+        if not sc:
+            raise HTTPException(status_code=404, detail="Scenario not found")
+
+        if sc.get("type") == "dag":
+            # For DAG scenarios, flatten and return alerts from all steps as a preview sequence
+            dag_struct = sc.get("dag_structure") or {}
+            steps = dag_struct.get("steps", {})
+            flattened_events = []
+            order = 1
+            for step_key, step_info in steps.items():
+                wazuh_alerts = step_info.get("wazuh_alerts", [])
+                for alert in wazuh_alerts:
+                    flattened_events.append({
+                        "id": f"dag-{step_key}-{order}",
+                        "scenario_id": scenario_id,
+                        "sequence_order": order,
+                        "mitre_technique": step_info.get("mitre_technique"),
+                        "mitre_tactic": "Multi-stage Execution",
+                        "wazuh_alert": alert,
+                    })
+                    order += 1
+            return flattened_events
+
         return await db_repo.get_scenario_events(scenario_id)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -65,6 +200,9 @@ async def run_simulation_scenario(
     scenario_id: str = Path(..., max_length=100),
     send_rate_per_sec: float = Query(1.0, ge=0.1, le=10.0),
     strip_labels: bool = Query(False),
+    timing_mode: str = Query("constant"),
+    max_original_delay: float = Query(30.0),
+    sender_type: str = Query("webhook"),
 ):
     """
     Trigger a simulation run for the target scenario.
@@ -83,6 +221,9 @@ async def run_simulation_scenario(
             scenario_name=sc["name"],
             delay_between_events=1.0 / send_rate_per_sec if send_rate_per_sec > 0 else 1.0,
             strip_labels=strip_labels,
+            timing_mode=timing_mode,
+            max_original_delay=max_original_delay,
+            sender_type=sender_type,
         )
         return {"status": "success", "run_id": run_id, "message": "Simulation run triggered"}
     except HTTPException:
@@ -184,6 +325,9 @@ async def trigger_bulk_simulations(payload: BulkRunRequest):
             strip_labels=payload.strip_labels,
             llm_provider=llm_provider,
             llm_model=llm_model,
+            timing_mode=payload.timing_mode,
+            max_original_delay=payload.max_original_delay,
+            sender_type=payload.sender_type,
         )
 
         return {"status": "success", "bulk_run_id": bulk_run_id, "message": "Bulk simulation run started in background"}

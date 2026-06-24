@@ -37,6 +37,8 @@ class DatabaseRepository:
         source_path: str,
         total_events: int = 0,
         status: str = "passive",
+        type: str = "linear",
+        dag_structure: dict[str, Any] | None = None,
     ) -> str:
         # Truncate strings to prevent database length constraint issues
         name = name[:255]
@@ -45,16 +47,18 @@ class DatabaseRepository:
         source_dataset = source_dataset[:100]
         source_path = source_path[:1000]
         status = status[:20]
+        type = type[:50]
 
         pool = await self.get_pool()
         scenario_id = uuid.uuid4()
+        dag_structure_str = json.dumps(dag_structure) if dag_structure else None
 
         async with pool.acquire() as conn:
             await conn.execute(
                 """
                 INSERT INTO simulator.attack_scenarios (
-                    id, name, description, mitre_ids, source_dataset, source_path, total_events, status, created_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                    id, name, description, mitre_ids, source_dataset, source_path, total_events, status, type, dag_structure, created_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
                 """,
                 scenario_id,
                 name,
@@ -64,8 +68,10 @@ class DatabaseRepository:
                 source_path,
                 total_events,
                 status,
+                type,
+                dag_structure_str,
             )
-        logger.info("db.scenario_created", scenario_id=str(scenario_id), name=name, status=status)
+        logger.info("db.scenario_created", scenario_id=str(scenario_id), name=name, status=status, type=type)
         return str(scenario_id)
 
     async def get_scenario_by_name(self, name: str) -> dict[str, Any] | None:
@@ -75,6 +81,8 @@ class DatabaseRepository:
             if row:
                 d = dict(row)
                 d["id"] = str(d["id"])
+                if d.get("dag_structure") and isinstance(d["dag_structure"], str):
+                    d["dag_structure"] = json.loads(d["dag_structure"])
                 return d
         return None
 
@@ -85,6 +93,8 @@ class DatabaseRepository:
             if row:
                 d = dict(row)
                 d["id"] = str(d["id"])
+                if d.get("dag_structure") and isinstance(d["dag_structure"], str):
+                    d["dag_structure"] = json.loads(d["dag_structure"])
                 return d
         return None
 
@@ -116,6 +126,8 @@ class DatabaseRepository:
             for row in rows:
                 d = dict(row)
                 d["id"] = str(d["id"])
+                if d.get("dag_structure") and isinstance(d["dag_structure"], str):
+                    d["dag_structure"] = json.loads(d["dag_structure"])
                 results.append(d)
             return results
 
@@ -211,6 +223,17 @@ class DatabaseRepository:
         logger.info("db.run_created", run_id=str(run_id), scenario_id=scenario_id, bulk_run_id=bulk_run_id)
         return str(run_id)
 
+    async def update_run_path(self, run_id: str, traversed_path: list[str]) -> None:
+        pool = await self.get_pool()
+        run_uuid = uuid.UUID(run_id)
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE simulator.simulation_runs SET traversed_path = $2 WHERE id = $1",
+                run_uuid,
+                traversed_path,
+            )
+        logger.info("db.run_path_updated", run_id=run_id, traversed_path=traversed_path)
+
     async def update_run_stats(
         self,
         run_id: str,
@@ -295,7 +318,7 @@ class DatabaseRepository:
     async def insert_simulation_result(
         self,
         run_id: str,
-        event_id: str,
+        event_id: str | None,
         session_id: str | None,
         expected_mitre: list[str],
         expected_playbook: str | None,
@@ -314,7 +337,7 @@ class DatabaseRepository:
 
         pool = await self.get_pool()
         run_uuid = uuid.UUID(run_id)
-        ev_uuid = uuid.UUID(event_id)
+        ev_uuid = uuid.UUID(event_id) if event_id else None
         result_id = uuid.uuid4()
 
         async with pool.acquire() as conn:
@@ -343,11 +366,11 @@ class DatabaseRepository:
         async with pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT res.*, ev.mitre_technique, ev.sequence_order
+                SELECT res.*, COALESCE(ev.mitre_technique, res.expected_mitre[1]) as mitre_technique, ev.sequence_order
                 FROM simulator.simulation_results res
-                JOIN simulator.attack_events ev ON res.event_id = ev.id
+                LEFT JOIN simulator.attack_events ev ON res.event_id = ev.id
                 WHERE res.run_id = $1
-                ORDER BY ev.sequence_order ASC
+                ORDER BY COALESCE(ev.sequence_order, 0) ASC, res.created_at ASC
                 """,
                 run_uuid,
             )
@@ -356,7 +379,24 @@ class DatabaseRepository:
                 d = dict(row)
                 d["id"] = str(d["id"])
                 d["run_id"] = str(d["run_id"])
-                d["event_id"] = str(d["event_id"])
+                d["event_id"] = str(d["event_id"]) if d.get("event_id") else None
+
+                # Map match_result to verdict for the UI
+                mr = d.get("match_result")
+                if mr == "CORRECT":
+                    d["verdict"] = "TRUE_POSITIVE"
+                elif mr == "WRONG":
+                    d["verdict"] = "FALSE_POSITIVE"
+                else:
+                    d["verdict"] = mr
+
+                # Map expected_playbook to expected_playbooks list
+                epb = d.get("expected_playbook")
+                if epb:
+                    d["expected_playbooks"] = [pb.strip() for pb in epb.split(",")]
+                else:
+                    d["expected_playbooks"] = []
+
                 results.append(d)
             return results
 
@@ -544,7 +584,13 @@ class DatabaseRepository:
                 "SELECT * FROM simulator.attack_scenarios WHERE id = $1",
                 scenario_id,
             )
-            return dict(row) if row else None
+            if row:
+                d = dict(row)
+                d["id"] = str(d["id"])
+                if d.get("dag_structure") and isinstance(d["dag_structure"], str):
+                    d["dag_structure"] = json.loads(d["dag_structure"])
+                return d
+            return None
 
     async def get_active_simulation_runs(self) -> list[str]:
         pool = await self.get_pool()

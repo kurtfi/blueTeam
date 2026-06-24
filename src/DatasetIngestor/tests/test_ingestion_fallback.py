@@ -1,5 +1,5 @@
-from attack_simulator.correlation.engine import CorrelationEngine
-from attack_simulator.services.ingestion import correlate_and_fallback_events
+from dataset_ingestor.correlation.engine import CorrelationEngine
+from dataset_ingestor.ingestion import correlate_and_fallback_events
 
 
 def test_background_noise_filtering_and_fallback():

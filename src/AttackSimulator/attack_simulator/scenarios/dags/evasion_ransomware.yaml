@@ -1,0 +1,56 @@
+name: "Defense Evasion and Ransomware Impact"
+description: "Simulates initial execution via MSHTA/VBScript, bypassing UAC/Process injection defense evasion, and executing a ransomware shadow copy deletion impact."
+type: "dag"
+initial_step: "mshta_execution"
+steps:
+  mshta_execution:
+    name: "MSHTA JavaScript Execution"
+    mitre_technique: "T1218.005"
+    log_source: "data/cmd_mshta_javascript_getobject_sct.zip"
+    next:
+      TRUE_POSITIVE: "uac_bypass_fallback" # Blocked, try fallback bypass
+      FALSE_POSITIVE: "process_herpaderping" # Succeeded, inject process
+      NO_PLAYBOOK: "process_herpaderping"
+      TIMEOUT: "process_herpaderping"
+
+  uac_bypass_fallback:
+    name: "CMSTP Bypass UAC Fallback"
+    mitre_technique: "T1218.003"
+    log_source: "data/psh_cmstp_execution_bypassuac.zip"
+    next:
+      TRUE_POSITIVE: "exit_mitigated" # Fallback blocked
+      FALSE_POSITIVE: "process_herpaderping" # Fallback succeeded
+      NO_PLAYBOOK: "process_herpaderping"
+      TIMEOUT: "process_herpaderping"
+
+  process_herpaderping:
+    name: "Process Herpaderping Injection"
+    mitre_technique: "T1055"
+    log_source: "data/cmd_process_herpaderping_snippingtool.zip"
+    next:
+      TRUE_POSITIVE: "exit_mitigated"
+      FALSE_POSITIVE: "ransomware_impact"
+      NO_PLAYBOOK: "ransomware_impact"
+      TIMEOUT: "ransomware_impact"
+
+  ransomware_impact:
+    name: "Volume Shadow Copy Deletion"
+    mitre_technique: "T1490"
+    log_source: "data/raccine_simulation_mode.zip"
+    next:
+      TRUE_POSITIVE: "exit_mitigated"
+      FALSE_POSITIVE: "exit_compromised"
+      NO_PLAYBOOK: "exit_compromised"
+      TIMEOUT: "exit_compromised"
+
+  exit_mitigated:
+    name: "Attack Mitigated"
+    mitre_technique: "T1218.005"
+    log_source: null
+    next: null
+
+  exit_compromised:
+    name: "System Encrypted and Held for Ransom"
+    mitre_technique: "T1490"
+    log_source: null
+    next: null

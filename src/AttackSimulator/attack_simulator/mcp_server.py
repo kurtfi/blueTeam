@@ -172,28 +172,6 @@ async def activate_scenario(scenario_name: str) -> str:
         return f"Error activating scenario: {str(e)}"
 
 
-@mcp.tool()
-async def download_mordor_scenario(url: str) -> str:
-    """
-    Downloads a Mordor dataset zip file from a URL to the local data/ folder.
-    Performs duplicate checks to block downloading if already downloaded or ingested.
-
-    Args:
-        url: The HTTP/HTTPS URL of the Mordor dataset zip file to download.
-    """
-    if not url or len(url) > 1000:
-        return "Error: URL exceeds 1000 characters limit."
-
-    try:
-        from attack_simulator.services.ingestion import IngestionService
-
-        service = IngestionService()
-        local_path = await service.download_dataset(url)
-        return f"Successfully downloaded dataset from {url} to {local_path}"
-    except Exception as e:
-        logger.error("mcp.download_scenario.error", error=str(e))
-        return f"Error downloading dataset: {str(e)}"
-
 
 @mcp.tool()
 async def get_playbook_coverage_gaps() -> str:
@@ -229,38 +207,6 @@ async def get_playbook_coverage_gaps() -> str:
     except Exception as e:
         logger.error("mcp.gap_report.error", error=str(e))
         return f"Error generating gap report: {str(e)}"
-
-
-@mcp.tool()
-async def ingest_all_scenarios(directory_path: str = "data") -> str:
-    """
-    Ingests all dataset files in the specified directory using the compiled metadata mappings.
-    Checks and prevents duplicate scenario names/paths from being ingested.
-
-    Args:
-        directory_path: Absolute or relative path to the directory containing datasets (default: 'data').
-    """
-    try:
-        from attack_simulator.services.ingestion import IngestionService
-
-        service = IngestionService()
-        results = await service.ingest_all_scenarios(directory_path)
-
-        import json
-
-        return json.dumps(
-            {
-                "status": "COMPLETED",
-                "total_files": results["total"],
-                "ingested": results["ingested"],
-                "skipped": results["skipped"],
-                "failed": results["failed"],
-            },
-            indent=2,
-        )
-    except Exception as e:
-        logger.error("mcp.ingest_all.error", error=str(e))
-        return f"Error ingesting scenarios: {str(e)}"
 
 
 def run_server() -> None:

@@ -51,7 +51,9 @@ class OriginalDeltaStrategy(TimingStrategy):
     def _parse_timestamp(self, event: dict[str, Any]) -> datetime | None:
         """Helper to extract and parse ISO timestamp from wazuh_alert dict."""
         try:
-            alert = event.get("wazuh_alert") or {}
+            alert = event.get("wazuh_alert") if "wazuh_alert" in event else event
+            if not isinstance(alert, dict):
+                return None
             ts_str = alert.get("@timestamp")
             if not ts_str:
                 return None

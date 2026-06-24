@@ -7,8 +7,7 @@ import pytest
 from typing import Any
 from unittest.mock import patch, AsyncMock, MagicMock
 
-from attack_simulator.exceptions import ScenarioNotFoundError, DuplicateScenarioError, SimulatorException
-from attack_simulator.services.ingestion import IngestionService
+from attack_simulator.exceptions import ScenarioNotFoundError, SimulatorException
 from attack_simulator.services.simulation import SimulationService
 from attack_simulator.sender.base import AlertSender
 from attack_simulator.evaluator.gateway import PlaybookRegistryGateway
@@ -28,43 +27,6 @@ class MockPlaybookGateway(PlaybookRegistryGateway):
         mock_pb = MagicMock()
         mock_pb.id = "PB-MOCK"
         return [mock_pb]
-
-
-@pytest.mark.asyncio
-async def test_ingestion_duplicate_scenario_name() -> None:
-    service = IngestionService()
-
-    # Mock database repo returning existing scenario
-    with (
-        patch("attack_simulator.models.db_repo.get_scenario_by_path", new_callable=AsyncMock) as mock_get_path,
-        patch("attack_simulator.models.db_repo.get_scenario_by_name", new_callable=AsyncMock) as mock_get_name,
-        patch("attack_simulator.models.db_repo.get_scenario_events", new_callable=AsyncMock) as mock_get_events,
-    ):
-        mock_get_path.return_value = None
-        mock_get_name.return_value = {"id": str(uuid.uuid4()), "name": "Existing Scenario", "total_events": 5}
-        mock_get_events.return_value = [{"id": "event_id"}]
-
-        with pytest.raises(DuplicateScenarioError):
-            await service.ingest_scenario(
-                path="some_path.json", source_type="custom", scenario_name="Existing Scenario"
-            )
-
-
-@pytest.mark.asyncio
-async def test_ingestion_file_not_found() -> None:
-    service = IngestionService()
-
-    with (
-        patch("attack_simulator.models.db_repo.get_scenario_by_path", new_callable=AsyncMock) as mock_get_path,
-        patch("attack_simulator.models.db_repo.get_scenario_by_name", new_callable=AsyncMock) as mock_get_name,
-    ):
-        mock_get_path.return_value = None
-        mock_get_name.return_value = None
-
-        with pytest.raises(FileNotFoundError):
-            await service.ingest_scenario(
-                path="non_existing_file_xyz.json", source_type="custom", scenario_name="New Scenario"
-            )
 
 
 @pytest.mark.asyncio

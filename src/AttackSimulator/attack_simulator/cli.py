@@ -14,60 +14,12 @@ from attack_simulator.config import WEBHOOK_URL
 from attack_simulator.evaluator.gap_analyzer import generate_coverage_report, print_ascii_gap_report
 from attack_simulator.evaluator.playbook_match import evaluate_run
 from attack_simulator.models import db_repo
-from attack_simulator.services.ingestion import IngestionService
 from attack_simulator.services.simulation import SimulationService
 
 logger = structlog.get_logger(__name__)
 
 
-async def download_command(args: argparse.Namespace) -> None:
-    """Downloads a dataset from a URL to data/ directory with duplication checks."""
-    service = IngestionService()
-    local_path = await service.download_dataset(args.url)
-    print(f"[+] Download complete: {local_path}")
-
-
-async def ingest_command(args: argparse.Namespace) -> None:
-    """Ingests raw attack telemetry, correlates events, and stores scenario metadata."""
-    service = IngestionService()
-
-    print(f"[*] Starting ingestion from {args.source} source: {args.path} ...")
-    scenario_id = await service.ingest_scenario(
-        path=args.path, source_type=args.source, scenario_name=args.scenario_name, description=args.description
-    )
-
-    fallback_name = args.scenario_name or os.path.splitext(os.path.basename(args.path))[0].replace("_", " ").title()
-    sc = await db_repo.get_scenario_by_name(fallback_name)
-
-    sc_name = sc["name"] if sc else (args.scenario_name or "Unknown")
-    sc_total = sc["total_events"] if sc else 0
-    sc_mitre = ", ".join(sc["mitre_ids"]) if sc and sc["mitre_ids"] else ""
-
-    print("\n" + "=" * 60)
-    print("                    INGESTION SUCCESSFUL")
-    print("=" * 60)
-    print(f"Scenario Name:      {sc_name}")
-    print(f"Scenario ID:        {scenario_id}")
-    print(f"Correlated Alerts:  {sc_total}")
-    print(f"MITRE Techniques:   {sc_mitre}")
-    print("=" * 60)
-
-
-async def ingest_all_command(args: argparse.Namespace) -> None:
-    """Ingests all files in the data directory using compiled metadata mapping."""
-    service = IngestionService()
-
-    print(f"[*] Analyzing target directory '{args.dir}' for scenarios...")
-    results = await service.ingest_all_scenarios(args.dir)
-
-    print("\n" + "=" * 60)
-    print("                BATCH INGESTION COMPLETE")
-    print("=" * 60)
-    print(f"Total Files Found:  {results['total']}")
-    print(f"Ingested:          {results['ingested']}")
-    print(f"Skipped (Exists):  {results['skipped']}")
-    print(f"Failed/No Alerts:  {results['failed']}")
-    print("=" * 60)
+# Ingestion commands have been moved to the external scripts/ingest.py utility
 
 
 async def run_command(args: argparse.Namespace) -> None:
@@ -268,22 +220,7 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # Ingest subcommand
-    parser_ingest = subparsers.add_parser("ingest", help="Ingest raw log data and correlate into scenarios.")
-    parser_ingest.add_argument("--source", choices=["mordor", "custom"], required=True, help="Data source type")
-    parser_ingest.add_argument("--path", required=True, help="Path to raw logs (ZIP for mordor, YAML/JSON for custom)")
-    parser_ingest.add_argument("--scenario-name", help="Custom name for the scenario")
-    parser_ingest.add_argument("--description", help="Custom description for the scenario")
-
-    # Ingest-all subcommand
-    parser_ingest_all = subparsers.add_parser(
-        "ingest-all", help="Ingest all files in the data directory using compiled metadata."
-    )
-    parser_ingest_all.add_argument("--dir", default="data", help="Directory containing dataset files (default: data)")
-
-    # Download subcommand
-    parser_download = subparsers.add_parser("download", help="Download a scenario dataset from a URL.")
-    parser_download.add_argument("--url", required=True, help="URL of the Mordor dataset zip file")
+    # Ingestion and download subcommands have been moved to scripts/ingest.py
 
     # Run subcommand
     parser_run = subparsers.add_parser("run", help="Run a simulation scenario.")
@@ -325,13 +262,7 @@ def main() -> None:
     asyncio.set_event_loop(loop)
 
     try:
-        if args.command == "ingest":
-            loop.run_until_complete(ingest_command(args))
-        elif args.command == "ingest-all":
-            loop.run_until_complete(ingest_all_command(args))
-        elif args.command == "download":
-            loop.run_until_complete(download_command(args))
-        elif args.command == "run":
+        if args.command == "run":
             loop.run_until_complete(run_command(args))
         elif args.command == "activate":
             loop.run_until_complete(activate_command(args))

@@ -21,6 +21,7 @@ members = [
     "agentic-common",
     "agentix",
     "attack-simulator",
+    "dataset-ingestor",
     "triagecore",
 ]
 
@@ -497,7 +498,6 @@ dependencies = [
     { name = "fastmcp" },
     { name = "httpx" },
     { name = "pydantic" },
-    { name = "pyyaml" },
     { name = "structlog" },
     { name = "tqdm" },
     { name = "triagecore" },
@@ -510,7 +510,6 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=3.2.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "pydantic", specifier = ">=2.7.0" },
-    { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "structlog", specifier = ">=24.1.0" },
     { name = "tqdm", specifier = ">=4.66.0" },
     { name = "triagecore", editable = "src/TriageCore" },
@@ -1167,6 +1166,29 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bb/fe/da593db56d872f53fd1abfeb0c801310d3b7629a3b50873c2e13c5a3cac4/cyclopts-4.15.0.tar.gz", hash = "sha256:3b5655581bcb759880abf1aeebf6fd370a3a4da8cf1248dd71061e357a525a34", size = 177765, upload-time = "2026-05-21T12:23:22.413Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/03/85/72020c6d9c185ea36742e005d9e8f3b47ff8a4181ced8ff03d66e655de6b/cyclopts-4.15.0-py3-none-any.whl", hash = "sha256:0eb784abb4ea8893099429e903193ff31edcb5fe17a619fa93c6eaf60bf51f1f", size = 215341, upload-time = "2026-05-21T12:23:23.549Z" },
+]
+
+[[package]]
+name = "dataset-ingestor"
+version = "0.1.0"
+source = { editable = "src/DatasetIngestor" }
+dependencies = [
+    { name = "attack-simulator" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+    { name = "tqdm" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "attack-simulator", editable = "src/AttackSimulator" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "pydantic", specifier = ">=2.7.0" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "structlog", specifier = ">=24.1.0" },
+    { name = "tqdm", specifier = ">=4.66.0" },
 ]
 
 [[package]]

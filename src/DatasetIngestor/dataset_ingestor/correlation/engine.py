@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from attack_simulator.correlation.aggregator import EventAggregator
-from attack_simulator.correlation.rules import CorrelationRule, load_rules
+from dataset_ingestor.correlation.aggregator import EventAggregator
+from dataset_ingestor.correlation.rules import CorrelationRule, load_rules
 from attack_simulator.mapper.wazuh_template import generate_wazuh_alert
 
 logger = structlog.get_logger(__name__)
@@ -91,4 +91,4 @@ class CorrelationEngine:
                             rule_id=alert["rule"]["id"],
                         )
 
-        return alerts
+        return list(alerts)

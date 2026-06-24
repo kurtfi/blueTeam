@@ -1,0 +1,56 @@
+name: "Active Directory Domain Compromise"
+description: "Simulates a multi-stage Active Directory attack path starting from brute force, escalating to credential dumping, and culminating in a DCSync domain controller compromise."
+type: "dag"
+initial_step: "smb_brute_force"
+steps:
+  smb_brute_force:
+    name: "Initial SMB/SSH Brute Force"
+    mitre_technique: "T1110"
+    log_source: "data/cmd_psexec_lsa_secrets_dump.zip"
+    next:
+      TRUE_POSITIVE: "exit_mitigated" # Stopped by defensive agent
+      FALSE_POSITIVE: "lsass_dump"    # Missed, escalate
+      NO_PLAYBOOK: "lsass_dump"       # Missed, escalate
+      TIMEOUT: "lsass_dump"           # Missed, escalate
+
+  lsass_dump:
+    name: "LSASS Credential Dumping"
+    mitre_technique: "T1003.008"
+    log_source: "data/cmd_lsass_memory_dumpert.zip"
+    next:
+      TRUE_POSITIVE: "backup_sam_dump"  # Defended, try fallback credential dumping
+      FALSE_POSITIVE: "dcsync_domain"    # Succeeded, proceed to domain controller
+      NO_PLAYBOOK: "dcsync_domain"       # Succeeded, proceed to domain controller
+      TIMEOUT: "dcsync_domain"           # Succeeded, proceed to domain controller
+
+  backup_sam_dump:
+    name: "SAM Database Copy"
+    mitre_technique: "T1003.002"
+    log_source: "data/cmd_sam_copy_esentutl.zip"
+    next:
+      TRUE_POSITIVE: "exit_mitigated"
+      FALSE_POSITIVE: "dcsync_domain"
+      NO_PLAYBOOK: "dcsync_domain"
+      TIMEOUT: "dcsync_domain"
+
+  dcsync_domain:
+    name: "DCSync Domain Controller Extraction"
+    mitre_technique: "T1003.006"
+    log_source: "data/covenant_dcsync_dcerpc_drsuapi_DsGetNCChanges.zip"
+    next:
+      TRUE_POSITIVE: "exit_mitigated"
+      FALSE_POSITIVE: "exit_compromised"
+      NO_PLAYBOOK: "exit_compromised"
+      TIMEOUT: "exit_compromised"
+
+  exit_mitigated:
+    name: "Attack Mitigated"
+    mitre_technique: "T1110"
+    log_source: null
+    next: null
+
+  exit_compromised:
+    name: "Domain Fully Compromised"
+    mitre_technique: "T1003.006"
+    log_source: null
+    next: null

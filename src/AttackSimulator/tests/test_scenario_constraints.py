@@ -118,29 +118,4 @@ async def test_mcp_character_length_validations() -> None:
     res3 = await mcp_server.activate_scenario("C" * 256)
     assert "exceeds 255 characters" in res3
 
-    # 4. download_mordor_scenario url limit 1000
-    res4 = await mcp_server.download_mordor_scenario("http://" + "D" * 1000)
-    assert "exceeds 1000 characters" in res4
 
-
-@pytest.mark.asyncio
-async def test_download_mordor_scenario_duplicate_checks() -> None:
-    """
-    Verifies that download_mordor_scenario blocks downloads if the file or scenario already exists.
-    """
-    url = "https://example.com/test_duplicate_scenario.zip"
-
-    # Test Case 1: Local file already exists (size > 100)
-    with patch("os.path.exists", return_value=True), patch("os.path.getsize", return_value=150):
-        res = await mcp_server.download_mordor_scenario(url)
-        assert "already downloaded" in res
-
-    # Test Case 2: Scenario and events already exist in DB
-    scenario_id = str(uuid.uuid4())
-    with (
-        patch("os.path.exists", return_value=False),
-        patch.object(db_repo, "get_scenario_by_path", return_value={"id": scenario_id, "name": "Test"}),
-        patch.object(db_repo, "get_scenario_events", return_value=[{"id": "event_id"}]),
-    ):
-        res = await mcp_server.download_mordor_scenario(url)
-        assert "already ingested and has events" in res

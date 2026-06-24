@@ -138,6 +138,23 @@ function initEventListeners() {
         }
     });
 
+    // Individual Scenario Execution Timing Mode Controller
+    const scTimingMode = document.getElementById('sc-timing-mode');
+    const scRateRow = document.getElementById('sc-rate-row');
+    const scMaxDelayRow = document.getElementById('sc-max-delay-row');
+
+    if (scTimingMode && scRateRow && scMaxDelayRow) {
+        scTimingMode.addEventListener('change', () => {
+            if (scTimingMode.value === 'original') {
+                scRateRow.style.display = 'none';
+                scMaxDelayRow.style.display = 'flex';
+            } else {
+                scRateRow.style.display = 'flex';
+                scMaxDelayRow.style.display = 'none';
+            }
+        });
+    }
+
     // Individual Scenario Execution Rate Controller
     const scRateMinus = document.getElementById('sc-rate-minus');
     const scRatePlus = document.getElementById('sc-rate-plus');
@@ -161,12 +178,36 @@ function initEventListeners() {
         });
     }
 
+    // Individual Scenario Max Delay Controller
+    const scMaxDelayMinus = document.getElementById('sc-max-delay-minus');
+    const scMaxDelayPlus = document.getElementById('sc-max-delay-plus');
+    const scMaxDelayInput = document.getElementById('sc-max-delay-input');
+
+    if (scMaxDelayMinus && scMaxDelayPlus && scMaxDelayInput) {
+        scMaxDelayMinus.addEventListener('click', () => {
+            let val = parseInt(scMaxDelayInput.value) || 30;
+            if (val > 5) {
+                val -= 5;
+                scMaxDelayInput.value = `${val}s`;
+            }
+        });
+        scMaxDelayPlus.addEventListener('click', () => {
+            let val = parseInt(scMaxDelayInput.value) || 30;
+            if (val < 120) {
+                val += 5;
+                scMaxDelayInput.value = `${val}s`;
+            }
+        });
+    }
+
     // Trigger Single Scenario Simulation Run
     const triggerBtn = document.getElementById('sc-trigger-btn');
     if (triggerBtn) {
         triggerBtn.addEventListener('click', async () => {
             if (!state.selectedScenarioId) return;
+            const timingMode = scTimingMode ? scTimingMode.value : 'constant';
             const rate = parseFloat(scRateInput.value) || 1.0;
+            const maxDelay = scMaxDelayInput ? parseFloat(scMaxDelayInput.value) || 30.0 : 30.0;
             const strip = document.getElementById('sc-strip-labels').checked;
 
             triggerBtn.disabled = true;
@@ -178,7 +219,9 @@ function initEventListeners() {
                 // 2. Trigger run
                 const res = await api.post(`/simulations/scenarios/${state.selectedScenarioId}/run`, null, {
                     send_rate_per_sec: rate,
-                    strip_labels: strip
+                    strip_labels: strip,
+                    timing_mode: timingMode,
+                    max_original_delay: maxDelay
                 });
                 showToast(`Simulation started! Run ID: ${res.run_id}`, 'success');
                 // Switch to runs panel to monitor
@@ -211,6 +254,23 @@ function initEventListeners() {
         });
     }
 
+    // Bulk Execution Timing Mode Controller
+    const bulkTimingMode = document.getElementById('bulk-timing-mode');
+    const bulkRateRow = document.getElementById('bulk-rate-row');
+    const bulkMaxDelayRow = document.getElementById('bulk-max-delay-row');
+
+    if (bulkTimingMode && bulkRateRow && bulkMaxDelayRow) {
+        bulkTimingMode.addEventListener('change', () => {
+            if (bulkTimingMode.value === 'original') {
+                bulkRateRow.style.display = 'none';
+                bulkMaxDelayRow.style.display = 'flex';
+            } else {
+                bulkRateRow.style.display = 'flex';
+                bulkMaxDelayRow.style.display = 'none';
+            }
+        });
+    }
+
     // Bulk Execution Rate Controller
     const bulkRateMinus = document.getElementById('bulk-rate-minus');
     const bulkRatePlus = document.getElementById('bulk-rate-plus');
@@ -234,12 +294,36 @@ function initEventListeners() {
         });
     }
 
+    // Bulk Execution Max Delay Controller
+    const bulkMaxDelayMinus = document.getElementById('bulk-max-delay-minus');
+    const bulkMaxDelayPlus = document.getElementById('bulk-max-delay-plus');
+    const bulkMaxDelayInput = document.getElementById('bulk-max-delay-input');
+
+    if (bulkMaxDelayMinus && bulkMaxDelayPlus && bulkMaxDelayInput) {
+        bulkMaxDelayMinus.addEventListener('click', () => {
+            let val = parseInt(bulkMaxDelayInput.value) || 30;
+            if (val > 5) {
+                val -= 5;
+                bulkMaxDelayInput.value = `${val}s`;
+            }
+        });
+        bulkMaxDelayPlus.addEventListener('click', () => {
+            let val = parseInt(bulkMaxDelayInput.value) || 30;
+            if (val < 120) {
+                val += 5;
+                bulkMaxDelayInput.value = `${val}s`;
+            }
+        });
+    }
+
     // Trigger Bulk Run
     const bulkBtn = document.getElementById('bulk-execute-btn');
     if (bulkBtn) {
         bulkBtn.addEventListener('click', async () => {
             const name = document.getElementById('bulk-name-input').value.trim() || `Bulk Run ${new Date().toLocaleString()}`;
+            const timingMode = bulkTimingMode ? bulkTimingMode.value : 'constant';
             const rate = parseFloat(bulkRateInput.value) || 1.0;
+            const maxDelay = bulkMaxDelayInput ? parseFloat(bulkMaxDelayInput.value) || 30.0 : 30.0;
             const strip = document.getElementById('bulk-strip-labels').checked;
             
             // Get selected IDs
@@ -258,7 +342,9 @@ function initEventListeners() {
                     name: name,
                     scenario_ids: selectedIds,
                     send_rate_per_sec: rate,
-                    strip_labels: strip
+                    strip_labels: strip,
+                    timing_mode: timingMode,
+                    max_original_delay: maxDelay
                 });
                 showToast(`Bulk Run successfully started in background!`, 'success');
                 document.getElementById('bulk-name-input').value = '';
@@ -327,10 +413,11 @@ async function loadScenarios() {
 
             const statusClass = sc.status === 'active' ? 'badge-active' : 'badge-passive';
             const techniquesCount = sc.mitre_ids ? sc.mitre_ids.length : 0;
+            const isDagBadge = sc.type === 'dag' ? '<span class="badge badge-info" style="margin-left: 6px; font-size: 9px; padding: 1px 4px;">DAG</span>' : '';
 
             card.innerHTML = `
                 <div class="sc-header">
-                    <span class="sc-name">${escapeHtml(sc.name)}</span>
+                    <span class="sc-name">${escapeHtml(sc.name)} ${isDagBadge}</span>
                     <span class="badge ${statusClass}">${escapeHtml(sc.status)}</span>
                 </div>
                 <p class="sc-desc">${escapeHtml(sc.description || 'No description available')}</p>
@@ -389,21 +476,57 @@ async function showScenarioDetail(sc) {
     const preview = document.getElementById('detail-sc-events');
     preview.innerHTML = '<div class="text-center" style="padding: 10px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading event preview...</div>';
 
-    try {
-        const events = await api.get(`/simulations/scenarios/${sc.id}/events`);
+    if (sc.type === 'dag' && sc.dag_structure) {
         preview.innerHTML = '';
-        if (events && events.length > 0) {
-            events.forEach(evt => {
-                const line = document.createElement('div');
-                line.className = 'preview-line';
-                line.textContent = JSON.stringify(evt);
-                preview.appendChild(line);
-            });
-        } else {
-            preview.innerHTML = '<div class="text-center" style="padding: 10px; color: var(--text-muted);">No events found.</div>';
+        const steps = sc.dag_structure.steps || {};
+        for (const [stepKey, stepInfo] of Object.entries(steps)) {
+            const stepDiv = document.createElement('div');
+            stepDiv.style.marginBottom = '12px';
+            stepDiv.style.padding = '10px';
+            stepDiv.style.border = '1px solid rgba(255,255,255,0.06)';
+            stepDiv.style.borderRadius = '6px';
+            stepDiv.style.background = 'rgba(0,0,0,0.2)';
+
+            const transitions = stepInfo.next || {};
+            let transHtml = '';
+            if (Object.keys(transitions).length > 0) {
+                transHtml = `<div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">` +
+                    Object.entries(transitions).map(([verdict, nextStep]) => {
+                        return `<span>• If <strong style="color: var(--primary);">${escapeHtml(verdict)}</strong> ➔ <span style="color: var(--text-bright);">${escapeHtml(nextStep)}</span></span>`;
+                    }).join('') + `</div>`;
+            } else {
+                transHtml = `<div style="margin-top: 6px; font-size: 11px; color: var(--text-muted);">• Terminal Step (End of Path)</div>`;
+            }
+
+            const alertCount = stepInfo.wazuh_alerts ? stepInfo.wazuh_alerts.length : 0;
+
+            stepDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(255,255,255,0.08); padding-bottom: 6px; margin-bottom: 6px;">
+                    <strong style="color: var(--cyan); font-size: 12px; font-family: var(--font-title);">${escapeHtml(stepInfo.name || stepKey)}</strong>
+                    <span class="badge badge-info" style="font-size: 9px; padding: 1px 4px;">${escapeHtml(stepInfo.mitre_technique)}</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-main); font-family: var(--font-mono);">Replay: ${alertCount} alert(s)</div>
+                ${transHtml}
+            `;
+            preview.appendChild(stepDiv);
         }
-    } catch (err) {
-        preview.innerHTML = '<div class="text-center text-error" style="padding: 10px;">Failed to load preview events.</div>';
+    } else {
+        try {
+            const events = await api.get(`/simulations/scenarios/${sc.id}/events`);
+            preview.innerHTML = '';
+            if (events && events.length > 0) {
+                events.forEach(evt => {
+                    const line = document.createElement('div');
+                    line.className = 'preview-line';
+                    line.textContent = JSON.stringify(evt);
+                    preview.appendChild(line);
+                });
+            } else {
+                preview.innerHTML = '<div class="text-center" style="padding: 10px; color: var(--text-muted);">No events found.</div>';
+            }
+        } catch (err) {
+            preview.innerHTML = '<div class="text-center text-error" style="padding: 10px;">Failed to load preview events.</div>';
+        }
     }
 }
 
@@ -429,9 +552,21 @@ async function loadRuns() {
 
             const runDate = new Date(run.started_at || run.created_at).toLocaleString();
 
+            let pathHtml = '';
+            if (run.traversed_path && run.traversed_path.length > 0) {
+                pathHtml = `<div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">` + 
+                    run.traversed_path.map((node, i) => {
+                        const arrow = i > 0 ? '<i class="fa-solid fa-chevron-right" style="font-size: 8px; color: var(--text-muted); margin: 0 1px;"></i>' : '';
+                        return `${arrow}<span class="badge badge-info" style="font-size: 9px; padding: 2px 5px; text-transform: none; font-family: var(--font-sans); font-weight: 500;">${escapeHtml(node)}</span>`;
+                    }).join('') + `</div>`;
+            }
+
             tr.innerHTML = `
                 <td style="font-family: var(--font-mono); font-size: 11px;">${run.id.substring(0, 8)}...</td>
-                <td style="font-weight: 500;">${escapeHtml(run.scenario_name)}</td>
+                <td style="font-weight: 500; padding-top: 8px; padding-bottom: 8px;">
+                    <div>${escapeHtml(run.scenario_name)}</div>
+                    ${pathHtml}
+                </td>
                 <td class="status-badge ${statusClass}">${escapeHtml(run.status)}</td>
                 <td style="font-family: var(--font-mono);">${run.send_rate_per_sec} evt/s</td>
                 <td style="color: var(--text-muted); font-size: 11px;">${runDate}</td>
@@ -515,10 +650,10 @@ function updateBulkControllerUI() {
     const count = selectedBulkScenarioIds.size;
     if (count === 0) {
         bulkBtn.disabled = true;
-        bulkBtn.innerHTML = '<i class="fa-solid fa-play"></i> Trigger Bulk Evaluation';
+        bulkBtn.innerHTML = '<i class="fa-solid fa-play"></i> Trigger Bulk Simulation';
     } else {
         bulkBtn.disabled = false;
-        bulkBtn.innerHTML = `<i class="fa-solid fa-play"></i> Trigger Bulk Evaluation (${count})`;
+        bulkBtn.innerHTML = `<i class="fa-solid fa-play"></i> Trigger Bulk Simulation (${count})`;
     }
 
     // Update group checkboxes (checked and indeterminate states)
@@ -562,6 +697,13 @@ async function loadBulkScenariosList() {
         const groups = {}; // mitreId -> Array of scenarios
         
         dataset.forEach(sc => {
+            if (sc.type === "dag") {
+                const key = "DAG Scenarios";
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(sc);
+                return;
+            }
+
             const mitreIds = sc.mitre_ids || [];
             if (mitreIds.length === 0) {
                 const key = "Other";
@@ -578,8 +720,10 @@ async function loadBulkScenariosList() {
             }
         });
         
-        // Sort keys: alphabetically with "Other" last
+        // Sort keys: DAG first, then alphabetically, with Other last
         const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === "DAG Scenarios") return -1;
+            if (b === "DAG Scenarios") return 1;
             if (a === "Other") return 1;
             if (b === "Other") return -1;
             return a.localeCompare(b);
@@ -592,7 +736,9 @@ async function loadBulkScenariosList() {
             const node = document.createElement('div');
             node.className = 'tree-node';
             
-            const techName = techId === "Other" 
+            const techName = techId === "DAG Scenarios"
+                ? "DAG / Multi-stage Scenarios"
+                : techId === "Other" 
                 ? "Other / Custom Scenarios" 
                 : `${techId} - ${MITRE_NAMES[techId] || 'MITRE Technique'}`;
                 
@@ -817,9 +963,21 @@ async function loadBulkDetails(bulkRunId) {
             const progress = run.status === 'RUNNING' && sessionsCount === 0
                 ? 'Pending'
                 : `${sessionsCount} sessions`;
+
+            let pathHtml = '';
+            if (run.traversed_path && run.traversed_path.length > 0) {
+                pathHtml = `<div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">` + 
+                    run.traversed_path.map((node, i) => {
+                        const arrow = i > 0 ? '<i class="fa-solid fa-chevron-right" style="font-size: 8px; color: var(--text-muted); margin: 0 1px;"></i>' : '';
+                        return `${arrow}<span class="badge badge-info" style="font-size: 9px; padding: 2px 5px; text-transform: none; font-family: var(--font-sans); font-weight: 500;">${escapeHtml(node)}</span>`;
+                    }).join('') + `</div>`;
+            }
                 
             tr.innerHTML = `
-                <td style="font-weight: 500;">${escapeHtml(run.scenario_name || 'Deleted Scenario')}</td>
+                <td style="font-weight: 500; padding-top: 8px; padding-bottom: 8px;">
+                    <div>${escapeHtml(run.scenario_name || 'Deleted Scenario')}</div>
+                    ${pathHtml}
+                </td>
                 <td><span class="badge ${statusClass}">${escapeHtml(run.status)}</span></td>
                 <td>${progress}</td>
                 <td class="text-emerald" style="font-family: var(--font-mono); font-weight: bold; color: var(--success);">${run.matched_playbooks || 0}</td>
