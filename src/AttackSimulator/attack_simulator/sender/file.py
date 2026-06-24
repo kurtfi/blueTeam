@@ -8,6 +8,7 @@ import uuid
 from typing import Any
 
 import structlog
+
 from attack_simulator.mapper.wazuh_template import strip_information_leakage
 from attack_simulator.sender.base import AlertSender
 

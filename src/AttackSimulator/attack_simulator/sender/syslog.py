@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+
 from attack_simulator.mapper.wazuh_template import strip_information_leakage
 from attack_simulator.sender.base import AlertSender
 
@@ -31,7 +32,8 @@ class SyslogAlertSender(AlertSender):
     ) -> None:
         self.host = host or os.getenv("ATTACK_SIMULATOR_SYSLOG_HOST", "localhost")
         self.port = port or int(os.getenv("ATTACK_SIMULATOR_SYSLOG_PORT", "514"))
-        self.protocol = (protocol or os.getenv("ATTACK_SIMULATOR_SYSLOG_PROTOCOL", "UDP")).upper()
+        proto = protocol or os.getenv("ATTACK_SIMULATOR_SYSLOG_PROTOCOL") or "UDP"
+        self.protocol = proto.upper()
         self.rfc5424 = rfc5424
 
     def _format_rfc5424(self, payload: dict[str, Any], technique_id: str) -> str:

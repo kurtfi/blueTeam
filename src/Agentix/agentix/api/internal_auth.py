@@ -56,7 +56,10 @@ class InternalApiKeyMiddleware(BaseHTTPMiddleware):
 
         provided_key = request.headers.get(_HEADER_NAME)
 
-        if not provided_key or provided_key != expected_key:
+        import secrets
+
+        # Use constant-time comparison to prevent timing attacks
+        if not provided_key or not secrets.compare_digest(provided_key, expected_key):
             logger.warning(
                 "internal_auth.rejected",
                 path=request.url.path,

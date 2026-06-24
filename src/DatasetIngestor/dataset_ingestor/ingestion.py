@@ -11,13 +11,13 @@ from typing import Any
 
 import httpx
 import structlog
+from attack_simulator.mapper.mitre_catalog import get_mitre_info
+from attack_simulator.mapper.mordor_filename import extract_technique_from_path, get_mordor_file_info
+from attack_simulator.mapper.wazuh_template import generate_wazuh_alert, strip_information_leakage
 
 from dataset_ingestor.correlation.engine import CorrelationEngine
 from dataset_ingestor.loader.custom import CustomLoader
 from dataset_ingestor.loader.mordor import MordorLoader
-from attack_simulator.mapper.wazuh_template import strip_information_leakage, generate_wazuh_alert
-from attack_simulator.mapper.mitre_catalog import get_mitre_info
-from attack_simulator.mapper.mordor_filename import extract_technique_from_path, get_mordor_file_info
 
 logger = structlog.get_logger(__name__)
 
@@ -142,9 +142,20 @@ class IngestionService:
         Downloads a dataset from a URL to the local data/ directory.
         Returns the absolute local path to the downloaded file.
         """
-        filename = os.path.basename(url)
+        from urllib.parse import urlparse
+
+        parsed_url = urlparse(url)
+        filename = os.path.basename(parsed_url.path)
+        if not filename or filename in (".", ".."):
+            raise ValueError(f"Could not extract a valid filename from URL: {url}")
+
         dest_dir = "data"
-        local_path = os.path.abspath(os.path.join(dest_dir, filename))
+        abs_dest_dir = os.path.abspath(dest_dir)
+        local_path = os.path.abspath(os.path.join(abs_dest_dir, filename))
+
+        # Strict containment check to prevent path traversal
+        if not local_path.startswith(abs_dest_dir + os.sep) and local_path != abs_dest_dir:
+            raise ValueError(f"Path traversal detected in URL: {url}")
 
         if os.path.exists(local_path) and os.path.getsize(local_path) > 100:
             logger.info("ingestion.file_already_downloaded", filename=filename)

@@ -2,9 +2,9 @@
 Integration and E2E tests for AttackSimulator pipeline.
 """
 
-import os
 import uuid
 import pytest
+from typing import Any
 from unittest.mock import patch, AsyncMock
 
 from attack_simulator.models import db_repo
@@ -16,7 +16,7 @@ async def test_ingest_and_run_simulation_e2e() -> None:
     """
     Integration test: Load scenario, ingest to DB, execute mock simulation, and evaluate.
     """
-    metadata = {
+    metadata: dict[str, Any] = {
         "name": "E2E Credential Dumping Test",
         "description": "LSASS memory dumping simulation",
         "mitre_ids": ["T1003.001"],

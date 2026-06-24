@@ -4,10 +4,8 @@ Unit and integration tests for the refactored AttackSimulator components.
 
 import json
 import os
-import socket
 import tempfile
 import uuid
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,7 +14,7 @@ from attack_simulator.evaluator.agentix_gateway import AgentixSessionGateway
 from attack_simulator.sender.factory import get_sender
 from attack_simulator.sender.file import FileAlertSender
 from attack_simulator.sender.syslog import SyslogAlertSender
-from attack_simulator.services.timing import ConstantDelayStrategy, OriginalDeltaStrategy, get_timing_strategy
+from attack_simulator.services.timing import ConstantDelayStrategy, OriginalDeltaStrategy
 
 
 @pytest.mark.asyncio

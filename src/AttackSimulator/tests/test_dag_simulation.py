@@ -14,7 +14,7 @@ from attack_simulator.evaluator.gateway import PlaybookRegistryGateway
 
 class MockAlertSender(AlertSender):
     def __init__(self) -> None:
-        self.sent_alerts = []
+        self.sent_alerts: list[tuple[dict[str, Any], str]] = []
 
     async def send(self, alert_payload: dict, technique_id: str) -> str | None:
         self.sent_alerts.append((alert_payload, technique_id))
@@ -85,7 +85,7 @@ async def test_execute_dag_simulation_mitigated_path() -> None:
 
     # Mock DB update functions, playbook check, and gateway
     with (
-        patch("attack_simulator.models.db_repo.insert_simulation_result", new_callable=AsyncMock) as mock_insert,
+        patch("attack_simulator.models.db_repo.insert_simulation_result", new_callable=AsyncMock),
         patch("attack_simulator.models.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update_stats,
         patch("attack_simulator.models.db_repo.update_run_path", new_callable=AsyncMock) as mock_update_path,
         patch("attack_simulator.models.db_repo.get_pool", new_callable=AsyncMock) as mock_pool,
@@ -191,7 +191,7 @@ async def test_execute_dag_simulation_compromised_path() -> None:
 
     # Mock DB functions
     with (
-        patch("attack_simulator.models.db_repo.insert_simulation_result", new_callable=AsyncMock) as mock_insert,
+        patch("attack_simulator.models.db_repo.insert_simulation_result", new_callable=AsyncMock),
         patch("attack_simulator.models.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update_stats,
         patch("attack_simulator.models.db_repo.update_run_path", new_callable=AsyncMock) as mock_update_path,
         patch("attack_simulator.models.db_repo.get_pool", new_callable=AsyncMock) as mock_pool,

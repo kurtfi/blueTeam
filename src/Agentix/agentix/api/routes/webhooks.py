@@ -21,17 +21,39 @@ async def get_deduplicator(request: Request) -> AlertDeduplicator:
 async def verify_hmac_signature(
     request: Request, x_webhook_signature: str = Header(None), x_internal_api_key: str = Header(None)
 ):
+    from fastapi.params import Header as FastAPIHeader
+    if isinstance(x_webhook_signature, FastAPIHeader):
+        x_webhook_signature = None
+    if isinstance(x_internal_api_key, FastAPIHeader):
+        x_internal_api_key = None
+
+    import secrets
+
     # 1. Allow bypass if internal API key matches (e.g. from internal scripts)
     internal_key = os.getenv("AGENTIX_INTERNAL_API_KEY")
-    if internal_key and x_internal_api_key == internal_key:
+    if internal_key and x_internal_api_key and secrets.compare_digest(x_internal_api_key, internal_key):
         logger.info("webhooks.auth.internal_key_authorized")
         return
 
-    # 2. Check if webhook secret is configured
+    # 2. Check if webhook secret is configured (Fail-Closed by default)
     secret = os.getenv("AGENTIX_WEBHOOK_SECRET")
     if not secret:
-        logger.warning("webhooks.auth.missing_secret_bypass")
-        return
+        allow_unauth = os.getenv("AGENTIX_ALLOW_UNAUTHENTICATED_WEBHOOKS", "False").lower() == "true"
+        if allow_unauth:
+            logger.warning(
+                "webhooks.auth.missing_secret_bypass",
+                msg="Webhook secret is missing! Bypassing signature verification (INSECURE DEV MODE)."
+            )
+            return
+        else:
+            logger.critical(
+                "webhooks.auth.missing_secret_fail_closed",
+                msg="AGENTIX_WEBHOOK_SECRET is not configured! Failing closed. Set AGENTIX_ALLOW_UNAUTHENTICATED_WEBHOOKS=True to override for local development."
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Webhook configuration error: Webhook secret is not set."
+            )
 
     # 3. Fall back to standard signature verification
     if not x_webhook_signature:

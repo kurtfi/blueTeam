@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 import structlog
+
 from attack_simulator.config import INTERNAL_API_KEY, WEBHOOK_URL
 from attack_simulator.mapper.wazuh_template import strip_information_leakage
 from attack_simulator.sender.base import AlertSender
@@ -30,7 +31,10 @@ class WebhookAlertSender(AlertSender):
         if INTERNAL_API_KEY:
             headers["X-Internal-API-Key"] = INTERNAL_API_KEY
 
-        async with httpx.AsyncClient(verify=False) as client:
+        import os
+        verify_ssl = os.getenv("ATTACK_SIMULATOR_VERIFY_SSL", "True").lower() == "true"
+
+        async with httpx.AsyncClient(verify=verify_ssl) as client:
             try:
                 logger.debug(
                     "sender.posting_alert",

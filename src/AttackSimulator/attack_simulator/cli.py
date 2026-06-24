@@ -10,7 +10,6 @@ import sys
 import structlog
 from tqdm import tqdm  # type: ignore[import-untyped]
 
-from attack_simulator.config import WEBHOOK_URL
 from attack_simulator.evaluator.gap_analyzer import generate_coverage_report, print_ascii_gap_report
 from attack_simulator.evaluator.playbook_match import evaluate_run
 from attack_simulator.models import db_repo

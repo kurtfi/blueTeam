@@ -2,9 +2,7 @@
 Tests for character length validations, scenario activation constraints, and duplication checks.
 """
 
-import uuid
 import pytest
-from unittest.mock import patch
 
 from attack_simulator.models import db_repo
 from attack_simulator import mcp_server

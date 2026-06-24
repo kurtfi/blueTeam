@@ -84,7 +84,7 @@ class SimulationService:
                 self.execute_dag_simulation(
                     run_id=run_id,
                     scenario_id=scenario_id,
-                    dag_structure=sc.get("dag_structure"),
+                    dag_structure=sc.get("dag_structure") or {},
                     delay_between_events=delay_between_events,
                     strip_labels=strip_labels,
                     timing_strategy=timing_strategy,
@@ -226,6 +226,7 @@ class SimulationService:
         no_playbook = 0
 
         import uuid
+
         from attack_simulator.evaluator.playbook_match import check_actual_playbook, get_expected_playbooks
 
         try:
@@ -502,7 +503,7 @@ class SimulationService:
                     await self.execute_dag_simulation(
                         run_id=run_id,
                         scenario_id=sc_id,
-                        dag_structure=sc.get("dag_structure"),
+                        dag_structure=sc.get("dag_structure") or {},
                         delay_between_events=delay,
                         strip_labels=strip_labels,
                         timing_strategy=timing_strategy,

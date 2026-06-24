@@ -4,15 +4,15 @@ Reads YAML DAG definitions, resolves step log zips, correlates alerts, and retur
 """
 
 import os
-import yaml
-import structlog
 from typing import Any
 
-from dataset_ingestor.loader.mordor import MordorLoader
-from dataset_ingestor.loader.custom import CustomLoader
+import structlog
+import yaml
+from attack_simulator.mapper.wazuh_template import strip_information_leakage
 from dataset_ingestor.correlation.engine import CorrelationEngine
 from dataset_ingestor.ingestion import correlate_and_fallback_events
-from attack_simulator.mapper.wazuh_template import strip_information_leakage
+from dataset_ingestor.loader.custom import CustomLoader
+from dataset_ingestor.loader.mordor import MordorLoader
 
 logger = structlog.get_logger(__name__)
 
@@ -34,7 +34,7 @@ class DagScenarioLoader:
             raise FileNotFoundError(f"DAG definition file not found: {file_path}")
 
         logger.info("dag_loader.loading_yaml", path=file_path)
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             dag_data = yaml.safe_load(f)
 
         name = dag_data.get("name")
@@ -134,7 +134,7 @@ class DagScenarioLoader:
         """
         Loads all DAG scenarios defined in YAML files in the given directory and returns their payloads.
         """
-        payloads = []
+        payloads: list[dict[str, Any]] = []
         if not os.path.exists(dags_directory):
             logger.info("dag_loader.directory_not_found", path=dags_directory)
             return payloads
