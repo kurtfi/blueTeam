@@ -14,20 +14,3 @@ class ScenarioNotFoundError(SimulatorException):
 
     pass
 
-
-class DuplicateScenarioError(SimulatorException):
-    """Raised when trying to ingest a scenario that already exists in the database."""
-
-    pass
-
-
-class IngestionError(SimulatorException):
-    """Raised when the scenario ingestion process fails."""
-
-    pass
-
-
-class DatasetDownloadError(SimulatorException):
-    """Raised when downloading a dataset from a remote URL fails."""
-
-    pass
