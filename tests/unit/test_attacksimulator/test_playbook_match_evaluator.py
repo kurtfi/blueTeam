@@ -177,3 +177,51 @@ async def test_check_actual_playbook_priority() -> None:
 
     # Verify trigger overrides both final answer and details
     assert await check_actual_playbook(session_id) == "PB-073"
+
+
+def test_extract_playbook_from_metadata() -> None:
+    from attack_simulator.evaluator.playbook_match import extract_playbook_from_metadata
+
+    # Happy paths
+    assert extract_playbook_from_metadata(
+        {"tool_name": "trigger_playbook", "tool_input": {"playbook_id": "PB-012"}}
+    ) == ("PB-012", None)
+    assert extract_playbook_from_metadata(
+        {"tool_name": "get_playbook_details", "tool_input": {"playbook_id": "PB-005"}}
+    ) == (None, "PB-005")
+
+    # JSON string serialization handling
+    assert extract_playbook_from_metadata(
+        '{"tool_name": "trigger_playbook", "tool_input": "{\\"playbook_id\\": \\"PB-073\\"}"}'
+    ) == ("PB-073", None)
+
+    # Malformed metadata / fallback cases
+    assert extract_playbook_from_metadata(None) == (None, None)
+    assert extract_playbook_from_metadata("invalid-json") == (None, None)
+    assert extract_playbook_from_metadata({"tool_name": "unknown_tool"}) == (None, None)
+
+
+def test_extract_playbooks_from_text() -> None:
+    from attack_simulator.evaluator.playbook_match import extract_playbooks_from_text
+
+    assert extract_playbooks_from_text("Here is PB-001 and PB-002.") == ["PB-001", "PB-002"]
+    assert extract_playbooks_from_text("No playbooks here.") == []
+
+
+def test_determine_session_verdict() -> None:
+    from attack_simulator.evaluator.playbook_match import determine_session_verdict
+
+    # Pending
+    assert determine_session_verdict(None, ["PB-001"], "ACTIVE") == "PENDING"
+    assert determine_session_verdict(None, ["PB-001"], "WAITING_APPROVAL") == "PENDING"
+
+    # Correct
+    assert determine_session_verdict("PB-001", ["PB-001", "PB-002"], "COMPLETED") == "CORRECT"
+    assert determine_session_verdict(None, [], "COMPLETED") == "CORRECT"
+
+    # Wrong
+    assert determine_session_verdict("PB-999", ["PB-001"], "COMPLETED") == "WRONG"
+
+    # No Playbook
+    assert determine_session_verdict(None, ["PB-001"], "COMPLETED") == "NO_PLAYBOOK"
+

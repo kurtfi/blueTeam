@@ -3,6 +3,7 @@ Evaluates simulation runs by comparing expected vs actual playbook selections.
 """
 
 import json
+import re
 import uuid
 from typing import Any
 
@@ -64,13 +65,68 @@ async def get_expected_playbooks(mitre_ids: list[str]) -> list[str]:
         return []
 
 
+def extract_playbook_from_metadata(meta: Any) -> tuple[str | None, str | None]:
+    """
+    Parses metadata dictionary/JSON to extract triggered and detailed playbooks.
+    Returns a tuple (triggered_playbook, detailed_playbook).
+    """
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except Exception:
+            meta = None
+
+    if not (meta and isinstance(meta, dict)):
+        return None, None
+
+    tool_name = meta.get("tool_name")
+    tool_input = meta.get("tool_input") or {}
+    if isinstance(tool_input, str):
+        try:
+            tool_input = json.loads(tool_input)
+        except Exception:
+            pass
+
+    if not isinstance(tool_input, dict):
+        return None, None
+
+    pb = tool_input.get("playbook_id")
+    if pb:
+        pb_str = str(pb)
+        if tool_name == "trigger_playbook":
+            return pb_str, None
+        elif tool_name == "get_playbook_details":
+            return None, pb_str
+
+    return None, None
+
+
+def extract_playbooks_from_text(content: str) -> list[str]:
+    """
+    Finds all patterns of PB-XXX (e.g. PB-001) in the content.
+    """
+    return re.findall(r"PB-\d{3}", content)
+
+
+def determine_session_verdict(actual: str | None, expected_list: list[str], sess_status: str) -> str:
+    """
+    Pure function to determine the verdict of a session based on expected playbooks,
+    actual playbook triggered, and session status.
+    """
+    if sess_status in ("ACTIVE", "WAITING_APPROVAL") and actual is None:
+        return "PENDING"
+
+    if actual:
+        return "CORRECT" if actual in expected_list else "WRONG"
+
+    return "CORRECT" if not expected_list else "NO_PLAYBOOK"
+
+
 async def check_actual_playbook(session_id: str, conn: Any | None = None) -> str | None:
     """
     Queries the session audit logs in PostgreSQL to find if and which playbook the agent triggered,
     detailed, or referenced in its final answer.
     """
-    import re
-
     rows = await agentix_gateway.get_session_events(session_id, conn)
 
     triggered_pbs = []
@@ -83,34 +139,14 @@ async def check_actual_playbook(session_id: str, conn: Any | None = None) -> str
         content = row["content"] or ""
         meta = row["metadata"]
 
-        if isinstance(meta, str):
-            try:
-                meta = json.loads(meta)
-            except Exception:
-                meta = None
-
-        if meta and isinstance(meta, dict):
-            tool_name = meta.get("tool_name")
-            tool_input = meta.get("tool_input") or {}
-            if isinstance(tool_input, str):
-                try:
-                    tool_input = json.loads(tool_input)
-                except Exception:
-                    pass
-
-            if tool_name == "trigger_playbook" and isinstance(tool_input, dict):
-                pb = tool_input.get("playbook_id")
-                if pb:
-                    triggered_pbs.append(str(pb))
-            elif tool_name == "get_playbook_details" and isinstance(tool_input, dict):
-                pb = tool_input.get("playbook_id")
-                if pb:
-                    detailed_pbs.append(str(pb))
+        triggered_pb, detailed_pb = extract_playbook_from_metadata(meta)
+        if triggered_pb:
+            triggered_pbs.append(triggered_pb)
+        if detailed_pb:
+            detailed_pbs.append(detailed_pb)
 
         if ev_type == "answer" and actor == "agent":
-            # Find all patterns of PB-XXX in the agent's answer
-            matches = re.findall(r"PB-\d{3}", content)
-            for m in matches:
+            for m in extract_playbooks_from_text(content):
                 if m not in answer_pbs:
                     answer_pbs.append(m)
 
@@ -178,19 +214,7 @@ async def evaluate_run(run_id: str) -> dict[str, Any]:
         if not sess_status:
             sess_status = "FAILED"
 
-        # Determine session verdict
-        if sess_status in ("ACTIVE", "WAITING_APPROVAL") and actual is None:
-            match_result = "PENDING"
-        elif actual:
-            if actual in expected_list:
-                match_result = "CORRECT"
-            else:
-                match_result = "WRONG"
-        else:
-            if not expected_list:
-                match_result = "CORRECT"
-            else:
-                match_result = "NO_PLAYBOOK"
+        match_result = determine_session_verdict(actual, expected_list, sess_status)
 
         # Count the session verdict (pending is not counted yet, keeping the run in RUNNING status)
         if match_result == "CORRECT":
@@ -262,3 +286,4 @@ async def evaluate_run(run_id: str) -> dict[str, Any]:
 
     logger.info("evaluator.run_evaluated", report=report)
     return report
+
