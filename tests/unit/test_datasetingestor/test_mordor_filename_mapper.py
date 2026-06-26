@@ -2,7 +2,7 @@
 Unit tests for mordor_filename mapper.
 """
 
-from attack_simulator.mapper.mordor_filename import extract_technique_from_path
+from dataset_ingestor.mapper.mordor_filename import extract_technique_from_path
 
 
 def test_static_mappings() -> None:

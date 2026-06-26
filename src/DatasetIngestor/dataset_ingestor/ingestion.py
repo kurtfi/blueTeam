@@ -12,8 +12,8 @@ from typing import Any
 import httpx
 import structlog
 from attack_simulator.mapper.mitre_catalog import get_mitre_info
-from attack_simulator.mapper.mordor_filename import extract_technique_from_path, get_mordor_file_info
 from attack_simulator.mapper.wazuh_template import generate_wazuh_alert, strip_information_leakage
+from dataset_ingestor.mapper.mordor_filename import extract_technique_from_path, get_mordor_file_info
 
 from dataset_ingestor.correlation.engine import CorrelationEngine
 from dataset_ingestor.loader.custom import CustomLoader
