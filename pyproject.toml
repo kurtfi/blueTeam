@@ -11,6 +11,7 @@ module = [
     "yaml.*",
     "langfuse.*",
     "asyncpg.*",
-    "pgvector.*"
+    "pgvector.*",
+    "general_mcp.*"
 ]
 ignore_missing_imports = true

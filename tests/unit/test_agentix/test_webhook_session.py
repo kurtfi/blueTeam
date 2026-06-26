@@ -8,6 +8,11 @@ from fastapi.testclient import TestClient
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def setup_webhook_env(monkeypatch):
+    monkeypatch.setenv("AGENTIX_ALLOW_UNAUTHENTICATED_WEBHOOKS", "True")
+
+
 @pytest.mark.asyncio
 async def test_handle_siem_alert_persists():
     payload = {

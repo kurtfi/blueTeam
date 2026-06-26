@@ -127,13 +127,17 @@ class MCPToolAdapter(BaseTool):
         log = logger.bind(tool=self.name, attempt=0)
 
         # Get or initialize shared circuit state on client instance
-        if not hasattr(self._client, "_circuit_state"):
-            self._client._circuit_state = {
+        circuit = getattr(self._client, "_circuit_state", None)
+        if not isinstance(circuit, dict):
+            circuit = {
                 "consecutive_failures": 0,
                 "open": False,
                 "open_until": 0.0,
             }
-        circuit = self._client._circuit_state
+            try:
+                self._client._circuit_state = circuit
+            except AttributeError:
+                pass
 
         import time
 

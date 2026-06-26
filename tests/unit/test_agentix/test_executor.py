@@ -41,7 +41,7 @@ async def test_run_command_success():
         assert res.success is True
         assert res.output == "hello world\n"
         mock_exec.assert_called_once_with(
-            "echo", "hello world", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            "echo", "hello world", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, process_group=0
         )
 
 
@@ -67,14 +67,17 @@ async def test_run_command_failure():
 
 @pytest.mark.asyncio
 async def test_run_command_timeout():
+    import signal
     with (
         patch("agentix.sandbox.executor.settings") as mock_settings,
         patch("agentix.sandbox.executor.asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec,
         patch("agentix.sandbox.executor.asyncio.wait_for", new_callable=AsyncMock) as mock_wait,
+        patch("agentix.sandbox.executor.os.killpg") as mock_killpg,
     ):
         mock_settings.agentix_sandbox_enabled = True
 
         proc_mock = MagicMock()
+        proc_mock.pid = 12345
         proc_mock.communicate = AsyncMock(return_value=(b"", b""))
         mock_exec.return_value = proc_mock
 
@@ -84,4 +87,4 @@ async def test_run_command_timeout():
 
         assert res.success is False
         assert "Command timed out" in res.error
-        proc_mock.kill.assert_called_once()
+        mock_killpg.assert_called_once_with(12345, signal.SIGKILL)

@@ -12,6 +12,8 @@ Safety layers
 from __future__ import annotations
 
 import asyncio
+import os
+import signal
 
 import structlog
 
@@ -62,9 +64,6 @@ async def run_command(command: str, timeout: int = 30) -> ToolResult:
         try:
             stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=effective_timeout)
         except TimeoutError:
-            import os
-            import signal
-
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:

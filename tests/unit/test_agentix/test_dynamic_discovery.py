@@ -11,15 +11,15 @@ class DummyTool(BaseTool):
         self.category = category
 
     @property
-    def name(self) -> str:
+    def name(self) -> str:  # type: ignore[override]
         return self._name
 
     @property
-    def description(self) -> str:
+    def description(self) -> str:  # type: ignore[override]
         return self._description
 
     @property
-    def parameters(self) -> dict:
+    def parameters(self) -> dict:  # type: ignore[override]
         return {}
 
     async def execute(self, **kwargs):
