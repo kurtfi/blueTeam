@@ -18,6 +18,7 @@ tests/
 │   ├── test_agentix/              # Core Agentix davranışları
 │   │   ├── test_alert_dedup.py
 │   │   ├── test_cleanup.py
+│   │   ├── test_core_sessions_api.py
 │   │   ├── test_draft_history.py
 │   │   ├── test_executor.py
 │   │   ├── test_gateway_auth.py
@@ -26,6 +27,8 @@ tests/
 │   │   ├── test_langfuse_conn.py
 │   │   ├── test_mcp_adapter.py
 │   │   ├── test_ollama_provider.py
+│   │   ├── test_postgres_session.py
+│   │   ├── test_sessions_api.py
 │   │   ├── test_triage_workflow.py
 │   │   └── test_workspace.py
 │   └── test_triagecore/           # TriageCore / Playbook motoru
@@ -370,3 +373,4 @@ pytest tests/integration/ -v --forked
 - [API Reference](../architecture/api-reference.md)
 - [Playbook Development Guide](./5_playbook-development.md)
 - [Security Model](../architecture/security-model.md)
+- [Attack Simulation Guide](./7_attack-simulation.md)
