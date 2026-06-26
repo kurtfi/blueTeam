@@ -729,91 +729,154 @@ async function loadBulkScenariosList() {
             return a.localeCompare(b);
         });
         
-        listContainer.innerHTML = '';
-        
-        sortedKeys.forEach(techId => {
-            const scList = groups[techId];
-            const node = document.createElement('div');
-            node.className = 'tree-node';
-            
-            const techName = techId === "DAG Scenarios"
-                ? "DAG / Multi-stage Scenarios"
-                : techId === "Other" 
-                ? "Other / Custom Scenarios" 
-                : `${techId} - ${MITRE_NAMES[techId] || 'MITRE Technique'}`;
+        // Populate category dropdown
+        const categorySelect = document.getElementById('bulk-category-select');
+        if (categorySelect) {
+            categorySelect.innerHTML = '<option value="all">All Categories</option>';
+            sortedKeys.forEach(techId => {
+                const techName = techId === "DAG Scenarios"
+                    ? "DAG / Multi-stage Scenarios"
+                    : techId === "Other" 
+                    ? "Other / Custom Scenarios" 
+                    : `${techId} - ${MITRE_NAMES[techId] || 'MITRE Technique'}`;
                 
-            node.innerHTML = `
-                <div class="tree-header" style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-chevron-down tree-toggle-icon" style="cursor: pointer; padding: 4px;"></i>
-                    <input type="checkbox" class="bulk-group-select-checkbox" data-group-id="${escapeHtml(techId)}" style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--primary);">
-                    <span style="flex-grow: 1; cursor: pointer; user-select: none;">${escapeHtml(techName)} (${scList.length})</span>
-                </div>
-                <div class="tree-children"></div>
-            `;
-            
-            const header = node.querySelector('.tree-header');
-            const childrenContainer = node.querySelector('.tree-children');
-            const toggleIcon = node.querySelector('.tree-toggle-icon');
-            const groupCheckbox = node.querySelector('.bulk-group-select-checkbox');
-            
-            header.addEventListener('click', (e) => {
-                if (e.target.closest('.bulk-group-select-checkbox')) {
-                    return;
-                }
-                toggleIcon.classList.toggle('collapsed');
-                childrenContainer.classList.toggle('hide');
+                const opt = document.createElement('option');
+                opt.value = techId;
+                opt.textContent = `${techName} (${groups[techId].length})`;
+                categorySelect.appendChild(opt);
             });
             
-            groupCheckbox.addEventListener('change', (e) => {
-                const isChecked = e.target.checked;
-                const childCheckboxes = childrenContainer.querySelectorAll('.bulk-sc-select-checkbox');
-                childCheckboxes.forEach(cb => {
-                    const scId = cb.getAttribute('data-scenario-id');
-                    cb.checked = isChecked;
-                    if (isChecked) {
-                        selectedBulkScenarioIds.add(scId);
-                    } else {
-                        selectedBulkScenarioIds.delete(scId);
-                    }
+            if (!categorySelect.dataset.listenerAdded) {
+                categorySelect.addEventListener('change', () => {
+                    renderFilteredScenarios();
                 });
-                updateBulkControllerUI();
-            });
+                categorySelect.dataset.listenerAdded = "true";
+            }
+        }
+
+        function renderFilteredScenarios() {
+            listContainer.innerHTML = '';
+            const selectedVal = categorySelect ? categorySelect.value : 'all';
+            const keysToRender = selectedVal === 'all' ? sortedKeys : [selectedVal];
             
-            scList.sort((a,b) => a.name.localeCompare(b.name)).forEach(sc => {
-                const leaf = document.createElement('div');
-                leaf.className = 'tree-leaf';
-                leaf.style.paddingLeft = '32px';
+            keysToRender.forEach(techId => {
+                const scList = groups[techId];
+                if (!scList) return;
                 
-                const checked = selectedBulkScenarioIds.has(sc.id) ? 'checked' : '';
+                const node = document.createElement('div');
+                node.className = 'tree-node';
                 
-                leaf.innerHTML = `
-                    <label style="display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; user-select: none; margin: 0;">
-                        <input type="checkbox" class="bulk-sc-select-checkbox" data-scenario-id="${sc.id}" data-scenario-name="${escapeHtml(sc.name)}" ${checked} style="cursor: pointer; width: 13px; height: 13px; accent-color: var(--primary);">
-                        <div style="min-width: 0; flex-grow: 1;">
-                            <div class="tree-leaf-title" title="${escapeHtml(sc.name)}">${escapeHtml(sc.name)}</div>
-                            <span class="tree-leaf-desc">${escapeHtml(sc.description || 'No description.')}</span>
-                        </div>
-                        <span style="color: var(--text-muted); font-size: 10px; white-space: nowrap; margin-left: auto;">(${sc.total_events || 0} events)</span>
-                    </label>
+                const techName = techId === "DAG Scenarios"
+                    ? "DAG / Multi-stage Scenarios"
+                    : techId === "Other" 
+                    ? "Other / Custom Scenarios" 
+                    : `${techId} - ${MITRE_NAMES[techId] || 'MITRE Technique'}`;
+                    
+                node.innerHTML = `
+                    <div class="tree-header" style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                        <i class="fa-solid fa-chevron-down tree-toggle-icon" style="cursor: pointer; padding: 4px;"></i>
+                        <input type="checkbox" class="bulk-group-select-checkbox" data-group-id="${escapeHtml(techId)}" style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--primary);">
+                        <span style="flex-grow: 1; cursor: pointer; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(techName)} (${scList.length})</span>
+                    </div>
+                    <div class="tree-children"></div>
                 `;
                 
-                const checkbox = leaf.querySelector('.bulk-sc-select-checkbox');
-                checkbox.addEventListener('change', (e) => {
-                    const isChecked = e.target.checked;
-                    if (isChecked) {
-                        selectedBulkScenarioIds.add(sc.id);
-                    } else {
-                        selectedBulkScenarioIds.delete(sc.id);
+                const header = node.querySelector('.tree-header');
+                const childrenContainer = node.querySelector('.tree-children');
+                const toggleIcon = node.querySelector('.tree-toggle-icon');
+                const groupCheckbox = node.querySelector('.bulk-group-select-checkbox');
+                
+                header.addEventListener('click', (e) => {
+                    if (e.target.closest('.bulk-group-select-checkbox')) {
+                        return;
                     }
+                    toggleIcon.classList.toggle('collapsed');
+                    childrenContainer.classList.toggle('hide');
+                });
+                
+                groupCheckbox.addEventListener('change', (e) => {
+                    const isChecked = e.target.checked;
+                    const childCheckboxes = childrenContainer.querySelectorAll('.bulk-sc-select-checkbox');
+                    childCheckboxes.forEach(cb => {
+                        const scId = cb.getAttribute('data-scenario-id');
+                        cb.checked = isChecked;
+                        if (isChecked) {
+                            selectedBulkScenarioIds.add(scId);
+                        } else {
+                            selectedBulkScenarioIds.delete(scId);
+                        }
+                    });
                     updateBulkControllerUI();
                 });
                 
-                childrenContainer.appendChild(leaf);
+                scList.sort((a,b) => a.name.localeCompare(b.name)).forEach(sc => {
+                    const leaf = document.createElement('div');
+                    leaf.className = 'tree-leaf';
+                    leaf.style.paddingLeft = '32px';
+                    
+                    const checked = selectedBulkScenarioIds.has(sc.id) ? 'checked' : '';
+                    
+                    leaf.innerHTML = `
+                        <label style="display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; user-select: none; margin: 0; min-width: 0;">
+                            <input type="checkbox" class="bulk-sc-select-checkbox" data-scenario-id="${sc.id}" data-scenario-name="${escapeHtml(sc.name)}" ${checked} style="cursor: pointer; width: 13px; height: 13px; accent-color: var(--primary);">
+                            <div style="min-width: 0; flex-grow: 1;">
+                                <div class="tree-leaf-title" title="${escapeHtml(sc.name)}">${escapeHtml(sc.name)}</div>
+                                <span class="tree-leaf-desc">${escapeHtml(sc.description || 'No description.')}</span>
+                            </div>
+                            <span style="color: var(--text-muted); font-size: 10px; white-space: nowrap; margin-left: auto;">(${sc.total_events || 0} events)</span>
+                        </label>
+                    `;
+                    
+                    const checkbox = leaf.querySelector('.bulk-sc-select-checkbox');
+                    checkbox.addEventListener('change', (e) => {
+                        const isChecked = e.target.checked;
+                        if (isChecked) {
+                            selectedBulkScenarioIds.add(sc.id);
+                        } else {
+                            selectedBulkScenarioIds.delete(sc.id);
+                        }
+                        
+                        const allCheckboxes = childrenContainer.querySelectorAll('.bulk-sc-select-checkbox');
+                        const checkedCount = Array.from(allCheckboxes).filter(cb => cb.checked).length;
+                        
+                        if (checkedCount === 0) {
+                            groupCheckbox.checked = false;
+                            groupCheckbox.indeterminate = false;
+                        } else if (checkedCount === allCheckboxes.length) {
+                            groupCheckbox.checked = true;
+                            groupCheckbox.indeterminate = false;
+                        } else {
+                            groupCheckbox.checked = false;
+                            groupCheckbox.indeterminate = true;
+                        }
+                        
+                        updateBulkControllerUI();
+                    });
+                    
+                    childrenContainer.appendChild(leaf);
+                });
+                
+                // Initialize group checkbox state based on selection
+                const allCheckboxes = childrenContainer.querySelectorAll('.bulk-sc-select-checkbox');
+                if (allCheckboxes.length > 0) {
+                    const checkedCount = Array.from(allCheckboxes).filter(cb => cb.checked).length;
+                    if (checkedCount === 0) {
+                        groupCheckbox.checked = false;
+                        groupCheckbox.indeterminate = false;
+                    } else if (checkedCount === allCheckboxes.length) {
+                        groupCheckbox.checked = true;
+                        groupCheckbox.indeterminate = false;
+                    } else {
+                        groupCheckbox.checked = false;
+                        groupCheckbox.indeterminate = true;
+                    }
+                }
+                
+                listContainer.appendChild(node);
             });
-            
-            listContainer.appendChild(node);
-        });
-        
+        }
+
+        renderFilteredScenarios();
         updateBulkControllerUI();
         
     } catch (err) {

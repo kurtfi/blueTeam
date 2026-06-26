@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +8,9 @@
     <!-- Google Fonts: Space Grotesk, Inter and JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -18,7 +21,8 @@
             --text-main: #c9d1d9;
             --text-bright: #f0f6fc;
             --text-muted: #8b949e;
-            --primary: #f59e0b; /* Amber accent */
+            --primary: #f59e0b;
+            /* Amber accent */
             --primary-glow: rgba(245, 158, 11, 0.15);
             --cyan: #06b6d4;
             --cyan-glow: rgba(6, 182, 212, 0.15);
@@ -38,7 +42,7 @@
 
         body {
             background-color: var(--bg-color);
-            background-image: 
+            background-image:
                 radial-gradient(at 10% 10%, rgba(245, 158, 11, 0.03) 0px, transparent 50%),
                 radial-gradient(at 90% 90%, rgba(6, 182, 212, 0.03) 0px, transparent 50%);
             color: var(--text-main);
@@ -431,7 +435,7 @@
             min-height: 0;
             border: 1px solid var(--border-color);
             border-radius: var(--card-radius);
-            background: rgba(0,0,0,0.1);
+            background: rgba(0, 0, 0, 0.1);
         }
 
         table {
@@ -551,7 +555,7 @@
             border: 1px solid var(--border-color);
             border-radius: 6px;
             overflow: hidden;
-            background: rgba(0,0,0,0.2);
+            background: rgba(0, 0, 0, 0.2);
         }
 
         .rate-btn {
@@ -569,7 +573,7 @@
         }
 
         .rate-btn:hover {
-            background: rgba(255,255,255,0.05);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .rate-input {
@@ -622,7 +626,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             animation: slideIn 0.2s ease-out;
         }
 
@@ -639,8 +643,15 @@
         }
 
         @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         /* BULK PANEL SCENARIOS LIST */
@@ -651,7 +662,7 @@
             overflow-y: auto;
             max-height: 400px;
             border: 1px solid var(--border-color);
-            background: rgba(0,0,0,0.2);
+            background: rgba(0, 0, 0, 0.2);
             padding: 12px;
             border-radius: var(--card-radius);
         }
@@ -667,7 +678,7 @@
         }
 
         .bulk-sc-item:hover {
-            background: rgba(255,255,255,0.02);
+            background: rgba(255, 255, 255, 0.02);
         }
 
         .bulk-sc-item input {
@@ -707,6 +718,7 @@
             font-family: var(--font-mono);
             color: var(--text-bright);
             transition: all 0.2s ease;
+            min-width: 0;
         }
 
         .tree-header:hover {
@@ -749,6 +761,7 @@
             border: 1px solid rgba(255, 255, 255, 0.03);
             border-radius: var(--card-radius);
             transition: all 0.2s ease;
+            min-width: 0;
         }
 
         .tree-leaf:hover {
@@ -772,7 +785,6 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 280px;
             display: block;
         }
 
@@ -799,31 +811,37 @@
             letter-spacing: 0.05em;
             text-transform: uppercase;
         }
+
         .badge-error {
             background: rgba(239, 68, 68, 0.15);
             color: var(--error);
             border: 1px solid rgba(239, 68, 68, 0.3);
         }
+
         .badge-warning {
             background: rgba(245, 158, 11, 0.15);
             color: var(--primary);
             border: 1px solid rgba(245, 158, 11, 0.3);
         }
+
         .badge-info {
             background: rgba(6, 182, 212, 0.15);
             color: var(--cyan);
             border: 1px solid rgba(6, 182, 212, 0.3);
         }
+
         .badge-success {
             background: rgba(34, 197, 94, 0.15);
             color: var(--success);
             border: 1px solid rgba(34, 197, 94, 0.3);
         }
+
         .badge-muted {
             background: rgba(139, 148, 158, 0.1);
             color: var(--text-muted);
             border: 1px solid rgba(139, 148, 158, 0.2);
         }
+
         .active-row {
             background: rgba(6, 182, 212, 0.05) !important;
             border-left: 3px solid var(--cyan);
@@ -836,7 +854,7 @@
             overflow-y: auto;
             max-height: 450px;
             border: 1px solid var(--border-color);
-            background: rgba(0,0,0,0.2);
+            background: rgba(0, 0, 0, 0.2);
             padding: 12px;
             border-radius: var(--card-radius);
         }
@@ -849,40 +867,51 @@
             width: 6px;
             height: 6px;
         }
+
         .scrollbar-thin::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 3px;
         }
+
         .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
         }
-        
+
         .status-badge {
             font-family: var(--font-mono);
             font-size: 11px;
             font-weight: bold;
         }
-        
+
         .status-completed {
             color: var(--success);
         }
-        
+
         .status-running {
             color: var(--cyan);
             animation: pulse 1.5s infinite;
         }
-        
+
         .status-failed {
             color: var(--error);
         }
 
         @keyframes pulse {
-            0% { opacity: 0.6; }
-            50% { opacity: 1; }
-            100% { opacity: 0.6; }
+            0% {
+                opacity: 0.6;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.6;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <!-- TOP HEADER -->
@@ -920,7 +949,7 @@
 
         <!-- VIEWPORT -->
         <main class="viewport scrollbar-thin">
-            
+
             <!-- PANEL 1: SCENARIOS CATALOG -->
             <div id="panel-scenarios" class="panel active">
                 <div class="scenario-grid">
@@ -947,8 +976,11 @@
                             <div class="detail-body">
                                 <div class="detail-section">
                                     <div class="detail-section-title">Name & Description</div>
-                                    <h4 id="detail-sc-name" style="color: var(--text-bright); font-size: 16px; font-family: var(--font-title); margin-bottom: 6px;">-</h4>
-                                    <p id="detail-sc-desc" style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">-</p>
+                                    <h4 id="detail-sc-name"
+                                        style="color: var(--text-bright); font-size: 16px; font-family: var(--font-title); margin-bottom: 6px;">
+                                        -</h4>
+                                    <p id="detail-sc-desc"
+                                        style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">-</p>
                                 </div>
                                 <div class="detail-section">
                                     <div class="detail-section-title">MITRE ATT&CK Mapping</div>
@@ -956,33 +988,41 @@
                                         <!-- Chips -->
                                     </div>
                                 </div>
-                                <div class="detail-section" style="display: flex; flex-direction: column; flex: 1; min-height: 200px;">
-                                    <div class="detail-section-title">Alert Sequence Preview (<span id="detail-sc-events-count">0</span> Events)</div>
+                                <div class="detail-section"
+                                    style="display: flex; flex-direction: column; flex: 1; min-height: 200px;">
+                                    <div class="detail-section-title">Alert Sequence Preview (<span
+                                            id="detail-sc-events-count">0</span> Events)</div>
                                     <div id="detail-sc-events" class="events-preview scrollbar-thin">
                                         <!-- Previews -->
                                     </div>
                                 </div>
-                                <div class="controller-box" style="margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 12px;">
+                                <div class="controller-box"
+                                    style="margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 12px;">
                                     <div class="control-group" style="justify-content: space-between; width: 100%;">
                                         <span class="control-label">TIMING MODE:</span>
-                                        <select id="sc-timing-mode" class="sim-select" style="width: auto; min-width: 130px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-bright); padding: 4px 8px; border-radius: 6px; font-size: 12px; outline: none; cursor: pointer;">
+                                        <select id="sc-timing-mode" class="sim-select"
+                                            style="width: auto; min-width: 130px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-bright); padding: 4px 8px; border-radius: 6px; font-size: 12px; outline: none; cursor: pointer;">
                                             <option value="constant">Constant Delay</option>
                                             <option value="original">Original Timing</option>
                                         </select>
                                     </div>
-                                    <div class="control-group" id="sc-rate-row" style="justify-content: space-between; width: 100%;">
+                                    <div class="control-group" id="sc-rate-row"
+                                        style="justify-content: space-between; width: 100%;">
                                         <span class="control-label">RATE:</span>
                                         <div class="rate-control">
                                             <button type="button" class="rate-btn" id="sc-rate-minus">-</button>
-                                            <input type="text" id="sc-rate-input" class="rate-input" value="1.0" readonly>
+                                            <input type="text" id="sc-rate-input" class="rate-input" value="1.0"
+                                                readonly>
                                             <button type="button" class="rate-btn" id="sc-rate-plus">+</button>
                                         </div>
                                     </div>
-                                    <div class="control-group" id="sc-max-delay-row" style="justify-content: space-between; width: 100%; display: none;">
+                                    <div class="control-group" id="sc-max-delay-row"
+                                        style="justify-content: space-between; width: 100%; display: none;">
                                         <span class="control-label">MAX DELAY CAP:</span>
                                         <div class="rate-control">
                                             <button type="button" class="rate-btn" id="sc-max-delay-minus">-</button>
-                                            <input type="text" id="sc-max-delay-input" class="rate-input" value="30s" readonly>
+                                            <input type="text" id="sc-max-delay-input" class="rate-input" value="30s"
+                                                readonly>
                                             <button type="button" class="rate-btn" id="sc-max-delay-plus">+</button>
                                         </div>
                                     </div>
@@ -990,7 +1030,8 @@
                                         <input type="checkbox" id="sc-strip-labels">
                                         <span>Anonymize Alerts</span>
                                     </label>
-                                    <button id="sc-trigger-btn" class="btn btn-primary" style="justify-content: center; width: 100%;">
+                                    <button id="sc-trigger-btn" class="btn btn-primary"
+                                        style="justify-content: center; width: 100%;">
                                         <i class="fa-solid fa-play"></i> Trigger Simulation
                                     </button>
                                 </div>
@@ -1030,7 +1071,8 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon" style="color: var(--error); background: rgba(239, 68, 68, 0.1);"><i class="fa-solid fa-circle-xmark"></i></div>
+                        <div class="stat-icon" style="color: var(--error); background: rgba(239, 68, 68, 0.1);"><i
+                                class="fa-solid fa-circle-xmark"></i></div>
                         <div>
                             <div class="stat-label">Playbook Mismatches</div>
                             <div class="stat-value" id="stats-mismatched">0</div>
@@ -1065,7 +1107,8 @@
                     <!-- Run Audit Log -->
                     <div class="glass-panel" style="flex: 1; min-height: 0;">
                         <div class="panel-header">
-                            <h3><i class="fa-solid fa-fingerprint" aria-hidden="true"></i> RUN RESULTS AUDIT SEQUENCE</h3>
+                            <h3><i class="fa-solid fa-fingerprint" aria-hidden="true"></i> RUN RESULTS AUDIT SEQUENCE
+                            </h3>
                         </div>
                         <div class="table-wrap scrollbar-thin" id="audit-table-wrap" style="display: none;">
                             <table>
@@ -1098,43 +1141,58 @@
                         <div class="panel-header">
                             <h3><i class="fa-solid fa-sliders"></i> RUN CONFIG</h3>
                         </div>
-                        <div class="scrollbar-thin" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+                        <div class="scrollbar-thin"
+                            style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
                             <div class="detail-section">
                                 <div class="detail-section-title">Bulk Run Name</div>
-                                <input type="text" id="bulk-name-input" placeholder="e.g. LLM Benchmark Test" style="width: 100%; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; color: var(--text-bright); font-size: 13px;">
+                                <input type="text" id="bulk-name-input" placeholder="e.g. LLM Benchmark Test"
+                                    style="width: 100%; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; color: var(--text-bright); font-size: 13px;">
                             </div>
-                            <div class="detail-section" style="display: flex; flex-direction: column; flex: 1; min-height: 350px;">
-                                <div class="detail-section-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div class="detail-section" style="display: flex; flex-direction: column; height: 800px;">
+                                <div class="detail-section-title"
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <span>Select Scenarios</span>
-                                    <button id="bulk-select-all" class="btn btn-secondary" style="padding: 2px 6px; font-size: 10px;">Select All</button>
+                                    <button id="bulk-select-all" class="btn btn-secondary"
+                                        style="padding: 2px 6px; font-size: 10px;">Select All</button>
                                 </div>
-                                <div id="bulk-scenario-list" class="sim-scenario-list scrollable" style="flex: 1; overflow-y: auto;">
+                                <select id="bulk-category-select" class="sim-select"
+                                    style="width: 100%; margin-bottom: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-bright); padding: 8px; border-radius: 6px; font-size: 12px; outline: none; cursor: pointer;">
+                                    <option value="all">All Categories</option>
+                                </select>
+                                <div id="bulk-scenario-list" class="sim-scenario-list scrollbar-thin"
+                                    style="flex: 1; min-height: 0; overflow-y: auto; max-height: none;">
                                     <div class="tree-empty">Loading scenarios...</div>
                                 </div>
                             </div>
                             <div class="detail-section">
                                 <div class="detail-section-title">Execution Controls</div>
                                 <div style="display: flex; flex-direction: column; gap: 12px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                                         <span class="control-label">TIMING MODE:</span>
-                                        <select id="bulk-timing-mode" class="sim-select" style="width: auto; min-width: 130px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-bright); padding: 4px 8px; border-radius: 6px; font-size: 12px; outline: none; cursor: pointer;">
+                                        <select id="bulk-timing-mode" class="sim-select"
+                                            style="width: auto; min-width: 130px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-bright); padding: 4px 8px; border-radius: 6px; font-size: 12px; outline: none; cursor: pointer;">
                                             <option value="constant">Constant Delay</option>
                                             <option value="original">Original Timing</option>
                                         </select>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;" id="bulk-rate-row">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;"
+                                        id="bulk-rate-row">
                                         <span class="control-label">RATE:</span>
                                         <div class="rate-control">
                                             <button type="button" class="rate-btn" id="bulk-rate-minus">-</button>
-                                            <input type="text" id="bulk-rate-input" class="rate-input" value="1.0" readonly>
+                                            <input type="text" id="bulk-rate-input" class="rate-input" value="1.0"
+                                                readonly>
                                             <button type="button" class="rate-btn" id="bulk-rate-plus">+</button>
                                         </div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; display: none;" id="bulk-max-delay-row">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; display: none;"
+                                        id="bulk-max-delay-row">
                                         <span class="control-label">MAX DELAY CAP:</span>
                                         <div class="rate-control">
                                             <button type="button" class="rate-btn" id="bulk-max-delay-minus">-</button>
-                                            <input type="text" id="bulk-max-delay-input" class="rate-input" value="30s" readonly>
+                                            <input type="text" id="bulk-max-delay-input" class="rate-input" value="30s"
+                                                readonly>
                                             <button type="button" class="rate-btn" id="bulk-max-delay-plus">+</button>
                                         </div>
                                     </div>
@@ -1145,7 +1203,8 @@
                                 </div>
                             </div>
                         </div>
-                        <button id="bulk-execute-btn" class="btn btn-primary" style="margin-top: 16px; justify-content: center; width: 100%;">
+                        <button id="bulk-execute-btn" class="btn btn-primary"
+                            style="margin-top: 16px; justify-content: center; width: 100%;">
                             <i class="fa-solid fa-play"></i> Trigger Bulk Simulation
                         </button>
                     </div>
@@ -1173,7 +1232,9 @@
                                     </thead>
                                     <tbody id="bulk-runs-tbody">
                                         <tr>
-                                            <td colspan="8" class="text-center" style="padding: 20px; color: var(--text-muted);">No bulk runs recorded.</td>
+                                            <td colspan="8" class="text-center"
+                                                style="padding: 20px; color: var(--text-muted);">No bulk runs recorded.
+                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1182,11 +1243,14 @@
 
                         <!-- Bottom Table: Bulk Run Detail -->
                         <div class="glass-panel" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
-                            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <div class="panel-header"
+                                style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                                 <h3 style="margin: 0;"><i class="fa-solid fa-chart-bar"></i> BULK RUN DETAIL</h3>
-                                <span id="bulk-detail-name-badge" class="badge hide" style="font-family: var(--font-mono); font-size: 10px;">-</span>
+                                <span id="bulk-detail-name-badge" class="badge hide"
+                                    style="font-family: var(--font-mono); font-size: 10px;">-</span>
                             </div>
-                            <div class="table-wrap scrollbar-thin" id="bulk-detail-wrap" style="display: none; flex: 1; min-height: 180px;">
+                            <div class="table-wrap scrollbar-thin" id="bulk-detail-wrap"
+                                style="display: none; flex: 1; min-height: 180px;">
                                 <table>
                                     <thead>
                                         <tr>
@@ -1201,7 +1265,9 @@
                                     </thead>
                                     <tbody id="bulk-detail-tbody">
                                         <tr>
-                                            <td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">Select a bulk run from the list above to view its detailed scenario results.</td>
+                                            <td colspan="7" class="text-center"
+                                                style="padding: 20px; color: var(--text-muted);">Select a bulk run from
+                                                the list above to view its detailed scenario results.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1223,4 +1289,5 @@
 
     <script type="module" src="simulator.js"></script>
 </body>
+
 </html>
