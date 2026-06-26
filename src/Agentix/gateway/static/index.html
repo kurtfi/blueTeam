@@ -251,6 +251,13 @@
                             <option value="FAILED">Failed</option>
                         </select>
                     </div>
+                    <div class="select-container filter-select-container">
+                        <select id="filter-agent" class="session-select" style="width: 100%;">
+                            <option value="">All Agents</option>
+                            <option value="soc_analyst">SOC Analyst</option>
+                            <option value="simulation_analyst">Simulation Analyst</option>
+                        </select>
+                    </div>
                     <button id="sessions-refresh-btn" class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Refresh</button>
                 </div>
                 <div id="sessions-list-container" class="scrollable list-flex-container">
@@ -555,6 +562,6 @@
     </div>
 
     <!-- Scripts -->
-    <script type="module" src="app.js?v=20260606"></script>
+    <script type="module" src="app.js?v=20260626"></script>
 </body>
 </html>

@@ -221,3 +221,51 @@ async def test_get_allowed_playbooks_for_agent():
         "test_agent",
     )
 
+
+@pytest.mark.asyncio
+async def test_count_sessions_filter_agent():
+    conn_mock = AsyncMock()
+    pool_mock = create_mock_pool(conn_mock)
+    repo = PostgresSessionRepository(pool=pool_mock)
+
+    conn_mock.fetchval.return_value = 5
+
+    res = await repo.count_sessions(agent_name="soc_analyst")
+
+    assert res == 5
+    conn_mock.fetchval.assert_called_once()
+    args, _ = conn_mock.fetchval.call_args
+    assert "agent_name = $1" in args[0]
+    assert args[1] == "soc_analyst"
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_filter_agent():
+    conn_mock = AsyncMock()
+    pool_mock = create_mock_pool(conn_mock)
+    repo = PostgresSessionRepository(pool=pool_mock)
+
+    mock_id = uuid.uuid4()
+    mock_rows = [
+        {
+            "id": mock_id,
+            "display_name": "Test Session",
+            "source": "SIEM",
+            "status": "ACTIVE",
+            "owner_id": "admin",
+            "agent_name": "simulation_analyst",
+            "alert_payload": None,
+        }
+    ]
+    conn_mock.fetch.return_value = mock_rows
+
+    res = await repo.list_sessions(agent_name="simulation_analyst")
+
+    assert len(res) == 1
+    assert res[0]["id"] == str(mock_id)
+    assert res[0]["agent_name"] == "simulation_analyst"
+    conn_mock.fetch.assert_called_once()
+    args, _ = conn_mock.fetch.call_args
+    assert "agent_name = $1" in args[0]
+    assert args[1] == "simulation_analyst"
+

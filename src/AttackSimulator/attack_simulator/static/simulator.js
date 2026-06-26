@@ -364,6 +364,20 @@ function initEventListeners() {
             }
         });
     }
+
+    // Events Modal close handlers
+    const modal = document.getElementById('events-modal');
+    const closeBtn = document.getElementById('close-modal-btn');
+    if (modal && closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
 }
 
 // Global Refresh Data
@@ -597,35 +611,104 @@ async function loadRunAuditDetails(runId) {
     wrap.style.display = 'block';
 
     const tbody = document.getElementById('audit-table-body');
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading details...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading details...</td></tr>';
 
     try {
         const data = await api.get(`/simulations/runs/${runId}/results`);
         const results = data.results || [];
 
         if (results.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);">No audit records found for this run.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 20px; color: var(--text-muted);">No audit records found for this run.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = '';
+        // Group results by session_id
+        const sessions = {};
         results.forEach(res => {
+            const sessId = res.session_id || 'no-session';
+            if (!sessions[sessId]) {
+                sessions[sessId] = {
+                    session_id: sessId,
+                    expected_playbooks: res.expected_playbooks || [],
+                    actual_playbook: res.actual_playbook || 'None',
+                    verdict: res.verdict || res.match_result,
+                    events: []
+                };
+            }
+            sessions[sessId].events.push(res);
+        });
+
+        tbody.innerHTML = '';
+        Object.values(sessions).forEach(sess => {
             const tr = document.createElement('tr');
 
-            const verdictClass = res.verdict === 'TRUE_POSITIVE' ? 'text-emerald' :
-                                 res.verdict === 'FALSE_POSITIVE' ? 'text-error' : 'text-warning';
+            const verdictClass = sess.verdict === 'TRUE_POSITIVE' ? 'text-emerald' :
+                                 sess.verdict === 'FALSE_POSITIVE' ? 'text-error' : 'text-warning';
+
+            const sessDisplay = sess.session_id !== 'no-session' ? `${sess.session_id.substring(0, 12)}...` : 'N/A';
 
             tr.innerHTML = `
-                <td style="font-family: var(--font-mono); font-size: 11px; color: var(--cyan);">${res.session_id.substring(0, 12)}...</td>
-                <td style="font-weight: 500;">${escapeHtml(res.expected_playbooks ? res.expected_playbooks.join(', ') : 'None')}</td>
-                <td>${escapeHtml(res.actual_playbook || 'None')}</td>
-                <td class="${verdictClass}" style="font-weight: bold; font-size: 11px;">${escapeHtml(res.verdict)}</td>
+                <td style="font-family: var(--font-mono); font-size: 11px; color: var(--cyan);">${sessDisplay}</td>
+                <td style="font-weight: 500;">${escapeHtml(sess.expected_playbooks ? sess.expected_playbooks.join(', ') : 'None')}</td>
+                <td>${escapeHtml(sess.actual_playbook || 'None')}</td>
+                <td class="${verdictClass}" style="font-weight: bold; font-size: 11px;">${escapeHtml(sess.verdict)}</td>
+                <td>
+                    <button class="btn btn-secondary btn-view-events" style="padding: 2px 8px; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                        <i class="fa-solid fa-list"></i> ${sess.events.length} Events
+                    </button>
+                </td>
             `;
+
+            const viewBtn = tr.querySelector('.btn-view-events');
+            if (viewBtn) {
+                viewBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showSessionEventsModal(sess.session_id, sess.events);
+                });
+            }
+
             tbody.appendChild(tr);
         });
     } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-error" style="padding: 20px;">Failed to load audit results.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-error" style="padding: 20px;">Failed to load audit results.</td></tr>';
     }
+}
+
+function showSessionEventsModal(sessionId, events) {
+    const modal = document.getElementById('events-modal');
+    const modalSessionId = document.getElementById('modal-session-id');
+    const tbody = document.getElementById('modal-events-tbody');
+
+    if (!modal || !tbody) return;
+
+    modalSessionId.textContent = sessionId !== 'no-session' ? sessionId : 'N/A (No active session)';
+    tbody.innerHTML = '';
+
+    // Sort events by sequence_order or created_at
+    const sortedEvents = [...events].sort((a, b) => {
+        if (a.sequence_order !== null && b.sequence_order !== null) {
+            return a.sequence_order - b.sequence_order;
+        }
+        return new Date(a.created_at) - new Date(b.created_at);
+    });
+
+    sortedEvents.forEach(evt => {
+        const tr = document.createElement('tr');
+        const seq = evt.sequence_order !== undefined && evt.sequence_order !== null ? evt.sequence_order : '-';
+        const technique = evt.mitre_technique || (evt.expected_mitre ? evt.expected_mitre.join(', ') : 'None');
+        const respTime = evt.response_time_ms ? `${evt.response_time_ms} ms` : '-';
+        const dateStr = new Date(evt.created_at).toLocaleString();
+
+        tr.innerHTML = `
+            <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${seq}</td>
+            <td style="font-weight: 500;">${escapeHtml(technique)}</td>
+            <td style="font-family: var(--font-mono); font-size: 11px;">${respTime}</td>
+            <td style="color: var(--text-muted); font-size: 11px;">${dateStr}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    modal.style.display = 'flex';
 }
 
 async function loadStats() {

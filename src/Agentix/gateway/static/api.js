@@ -33,11 +33,12 @@ export async function getSessionStats() {
     return res.json();
 }
 
-export async function getSessions({ limit, offset, source, status, search }) {
+export async function getSessions({ limit, offset, source, status, search, agentName }) {
     let queryParams = [];
     if (source) queryParams.push(`source=${source}`);
     if (status) queryParams.push(`status_filter=${status}`);
     if (search) queryParams.push(`search=${encodeURIComponent(search)}`);
+    if (agentName) queryParams.push(`agent_name=${agentName}`);
     queryParams.push(`limit=${limit}`);
     queryParams.push(`offset=${offset}`);
     

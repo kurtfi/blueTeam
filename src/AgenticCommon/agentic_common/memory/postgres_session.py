@@ -330,6 +330,7 @@ class PostgresSessionRepository:
         status: str | None = None,
         owner_id: str | None = None,
         search: str | None = None,
+        agent_name: str | None = None,
         include_archived: bool = False,
     ) -> int:
         """
@@ -355,6 +356,10 @@ class PostgresSessionRepository:
             params.append(owner_id)
             where_clauses.append(f"owner_id = ${len(params)}")
 
+        if agent_name:
+            params.append(agent_name)
+            where_clauses.append(f"agent_name = ${len(params)}")
+
         if search:
             params.append(f"%{search}%")
             param_idx = len(params)
@@ -379,6 +384,7 @@ class PostgresSessionRepository:
         status: str | None = None,
         owner_id: str | None = None,
         search: str | None = None,
+        agent_name: str | None = None,
         limit: int = 50,
         offset: int = 0,
         include_archived: bool = False,
@@ -405,6 +411,10 @@ class PostgresSessionRepository:
         if owner_id:
             params.append(owner_id)
             where_clauses.append(f"owner_id = ${len(params)}")
+
+        if agent_name:
+            params.append(agent_name)
+            where_clauses.append(f"agent_name = ${len(params)}")
 
         if search:
             params.append(f"%{search}%")

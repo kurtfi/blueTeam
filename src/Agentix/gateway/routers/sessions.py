@@ -95,6 +95,7 @@ async def list_sessions_endpoint(
     source: str | None = None,
     status_filter: str | None = None,
     search: str | None = None,
+    agent_name: str | None = None,
     limit: int = 50,
     offset: int = 0,
     current_user: dict[str, Any] = Depends(get_current_user),
@@ -113,6 +114,7 @@ async def list_sessions_endpoint(
             source=source,
             status=status_filter,
             search=search,
+            agent_name=agent_name,
             limit=limit,
             offset=offset,
         )

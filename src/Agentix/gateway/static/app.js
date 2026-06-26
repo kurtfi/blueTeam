@@ -79,6 +79,7 @@ const sessionsListContainer = document.getElementById('sessions-list-container')
 const sessionsSearch = document.getElementById('sessions-search');
 const filterSource = document.getElementById('filter-source');
 const filterStatus = document.getElementById('filter-status');
+const filterAgent = document.getElementById('filter-agent');
 const sessionsRefreshBtn = document.getElementById('sessions-refresh-btn');
 
 // HITL Queue Elements
@@ -269,6 +270,16 @@ function setupEventListeners() {
     }
     if (filterStatus) {
         filterStatus.addEventListener('change', async () => {
+            await fetchWithLoader(
+                { buttons: [sessionsPrevBtn, sessionsNextBtn, sessionsLimitSelect], container: sessionsListContainer },
+                async () => {
+                    await loadSessionsList();
+                }
+            );
+        });
+    }
+    if (filterAgent) {
+        filterAgent.addEventListener('change', async () => {
             await fetchWithLoader(
                 { buttons: [sessionsPrevBtn, sessionsNextBtn, sessionsLimitSelect], container: sessionsListContainer },
                 async () => {
@@ -679,6 +690,7 @@ async function loadSessionsList(resetPage = true) {
         const srcVal = filterSource.value;
         const statusVal = filterStatus.value;
         const searchVal = sessionsSearch.value.trim();
+        const agentVal = filterAgent ? filterAgent.value : '';
         
         const offset = (state.sessionsPage - 1) * state.sessionsPageSize;
         const data = await api.getSessions({
@@ -686,7 +698,8 @@ async function loadSessionsList(resetPage = true) {
             offset,
             source: srcVal,
             status: statusVal,
-            search: searchVal
+            search: searchVal,
+            agentName: agentVal
         });
 
         store.setState({

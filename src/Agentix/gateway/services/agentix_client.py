@@ -204,6 +204,7 @@ async def list_sessions(
     source: str | None = None,
     status: str | None = None,
     search: str | None = None,
+    agent_name: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
@@ -219,6 +220,8 @@ async def list_sessions(
         params["status"] = status
     if search:
         params["search"] = search
+    if agent_name:
+        params["agent_name"] = agent_name
     params["limit"] = limit
     params["offset"] = offset
 

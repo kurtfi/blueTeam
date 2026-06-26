@@ -219,6 +219,7 @@ async def list_sessions(
     status: str | None = Query(None, max_length=255),
     owner_id: str | None = Query(None, max_length=255),
     search: str | None = Query(None, max_length=255),
+    agent_name: str | None = Query(None, max_length=255),
     limit: int = 50,
     offset: int = 0,
 ):
@@ -228,6 +229,7 @@ async def list_sessions(
             status=status,
             owner_id=owner_id,
             search=search,
+            agent_name=agent_name,
         )
         response.headers["X-Total-Count"] = str(total)
         return await postgres_session_repo.list_sessions(
@@ -235,6 +237,7 @@ async def list_sessions(
             status=status,
             owner_id=owner_id,
             search=search,
+            agent_name=agent_name,
             limit=limit,
             offset=offset,
         )
