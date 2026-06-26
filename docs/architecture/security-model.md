@@ -213,7 +213,7 @@ workspace/sessions/{session_id}/
 
 ### 3.5 Process Sandbox Execution Isolation
 
-Commands executed inside the sandbox environment ([executor.py](file:///Users/firatkurt/Documents/Repos/blueTeam/src/Agentix/agentix/sandbox/executor.py)) are isolated in a dedicated process group (`process_group=0` in subprocess initiation). 
+Commands executed inside the sandbox environment ([executor.py](../../src/Agentix/agentix/sandbox/executor.py)) are isolated in a dedicated process group (`process_group=0` in subprocess initiation). 
 
 This prevents the execution of command pipelines or backgrounded scripts from spawning untracked orphan processes (zombies) that leak memory and CPU resources on the host system. 
 When a subprocess execution hits its timeout, the system terminates the entire process group using `SIGKILL`:
@@ -225,7 +225,7 @@ os.killpg(proc.pid, signal.SIGKILL)
 
 ### 3.6 Tool Input Payload Limitation
 
-To prevent memory exhaustion (Out of Memory - OOM) attacks and database serialization failures, all large input dictionary payloads (such as `extra_context` and `data` in [soc_tools.py](file:///Users/firatkurt/Documents/Repos/blueTeam/src/TriageCore/triage_core/tools/soc_tools.py)) are validated before processing:
+To prevent memory exhaustion (Out of Memory - OOM) attacks and database serialization failures, all large input dictionary payloads (such as `extra_context` and `data` in [soc_tools.py](../../src/TriageCore/triage_core/tools/soc_tools.py)) are validated before processing:
 
 - Input dictionary arguments are capped at a maximum of **64KB (65,536 bytes)** JSON-serialized payload size.
 - If the size exceeds this threshold, the execution fails fast with a size violation error.
