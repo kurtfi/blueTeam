@@ -68,11 +68,25 @@ class PostgresSessionRepository:
         pool = await self.get_pool()
 
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        migration_dir = os.path.abspath(os.path.join(current_dir, "../../../../migrations"))
+        migration_dir = None
+        # Try searching upwards to find the migrations directory
+        temp_dir = current_dir
+        for _ in range(8):
+            possible_path = os.path.join(temp_dir, "migrations")
+            if os.path.exists(possible_path) and os.path.isdir(possible_path):
+                migration_dir = possible_path
+                break
+            parent = os.path.dirname(temp_dir)
+            if parent == temp_dir:
+                break
+            temp_dir = parent
+
+        # Fallback to the original hardcoded relative path
+        if not migration_dir:
+            migration_dir = os.path.abspath(os.path.join(current_dir, "../../../../migrations"))
 
         if not os.path.exists(migration_dir):
-            logger.error("postgres_session.migration_dir_not_found", path=migration_dir)
-            return
+            raise FileNotFoundError(f"Migrations directory not found (searched upward from {current_dir})")
 
         files = sorted([f for f in os.listdir(migration_dir) if f.endswith(".sql")])
         logger.info("postgres_session.found_migrations", files=files)
