@@ -7,7 +7,7 @@ from agentic_common.memory import postgres_session_repo
 def run_migrations_once():
     import asyncio
     from agentic_common.memory import postgres_session_repo
-    
+
     loop = asyncio.new_event_loop()
     try:
         loop.run_until_complete(postgres_session_repo.run_migrations())
