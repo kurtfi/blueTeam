@@ -44,9 +44,6 @@ def simulate_t1048():
 
 if __name__ == "__main__":
     runner = SimulationRunner(
-        name="T1048",
-        description="Data Exfiltration via DNS Tunneling",
-        expected_rules=["100005"]
+        name="T1048", description="Data Exfiltration via DNS Tunneling", expected_rules=["100005"]
     )
     runner.run(simulate_t1048)
-

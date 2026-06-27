@@ -47,9 +47,6 @@ def simulate_t1548_001():
 
 if __name__ == "__main__":
     runner = SimulationRunner(
-        name="T1548.001",
-        description="Privilege Escalation via SUID/SGID Abuse",
-        expected_rules=["100004"]
+        name="T1548.001", description="Privilege Escalation via SUID/SGID Abuse", expected_rules=["100004"]
     )
     runner.run(simulate_t1548_001)
-

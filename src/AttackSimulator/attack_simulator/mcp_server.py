@@ -64,6 +64,8 @@ async def _run_simulation_task(scenario_id: str, run_id: str, delay_seconds: flo
     except Exception as e:
         logger.exception("mcp.simulation_run_worker.error", run_id=run_id, error=str(e))
         await db_repo.update_run_stats(run_id=run_id, status="FAILED", sent_events=0)
+
+
 @mcp.tool()
 async def trigger_attack_simulation(
     scenario_name: str,
@@ -170,7 +172,6 @@ async def activate_scenario(scenario_name: str) -> str:
     except Exception as e:
         logger.error("mcp.activate_scenario.error", error=str(e))
         return f"Error activating scenario: {str(e)}"
-
 
 
 @mcp.tool()

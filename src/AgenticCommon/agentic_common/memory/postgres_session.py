@@ -109,7 +109,7 @@ class PostgresSessionRepository:
                     logger.warning(
                         "postgres_session.release_migration_lock_failed",
                         error=str(unlock_err),
-                        message="Connection might be severed; PostgreSQL will release session lock automatically."
+                        message="Connection might be severed; PostgreSQL will release session lock automatically.",
                     )
         logger.info("postgres_session.migrations_completed")
 
@@ -632,4 +632,3 @@ class PostgresSessionRepository:
 
 # Singleton instance helper
 postgres_session_repo = PostgresSessionRepository()
-

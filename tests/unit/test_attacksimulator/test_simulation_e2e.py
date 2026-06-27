@@ -21,17 +21,14 @@ async def test_ingest_and_run_simulation_e2e() -> None:
         "description": "LSASS memory dumping simulation",
         "mitre_ids": ["T1003.001"],
     }
-    
+
     mock_alert = {
         "rule": {
             "id": "100002",
             "level": 12,
             "description": "LSASS memory dumping detected via Sysmon Process Access",
             "groups": ["sysmon", "lsass", "credential_access", "mitre_t1003"],
-            "mitre": {
-                "id": ["T1003.001"],
-                "tactic": ["Credential Access"]
-            }
+            "mitre": {"id": ["T1003.001"], "tactic": ["Credential Access"]},
         },
         "full_log": "Sysmon process dump test",
     }

@@ -242,7 +242,9 @@ class IngestionService:
                 continue
 
             try:
-                payload = self.prepare_scenario_payload(file_path, "mordor" if filename.endswith((".zip", ".tar.gz")) else "custom")
+                payload = self.prepare_scenario_payload(
+                    file_path, "mordor" if filename.endswith((".zip", ".tar.gz")) else "custom"
+                )
                 payloads.append(payload)
             except Exception as e:
                 logger.error("ingestion.failed_payload_prep", path=file_path, error=str(e))

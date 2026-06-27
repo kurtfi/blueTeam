@@ -40,7 +40,6 @@ def strip_alert_labels(alert_payload: dict[str, Any]) -> dict[str, Any]:
     return sanitized
 
 
-
 class DagSimulationExecutor:
     """
     Orchestrates state-machine transitions and playbook matching evaluation
@@ -134,6 +133,7 @@ class DagSimulationExecutor:
                     continue
 
                 from attack_simulator.evaluator.playbook_match import get_expected_playbooks
+
                 expected_list = await get_expected_playbooks([mitre_technique])
                 expected_pb = expected_list[0] if expected_list else None
 
@@ -149,7 +149,9 @@ class DagSimulationExecutor:
                 # Poll and evaluate verdict
                 verdict, actual_pb = await self._poll_step_verdict(last_session_id, expected_list)
 
-                logger.info("simulation.dag_step_verdict", step=current_step, verdict=verdict, actual_playbook=actual_pb)
+                logger.info(
+                    "simulation.dag_step_verdict", step=current_step, verdict=verdict, actual_playbook=actual_pb
+                )
 
                 if verdict == "TRUE_POSITIVE":
                     match_result = "CORRECT"
@@ -188,11 +190,10 @@ class DagSimulationExecutor:
             logger.exception("simulation.dag_error", run_id=self.run_id, error=str(e))
             await self.db.update_run_stats(run_id=self.run_id, status="FAILED", sent_events=sent_events)
 
-    async def _poll_step_verdict(
-        self, last_session_id: str, expected_list: list[str]
-    ) -> tuple[str, str | None]:
+    async def _poll_step_verdict(self, last_session_id: str, expected_list: list[str]) -> tuple[str, str | None]:
         from attack_simulator.evaluator.agentix_gateway import AgentixSessionGateway
         from attack_simulator.evaluator.playbook_match import check_actual_playbook
+
         agentix_gateway = AgentixSessionGateway()
 
         verdict = "TIMEOUT"
@@ -402,6 +403,7 @@ class SimulationService:
         """
         if timing_strategy is None:
             from attack_simulator.services.timing import ConstantDelayStrategy
+
             timing_strategy = ConstantDelayStrategy(delay_seconds=delay_between_events)
         if sender is None:
             sender = self.alert_sender
@@ -629,4 +631,3 @@ class SimulationService:
         Cancel bulk run status and compute stats up to the point of cancellation.
         """
         await self.db.cancel_bulk_run(bulk_run_id)
-

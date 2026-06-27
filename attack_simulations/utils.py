@@ -116,14 +116,15 @@ class SimulationRunner:
     def run(self, simulate_func) -> None:
         ensure_log_file()
         print(f"\n[{self.name}] Simulating {self.description}...")
-        
+
         success = simulate_func()
-        
+
         if success:
             verify_log_contents()
             if "--verify" in sys.argv:
                 print("\n  Waiting 5s for Wazuh to process logs...")
                 import time
+
                 time.sleep(5)
                 verify_wazuh_alerts(self.expected_rules)
         else:

@@ -357,6 +357,3 @@ async def reject_session(session_id: str) -> dict:
         except Exception as e:
             logger.error("gateway.agentix_client.reject_session_failed", session_id=session_id, error=str(e))
             raise
-
-
-

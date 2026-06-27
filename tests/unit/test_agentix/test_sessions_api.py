@@ -34,10 +34,7 @@ async def test_list_sessions_gateway_agent_filter(client):
             "total_count": 0,
         }
 
-        response = client.get(
-            "/web/sessions?agent_name=soc_analyst",
-            headers={"Authorization": f"Bearer {token}"}
-        )
+        response = client.get("/web/sessions?agent_name=soc_analyst", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         data = response.json()
         assert data["sessions"] == []

@@ -268,4 +268,3 @@ def test_determine_session_verdict() -> None:
 
     # No Playbook
     assert determine_session_verdict(None, ["PB-001"], "COMPLETED") == "NO_PLAYBOOK"
-

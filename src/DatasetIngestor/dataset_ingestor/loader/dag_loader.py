@@ -80,7 +80,9 @@ class DagScenarioLoader:
         steps = dag_data.get("steps")
 
         if not name or not initial_step or not steps:
-            raise ValueError(f"Invalid DAG YAML structure in {file_path}. 'name', 'initial_step', and 'steps' are required.")
+            raise ValueError(
+                f"Invalid DAG YAML structure in {file_path}. 'name', 'initial_step', and 'steps' are required."
+            )
 
         # Process each step and correlate its logs
         processed_steps = {}
@@ -157,11 +159,7 @@ class DagScenarioLoader:
             logger.info("dag_loader.directory_not_found", path=dags_directory)
             return payloads
 
-        files = [
-            os.path.join(dags_directory, f)
-            for f in os.listdir(dags_directory)
-            if f.endswith((".yaml", ".yml"))
-        ]
+        files = [os.path.join(dags_directory, f) for f in os.listdir(dags_directory) if f.endswith((".yaml", ".yml"))]
 
         for file_path in files:
             try:

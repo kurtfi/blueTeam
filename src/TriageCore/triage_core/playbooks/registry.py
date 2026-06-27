@@ -78,7 +78,6 @@ class PlaybookRegistry:
             for pb in sorted(self._playbooks.values(), key=lambda p: p.id)
         ]
 
-
     def find_for_alert(
         self,
         rule_id: str = "",

@@ -86,7 +86,7 @@ async def create_linear_scenario(payload: LinearScenarioCreate):
             "status": "success",
             "scenario_id": scenario_id,
             "total_events": len(db_events),
-            "message": f"Linear scenario '{payload.name}' ingested successfully."
+            "message": f"Linear scenario '{payload.name}' ingested successfully.",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -118,11 +118,10 @@ async def create_dag_scenario(payload: DagScenarioCreate):
         return {
             "status": "success",
             "scenario_id": scenario_id,
-            "message": f"DAG scenario '{payload.name}' ingested successfully."
+            "message": f"DAG scenario '{payload.name}' ingested successfully.",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 @router.get("/simulations/scenarios")
@@ -160,14 +159,16 @@ async def get_simulation_scenario_events(scenario_id: str = Path(..., max_length
             for step_key, step_info in steps.items():
                 wazuh_alerts = step_info.get("wazuh_alerts", [])
                 for alert in wazuh_alerts:
-                    flattened_events.append({
-                        "id": f"dag-{step_key}-{order}",
-                        "scenario_id": scenario_id,
-                        "sequence_order": order,
-                        "mitre_technique": step_info.get("mitre_technique"),
-                        "mitre_tactic": "Multi-stage Execution",
-                        "wazuh_alert": alert,
-                    })
+                    flattened_events.append(
+                        {
+                            "id": f"dag-{step_key}-{order}",
+                            "scenario_id": scenario_id,
+                            "sequence_order": order,
+                            "mitre_technique": step_info.get("mitre_technique"),
+                            "mitre_tactic": "Multi-stage Execution",
+                            "wazuh_alert": alert,
+                        }
+                    )
                     order += 1
             return flattened_events
 

@@ -18,12 +18,8 @@ client = TestClient(app)
 @pytest.mark.asyncio
 async def test_list_sessions_core_agent_filter():
     with (
-        patch(
-            "agentix.api.routes.sessions.postgres_session_repo.count_sessions", new_callable=AsyncMock
-        ) as mock_count,
-        patch(
-            "agentix.api.routes.sessions.postgres_session_repo.list_sessions", new_callable=AsyncMock
-        ) as mock_list,
+        patch("agentix.api.routes.sessions.postgres_session_repo.count_sessions", new_callable=AsyncMock) as mock_count,
+        patch("agentix.api.routes.sessions.postgres_session_repo.list_sessions", new_callable=AsyncMock) as mock_list,
         patch("agentix.api.internal_auth.settings") as mock_settings,
     ):
         mock_settings.agentix_internal_api_key = "test-secret-key"
@@ -31,8 +27,7 @@ async def test_list_sessions_core_agent_filter():
         mock_list.return_value = []
 
         response = client.get(
-            "/v1/sessions?agent_name=simulation_analyst",
-            headers={"X-Internal-Api-Key": "test-secret-key"}
+            "/v1/sessions?agent_name=simulation_analyst", headers={"X-Internal-Api-Key": "test-secret-key"}
         )
 
         assert response.status_code == 200

@@ -268,4 +268,3 @@ async def test_list_sessions_filter_agent():
     args, _ = conn_mock.fetch.call_args
     assert "agent_name = $1" in args[0]
     assert args[1] == "simulation_analyst"
-

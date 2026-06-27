@@ -206,7 +206,9 @@ async def startup_event():
                 # Recreate stack for this attempt to ensure clean state
                 app.state.mcp_stack = AsyncExitStack()
 
-                soc_transport = await app.state.mcp_stack.enter_async_context(sse_client(settings.agentix_triage_core_url))
+                soc_transport = await app.state.mcp_stack.enter_async_context(
+                    sse_client(settings.agentix_triage_core_url)
+                )
                 soc_read, soc_write = soc_transport
                 app.state.triage_core_session = await app.state.mcp_stack.enter_async_context(
                     ClientSession(soc_read, soc_write)
@@ -265,7 +267,9 @@ async def startup_event():
                         # Auto-seed: map 'soc_analyst' and 'simulation_analyst' to all playbooks
                         await postgres_session_repo.map_agent_to_playbook("soc_analyst", pb_id)
                         await postgres_session_repo.map_agent_to_playbook("simulation_analyst", pb_id)
-                    logger.info("Successfully registered playbooks and mapped soc_analyst and simulation_analyst to DB.")
+                    logger.info(
+                        "Successfully registered playbooks and mapped soc_analyst and simulation_analyst to DB."
+                    )
                 except Exception as e:
                     logger.warning("Failed to fetch, cache, and register playbooks JSON at startup", error=str(e))
 

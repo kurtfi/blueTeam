@@ -227,12 +227,16 @@ def main() -> None:
     parser_run.add_argument("--delay", type=float, default=1.0, help="Delay (in seconds) between sending alerts")
     parser_run.add_argument("--rate", type=float, default=1.0, help="Send rate per second (default: 1.0)")
     parser_run.add_argument("--sender", choices=["webhook", "syslog", "file"], default="webhook", help="Sender backend")
-    parser_run.add_argument("--timing-mode", choices=["constant", "original"], default="constant", help="Replay timing mode")
+    parser_run.add_argument(
+        "--timing-mode", choices=["constant", "original"], default="constant", help="Replay timing mode"
+    )
     parser_run.add_argument("--max-original-delay", type=float, default=30.0, help="Maximum delay for original timing")
     parser_run.add_argument("--syslog-host", default="localhost", help="Syslog target host")
     parser_run.add_argument("--syslog-port", type=int, default=514, help="Syslog target port")
     parser_run.add_argument("--syslog-protocol", choices=["UDP", "TCP"], default="UDP", help="Syslog protocol")
-    parser_run.add_argument("--syslog-rfc5424", action="store_true", default=True, help="Use RFC 5424 standard syslog formatting")
+    parser_run.add_argument(
+        "--syslog-rfc5424", action="store_true", default=True, help="Use RFC 5424 standard syslog formatting"
+    )
 
     # Activate subcommand
     parser_activate = subparsers.add_parser("activate", help="Activate a specific scenario (passive others).")
@@ -290,4 +294,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

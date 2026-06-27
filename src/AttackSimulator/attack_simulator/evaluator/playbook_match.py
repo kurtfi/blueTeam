@@ -285,4 +285,3 @@ async def evaluate_run(run_id: str) -> dict[str, Any]:
 
     logger.info("evaluator.run_evaluated", report=report)
     return report
-

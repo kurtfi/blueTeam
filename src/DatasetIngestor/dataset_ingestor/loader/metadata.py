@@ -28,9 +28,7 @@ class ScenarioMetadataReader:
             else:
                 mitre_ids = [extract_technique_from_path(filepath)]
 
-            resolved_name = (
-                os.path.splitext(filename)[0].replace("_", " ").title()
-            )
+            resolved_name = os.path.splitext(filename)[0].replace("_", " ").title()
             resolved_desc = f"Simulated attack using Mordor dataset: {filename}"
 
             return {

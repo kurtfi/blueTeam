@@ -104,7 +104,9 @@ async def test_simulation_webhook_forwarding_failure(mock_async_client):
     mock_client_instance.post.side_effect = httpx.HTTPError("Connection failed")
     mock_async_client.return_value.__aenter__.return_value = mock_client_instance
 
-    response = client.post("/v1/webhooks/simulation", json={"test": "data"}, headers={"X-Webhook-Signature": "signature"})
+    response = client.post(
+        "/v1/webhooks/simulation", json={"test": "data"}, headers={"X-Webhook-Signature": "signature"}
+    )
 
     assert response.status_code == 502
     assert response.json()["detail"] == "Error forwarding request to agentix-api"

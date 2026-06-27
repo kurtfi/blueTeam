@@ -42,7 +42,11 @@ class AgentixSessionGateway:
                 if resp.status_code == 200:
                     data = resp.json()
                     return data.get("status")
-                logger.warn("agentix_gateway.get_session_status_unexpected_response", session_id=session_id, status_code=resp.status_code)
+                logger.warn(
+                    "agentix_gateway.get_session_status_unexpected_response",
+                    session_id=session_id,
+                    status_code=resp.status_code,
+                )
                 return None
             except Exception as e:
                 logger.error("agentix_gateway.get_session_status_failed", session_id=session_id, error=str(e))
@@ -65,7 +69,11 @@ class AgentixSessionGateway:
                 resp = await client.get(url, headers=headers, timeout=10.0)
                 if resp.status_code == 200:
                     return resp.json()
-                logger.warn("agentix_gateway.get_session_events_unexpected_response", session_id=session_id, status_code=resp.status_code)
+                logger.warn(
+                    "agentix_gateway.get_session_events_unexpected_response",
+                    session_id=session_id,
+                    status_code=resp.status_code,
+                )
                 return []
             except Exception as e:
                 logger.error("agentix_gateway.get_session_events_failed", session_id=session_id, error=str(e))
@@ -87,7 +95,11 @@ class AgentixSessionGateway:
                 resp = await client.get(url, headers=headers, timeout=10.0)
                 if resp.status_code == 200:
                     return resp.json()
-                logger.warn("agentix_gateway.get_session_details_unexpected_response", session_id=session_id, status_code=resp.status_code)
+                logger.warn(
+                    "agentix_gateway.get_session_details_unexpected_response",
+                    session_id=session_id,
+                    status_code=resp.status_code,
+                )
                 return None
             except Exception as e:
                 logger.error("agentix_gateway.get_session_details_failed", session_id=session_id, error=str(e))

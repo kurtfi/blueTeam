@@ -18,6 +18,7 @@ def _validate_dict_size(val: Any, max_bytes: int, name: str) -> None:
         if not isinstance(val, dict):
             raise ValueError(f"Input '{name}' must be a dictionary.")
         import json
+
         try:
             size = len(json.dumps(val))
             if size > max_bytes:

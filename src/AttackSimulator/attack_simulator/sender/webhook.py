@@ -32,6 +32,7 @@ class WebhookAlertSender(AlertSender):
             headers["X-Internal-API-Key"] = INTERNAL_API_KEY
 
         import os
+
         verify_ssl = os.getenv("ATTACK_SIMULATOR_VERIFY_SSL", "True").lower() == "true"
 
         async with httpx.AsyncClient(verify=verify_ssl) as client:

@@ -54,7 +54,7 @@ async def ingest_command(args: argparse.Namespace) -> None:
     """Ingests raw attack telemetry, correlates events, and posts scenario metadata to REST API."""
     service = IngestionService()
     print(f"[*] Parsing and correlating {args.source} source: {args.path} ...")
-    
+
     mitre_ids_list = None
     if getattr(args, "mitre_ids", None):
         mitre_ids_list = [t.strip() for t in args.mitre_ids.split(",") if t.strip()]
@@ -109,7 +109,7 @@ async def ingest_all_command(args: argparse.Namespace) -> None:
     """Ingests all files in the data directory and posts them to API."""
     service = IngestionService()
     print(f"[*] Analyzing target directory '{args.dir}' for scenarios...")
-    
+
     try:
         payloads = service.prepare_all_scenarios(args.dir)
     except Exception as e:
@@ -161,7 +161,7 @@ async def ingest_dags_command(args: argparse.Namespace) -> None:
     """Ingests all DAG scenarios in YAML format and posts to API."""
     loader = DagScenarioLoader()
     print(f"[*] Analyzing target directory '{args.dir}' for DAG scenarios...")
-    
+
     try:
         payloads = loader.load_all_dags(args.dir, data_dir=args.data_dir)
     except Exception as e:
@@ -210,9 +210,7 @@ async def ingest_dags_command(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="DatasetIngestor Ingestion Tool: Ingest scenarios via API."
-    )
+    parser = argparse.ArgumentParser(description="DatasetIngestor Ingestion Tool: Ingest scenarios via API.")
     parser.add_argument(
         "--api-url",
         default=os.getenv("ATTACK_SIMULATOR_API_URL", "http://localhost:8083/v1"),
@@ -244,12 +242,14 @@ def main() -> None:
     parser_ingest_all.add_argument("--dir", default="data", help="Directory containing dataset files (default: data)")
 
     # Ingest-dags subcommand
-    parser_ingest_dags = subparsers.add_parser(
-        "ingest-dags", help="Ingest all DAG scenarios in YAML format."
-    )
+    parser_ingest_dags = subparsers.add_parser("ingest-dags", help="Ingest all DAG scenarios in YAML format.")
     parser_ingest_dags.add_argument(
         "--dir",
-        default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "AttackSimulator", "attack_simulator", "scenarios", "dags")),
+        default=os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__), "..", "..", "AttackSimulator", "attack_simulator", "scenarios", "dags"
+            )
+        ),
         help="Directory containing YAML DAG files",
     )
     parser_ingest_dags.add_argument("--data-dir", default="data", help="Directory containing dataset files")

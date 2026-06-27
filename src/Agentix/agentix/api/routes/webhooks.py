@@ -22,6 +22,7 @@ async def verify_hmac_signature(
     request: Request, x_webhook_signature: str = Header(None), x_internal_api_key: str = Header(None)
 ):
     from fastapi.params import Header as FastAPIHeader
+
     if isinstance(x_webhook_signature, FastAPIHeader):
         x_webhook_signature = None
     if isinstance(x_internal_api_key, FastAPIHeader):
@@ -42,18 +43,15 @@ async def verify_hmac_signature(
         if allow_unauth:
             logger.warning(
                 "webhooks.auth.missing_secret_bypass",
-                msg="Webhook secret is missing! Bypassing signature verification (INSECURE DEV MODE)."
+                msg="Webhook secret is missing! Bypassing signature verification (INSECURE DEV MODE).",
             )
             return
         else:
             logger.critical(
                 "webhooks.auth.missing_secret_fail_closed",
-                msg="AGENTIX_WEBHOOK_SECRET is not configured! Failing closed. Set AGENTIX_ALLOW_UNAUTHENTICATED_WEBHOOKS=True to override for local development."
+                msg="AGENTIX_WEBHOOK_SECRET is not configured! Failing closed. Set AGENTIX_ALLOW_UNAUTHENTICATED_WEBHOOKS=True to override for local development.",
             )
-            raise HTTPException(
-                status_code=500,
-                detail="Webhook configuration error: Webhook secret is not set."
-            )
+            raise HTTPException(status_code=500, detail="Webhook configuration error: Webhook secret is not set.")
 
     # 3. Fall back to standard signature verification
     if not x_webhook_signature:

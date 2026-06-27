@@ -68,6 +68,7 @@ async def test_run_command_failure():
 @pytest.mark.asyncio
 async def test_run_command_timeout():
     import signal
+
     with (
         patch("agentix.sandbox.executor.settings") as mock_settings,
         patch("agentix.sandbox.executor.asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec,

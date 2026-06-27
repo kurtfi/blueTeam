@@ -22,10 +22,12 @@ async def test_orchestrator_playbook_filtering_allowed():
 
     # Mock catalog
     catalog_mock = MagicMock()
-    catalog_mock.cached_playbooks_json = json.dumps([
-        {"id": "PB-001", "name": "Shadow Access", "mitre_ids": ["T1003"], "severity": "high", "steps": 5},
-        {"id": "PB-002", "name": "Brute Force", "mitre_ids": ["T1110"], "severity": "medium", "steps": 3},
-    ])
+    catalog_mock.cached_playbooks_json = json.dumps(
+        [
+            {"id": "PB-001", "name": "Shadow Access", "mitre_ids": ["T1003"], "severity": "high", "steps": 5},
+            {"id": "PB-002", "name": "Brute Force", "mitre_ids": ["T1110"], "severity": "medium", "steps": 3},
+        ]
+    )
 
     # Tool mapping with playbook tool
     tool_mock = MagicMock()
@@ -50,7 +52,7 @@ async def test_orchestrator_playbook_filtering_allowed():
 
     with patch("agentix.core.rag.ContextEnrichmentService.retrieve_context", new_callable=AsyncMock) as mock_rag:
         mock_rag.return_value = "Mock RAG"
-        
+
         # Call internal context setup
         res = await orch._setup_orchestrator_context(
             user_message="Triage PB-001",
@@ -112,7 +114,10 @@ async def test_orchestrator_no_playbook_tools_no_db_query():
 
 
 @pytest.mark.asyncio
-@patch("agentic_common.memory.postgres_session.postgres_session_repo.get_allowed_playbooks_for_agent", new_callable=AsyncMock)
+@patch(
+    "agentic_common.memory.postgres_session.postgres_session_repo.get_allowed_playbooks_for_agent",
+    new_callable=AsyncMock,
+)
 async def test_mcp_adapter_authorization_check(mock_get_allowed):
     # Mock fastmcp client
     client_mock = AsyncMock()
@@ -143,6 +148,7 @@ async def test_mcp_adapter_authorization_check(mock_get_allowed):
 
 def test_simulation_analyst_loading():
     from agentix.agents.loader import AgentLoader
+
     config = AgentLoader.load_by_name("simulation_analyst")
     assert config.id == "simulation_analyst"
     assert config.name == "Simulation Analyst"

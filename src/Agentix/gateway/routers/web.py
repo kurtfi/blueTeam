@@ -212,6 +212,3 @@ async def get_playbook_details_endpoint(
         return await get_playbook_details(playbook_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-

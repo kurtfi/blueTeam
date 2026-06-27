@@ -115,5 +115,3 @@ async def test_mcp_character_length_validations() -> None:
     # 3. activate_scenario scenario_name limit 255
     res3 = await mcp_server.activate_scenario("C" * 256)
     assert "exceeds 255 characters" in res3
-
-

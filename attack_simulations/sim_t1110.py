@@ -51,10 +51,5 @@ def simulate_t1110():
 
 
 if __name__ == "__main__":
-    runner = SimulationRunner(
-        name="T1110",
-        description="Brute Force / Password Spray",
-        expected_rules=["100011"]
-    )
+    runner = SimulationRunner(name="T1110", description="Brute Force / Password Spray", expected_rules=["100011"])
     runner.run(simulate_t1110)
-

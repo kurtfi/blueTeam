@@ -36,7 +36,6 @@ if __name__ == "__main__":
     runner = SimulationRunner(
         name="T1059.004",
         description="Command and Scripting Interpreter: Unix Shell / Reverse Shell",
-        expected_rules=["100003"]
+        expected_rules=["100003"],
     )
     runner.run(simulate_t1059_004)
-

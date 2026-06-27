@@ -132,6 +132,7 @@ async def test_original_delta_strategy() -> None:
 async def test_agentix_session_gateway() -> None:
     """Verifies AgentixSessionGateway functions query the Agentix HTTP APIs correctly."""
     import httpx
+
     gateway = AgentixSessionGateway()
     dummy_session_id = str(uuid.uuid4())
 

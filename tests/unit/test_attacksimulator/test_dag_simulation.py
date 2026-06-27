@@ -47,51 +47,56 @@ async def test_execute_dag_simulation_mitigated_path() -> None:
             "step_1": {
                 "name": "Initial Exploitation",
                 "mitre_technique": "T1190",
-                "wazuh_alerts": [
-                    {"rule": {"id": "100001", "description": "Exploit exploit"}}
-                ],
+                "wazuh_alerts": [{"rule": {"id": "100001", "description": "Exploit exploit"}}],
                 "next": {
                     "TRUE_POSITIVE": "exit_mitigated",
                     "FALSE_POSITIVE": "step_2",
                     "NO_PLAYBOOK": "step_2",
                     "TIMEOUT": "step_2",
-                }
+                },
             },
             "step_2": {
                 "name": "Privilege Escalation",
                 "mitre_technique": "T1003.008",
-                "wazuh_alerts": [
-                    {"rule": {"id": "100002", "description": "LSASS Access"}}
-                ],
+                "wazuh_alerts": [{"rule": {"id": "100002", "description": "LSASS Access"}}],
                 "next": {
                     "TRUE_POSITIVE": "exit_mitigated",
                     "FALSE_POSITIVE": "exit_compromised",
-                }
+                },
             },
             "exit_mitigated": {
                 "name": "Attack Mitigated",
                 "mitre_technique": "T1190",
                 "wazuh_alerts": [],
-                "next": None
+                "next": None,
             },
             "exit_compromised": {
                 "name": "System Compromised",
                 "mitre_technique": "T1003.008",
                 "wazuh_alerts": [],
-                "next": None
-            }
-        }
+                "next": None,
+            },
+        },
     }
 
     # Mock DB update functions, playbook check, and gateway
     with (
         patch("attack_simulator.repository.postgres.db_repo.insert_simulation_result", new_callable=AsyncMock),
-        patch("attack_simulator.repository.postgres.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update_stats,
-        patch("attack_simulator.repository.postgres.db_repo.update_run_path", new_callable=AsyncMock) as mock_update_path,
+        patch(
+            "attack_simulator.repository.postgres.db_repo.update_run_stats", new_callable=AsyncMock
+        ) as mock_update_stats,
+        patch(
+            "attack_simulator.repository.postgres.db_repo.update_run_path", new_callable=AsyncMock
+        ) as mock_update_path,
         patch("attack_simulator.repository.postgres.db_repo.get_pool", new_callable=AsyncMock) as mock_pool,
-        patch("attack_simulator.evaluator.playbook_match.get_expected_playbooks", new_callable=AsyncMock) as mock_get_expected,
+        patch(
+            "attack_simulator.evaluator.playbook_match.get_expected_playbooks", new_callable=AsyncMock
+        ) as mock_get_expected,
         patch("attack_simulator.evaluator.playbook_match.check_actual_playbook", new_callable=AsyncMock) as mock_check,
-        patch("attack_simulator.evaluator.agentix_gateway.AgentixSessionGateway.get_session_status", new_callable=AsyncMock) as mock_status,
+        patch(
+            "attack_simulator.evaluator.agentix_gateway.AgentixSessionGateway.get_session_status",
+            new_callable=AsyncMock,
+        ) as mock_status,
     ):
         mock_get_expected.return_value = ["PB-123"]
         # Setup mock db pool connection for final result update
@@ -99,7 +104,7 @@ async def test_execute_dag_simulation_mitigated_path() -> None:
         mock_acq = MagicMock()
         mock_acq.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_acq.__aexit__ = AsyncMock()
-        
+
         mock_pool_instance = MagicMock()
         mock_pool_instance.acquire.return_value = mock_acq
         mock_pool.return_value = mock_pool_instance
@@ -152,59 +157,64 @@ async def test_execute_dag_simulation_compromised_path() -> None:
             "step_1": {
                 "name": "Initial Exploitation",
                 "mitre_technique": "T1190",
-                "wazuh_alerts": [
-                    {"rule": {"id": "100001", "description": "Exploit exploit"}}
-                ],
+                "wazuh_alerts": [{"rule": {"id": "100001", "description": "Exploit exploit"}}],
                 "next": {
                     "TRUE_POSITIVE": "exit_mitigated",
                     "FALSE_POSITIVE": "step_2",
                     "NO_PLAYBOOK": "step_2",
                     "TIMEOUT": "step_2",
-                }
+                },
             },
             "step_2": {
                 "name": "Privilege Escalation",
                 "mitre_technique": "T1003.008",
-                "wazuh_alerts": [
-                    {"rule": {"id": "100002", "description": "LSASS Access"}}
-                ],
+                "wazuh_alerts": [{"rule": {"id": "100002", "description": "LSASS Access"}}],
                 "next": {
                     "TRUE_POSITIVE": "exit_mitigated",
                     "FALSE_POSITIVE": "exit_compromised",
                     "NO_PLAYBOOK": "exit_compromised",
-                }
+                },
             },
             "exit_mitigated": {
                 "name": "Attack Mitigated",
                 "mitre_technique": "T1190",
                 "wazuh_alerts": [],
-                "next": None
+                "next": None,
             },
             "exit_compromised": {
                 "name": "System Compromised",
                 "mitre_technique": "T1003.008",
                 "wazuh_alerts": [],
-                "next": None
-            }
-        }
+                "next": None,
+            },
+        },
     }
 
     # Mock DB functions
     with (
         patch("attack_simulator.repository.postgres.db_repo.insert_simulation_result", new_callable=AsyncMock),
-        patch("attack_simulator.repository.postgres.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update_stats,
-        patch("attack_simulator.repository.postgres.db_repo.update_run_path", new_callable=AsyncMock) as mock_update_path,
+        patch(
+            "attack_simulator.repository.postgres.db_repo.update_run_stats", new_callable=AsyncMock
+        ) as mock_update_stats,
+        patch(
+            "attack_simulator.repository.postgres.db_repo.update_run_path", new_callable=AsyncMock
+        ) as mock_update_path,
         patch("attack_simulator.repository.postgres.db_repo.get_pool", new_callable=AsyncMock) as mock_pool,
-        patch("attack_simulator.evaluator.playbook_match.get_expected_playbooks", new_callable=AsyncMock) as mock_get_expected,
+        patch(
+            "attack_simulator.evaluator.playbook_match.get_expected_playbooks", new_callable=AsyncMock
+        ) as mock_get_expected,
         patch("attack_simulator.evaluator.playbook_match.check_actual_playbook", new_callable=AsyncMock) as mock_check,
-        patch("attack_simulator.evaluator.agentix_gateway.AgentixSessionGateway.get_session_status", new_callable=AsyncMock) as mock_status,
+        patch(
+            "attack_simulator.evaluator.agentix_gateway.AgentixSessionGateway.get_session_status",
+            new_callable=AsyncMock,
+        ) as mock_status,
     ):
         mock_get_expected.return_value = ["PB-123"]
         mock_conn = AsyncMock()
         mock_acq = MagicMock()
         mock_acq.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_acq.__aexit__ = AsyncMock()
-        
+
         mock_pool_instance = MagicMock()
         mock_pool_instance.acquire.return_value = mock_acq
         mock_pool.return_value = mock_pool_instance

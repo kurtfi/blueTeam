@@ -33,9 +33,6 @@ def simulate_t1003_008():
 
 if __name__ == "__main__":
     runner = SimulationRunner(
-        name="T1003.008",
-        description="OS Credential Dumping (/etc/shadow access)",
-        expected_rules=["100002"]
+        name="T1003.008", description="OS Credential Dumping (/etc/shadow access)", expected_rules=["100002"]
     )
     runner.run(simulate_t1003_008)
-
