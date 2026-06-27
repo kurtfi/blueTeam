@@ -3,43 +3,6 @@ import pytest
 
 from agentic_common.memory import postgres_session_repo
 from attack_simulator.evaluator.playbook_match import check_actual_playbook
-from attack_simulator.repository import db_repo
-
-
-@pytest.fixture(autouse=True)
-async def cleanup_db_pools():
-    """Close and reset connection pools before and after each test to prevent event loop mismatch errors."""
-    # Setup phase: close any pools left over from other test modules
-    if postgres_session_repo._pool:
-        try:
-            await postgres_session_repo._pool.close()
-        except Exception:
-            pass
-        postgres_session_repo._pool = None
-
-    if db_repo._pool:
-        try:
-            await db_repo._pool.close()
-        except Exception:
-            pass
-        db_repo._pool = None
-
-    yield
-
-    # Teardown phase: close pools after our tests to be clean
-    if postgres_session_repo._pool:
-        try:
-            await postgres_session_repo._pool.close()
-        except Exception:
-            pass
-        postgres_session_repo._pool = None
-
-    if db_repo._pool:
-        try:
-            await db_repo._pool.close()
-        except Exception:
-            pass
-        db_repo._pool = None
 
 
 @pytest.fixture(autouse=True)

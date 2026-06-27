@@ -4,41 +4,6 @@ Unit tests for Bulk Run Cancellation and Partial Completion states.
 
 import pytest
 from attack_simulator.repository import db_repo
-from agentic_common.memory import postgres_session_repo
-
-
-@pytest.fixture(autouse=True)
-async def cleanup_db_pools():
-    """Close and reset connection pools before and after each test to prevent event loop mismatch errors."""
-    if postgres_session_repo._pool:
-        try:
-            await postgres_session_repo._pool.close()
-        except Exception:
-            pass
-        postgres_session_repo._pool = None
-
-    if db_repo._pool:
-        try:
-            await db_repo._pool.close()
-        except Exception:
-            pass
-        db_repo._pool = None
-
-    yield
-
-    if postgres_session_repo._pool:
-        try:
-            await postgres_session_repo._pool.close()
-        except Exception:
-            pass
-        postgres_session_repo._pool = None
-
-    if db_repo._pool:
-        try:
-            await db_repo._pool.close()
-        except Exception:
-            pass
-        db_repo._pool = None
 
 
 @pytest.mark.asyncio
