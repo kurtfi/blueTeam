@@ -8,10 +8,11 @@ from typing import Any
 
 import structlog
 import yaml
-from agentic_common.mapper.wazuh_template import strip_information_leakage
 from dataset_ingestor.correlation.engine import CorrelationEngine
 from dataset_ingestor.ingestion import correlate_and_fallback_events
 from dataset_ingestor.loader.factory import DatasetLoaderFactory
+
+from agentic_common.mapper.wazuh_template import strip_information_leakage
 
 logger = structlog.get_logger(__name__)
 

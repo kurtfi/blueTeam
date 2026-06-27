@@ -8,7 +8,6 @@ from typing import Any
 
 import httpx
 import structlog
-
 from attack_simulator.config import INTERNAL_API_KEY, WEBHOOK_URL
 
 logger = structlog.get_logger(__name__)

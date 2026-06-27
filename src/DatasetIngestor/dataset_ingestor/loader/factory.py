@@ -3,8 +3,8 @@ Factory for resolving and instantiating appropriate DatasetLoaders.
 """
 
 from dataset_ingestor.loader.base import DatasetLoader
-from dataset_ingestor.loader.mordor import MordorLoader
 from dataset_ingestor.loader.custom import CustomLoader
+from dataset_ingestor.loader.mordor import MordorLoader
 
 
 class DatasetLoaderFactory:

@@ -4,6 +4,7 @@ Handles secure downloading of attack scenario datasets.
 
 import os
 from urllib.parse import urlparse
+
 import httpx
 import structlog
 

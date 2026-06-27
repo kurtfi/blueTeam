@@ -5,8 +5,8 @@ Extracts scenario metadata from Mordor or Custom datasets.
 import json
 import os
 from typing import Any
-import yaml
 
+import yaml
 from dataset_ingestor.mapper.mordor_filename import extract_technique_from_path, get_mordor_file_info
 
 

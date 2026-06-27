@@ -6,9 +6,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from agentic_common.mapper.wazuh_template import generate_wazuh_alert
 from dataset_ingestor.correlation.aggregator import EventAggregator
 from dataset_ingestor.correlation.rules import CorrelationRule, load_rules
+
+from agentic_common.mapper.wazuh_template import generate_wazuh_alert
 
 logger = structlog.get_logger(__name__)
 

@@ -7,8 +7,8 @@ from typing import Any
 import httpx
 import structlog
 
-from attack_simulator.config import INTERNAL_API_KEY, WEBHOOK_URL
 from agentic_common.mapper.wazuh_template import strip_information_leakage
+from attack_simulator.config import INTERNAL_API_KEY, WEBHOOK_URL
 from attack_simulator.sender.base import AlertSender
 
 logger = structlog.get_logger(__name__)

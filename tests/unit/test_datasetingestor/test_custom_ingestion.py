@@ -1,12 +1,10 @@
 import os
 import tempfile
-import argparse
-from unittest.mock import MagicMock, AsyncMock, patch
-import pytest
+from unittest.mock import MagicMock, patch
 
 from dataset_ingestor.loader.dag_loader import resolve_log_path
 from dataset_ingestor.ingestion import IngestionService
-from dataset_ingestor.cli import ingest_command, confirm_prompt
+from dataset_ingestor.cli import confirm_prompt
 
 
 def test_resolve_log_path_with_scenario_dir():
