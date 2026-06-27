@@ -11,8 +11,6 @@ def run_migrations_once():
     loop = asyncio.new_event_loop()
     try:
         loop.run_until_complete(postgres_session_repo.run_migrations())
-    except Exception as e:
-        print(f"\n[Warning] Migration run failed: {e}\n")
     finally:
         if postgres_session_repo._pool:
             try:
