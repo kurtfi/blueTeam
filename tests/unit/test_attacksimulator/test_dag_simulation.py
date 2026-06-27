@@ -85,10 +85,10 @@ async def test_execute_dag_simulation_mitigated_path() -> None:
 
     # Mock DB update functions, playbook check, and gateway
     with (
-        patch("attack_simulator.models.db_repo.insert_simulation_result", new_callable=AsyncMock),
-        patch("attack_simulator.models.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update_stats,
-        patch("attack_simulator.models.db_repo.update_run_path", new_callable=AsyncMock) as mock_update_path,
-        patch("attack_simulator.models.db_repo.get_pool", new_callable=AsyncMock) as mock_pool,
+        patch("attack_simulator.repository.postgres.db_repo.insert_simulation_result", new_callable=AsyncMock),
+        patch("attack_simulator.repository.postgres.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update_stats,
+        patch("attack_simulator.repository.postgres.db_repo.update_run_path", new_callable=AsyncMock) as mock_update_path,
+        patch("attack_simulator.repository.postgres.db_repo.get_pool", new_callable=AsyncMock) as mock_pool,
         patch("attack_simulator.evaluator.playbook_match.get_expected_playbooks", new_callable=AsyncMock) as mock_get_expected,
         patch("attack_simulator.evaluator.playbook_match.check_actual_playbook", new_callable=AsyncMock) as mock_check,
         patch("attack_simulator.evaluator.agentix_gateway.AgentixSessionGateway.get_session_status", new_callable=AsyncMock) as mock_status,
@@ -191,10 +191,10 @@ async def test_execute_dag_simulation_compromised_path() -> None:
 
     # Mock DB functions
     with (
-        patch("attack_simulator.models.db_repo.insert_simulation_result", new_callable=AsyncMock),
-        patch("attack_simulator.models.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update_stats,
-        patch("attack_simulator.models.db_repo.update_run_path", new_callable=AsyncMock) as mock_update_path,
-        patch("attack_simulator.models.db_repo.get_pool", new_callable=AsyncMock) as mock_pool,
+        patch("attack_simulator.repository.postgres.db_repo.insert_simulation_result", new_callable=AsyncMock),
+        patch("attack_simulator.repository.postgres.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update_stats,
+        patch("attack_simulator.repository.postgres.db_repo.update_run_path", new_callable=AsyncMock) as mock_update_path,
+        patch("attack_simulator.repository.postgres.db_repo.get_pool", new_callable=AsyncMock) as mock_pool,
         patch("attack_simulator.evaluator.playbook_match.get_expected_playbooks", new_callable=AsyncMock) as mock_get_expected,
         patch("attack_simulator.evaluator.playbook_match.check_actual_playbook", new_callable=AsyncMock) as mock_check,
         patch("attack_simulator.evaluator.agentix_gateway.AgentixSessionGateway.get_session_status", new_callable=AsyncMock) as mock_status,

@@ -11,7 +11,7 @@ from fastmcp import FastMCP
 
 from attack_simulator.evaluator.gap_analyzer import generate_coverage_report
 from attack_simulator.evaluator.playbook_match import evaluate_run
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 
 logger = structlog.get_logger(__name__)
 

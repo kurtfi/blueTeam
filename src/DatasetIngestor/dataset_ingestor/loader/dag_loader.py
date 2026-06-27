@@ -8,13 +8,44 @@ from typing import Any
 
 import structlog
 import yaml
-from attack_simulator.mapper.wazuh_template import strip_information_leakage
+from agentic_common.mapper.wazuh_template import strip_information_leakage
 from dataset_ingestor.correlation.engine import CorrelationEngine
 from dataset_ingestor.ingestion import correlate_and_fallback_events
-from dataset_ingestor.loader.custom import CustomLoader
-from dataset_ingestor.loader.mordor import MordorLoader
+from dataset_ingestor.loader.factory import DatasetLoaderFactory
 
 logger = structlog.get_logger(__name__)
+
+
+def resolve_log_path(log_source: str, data_dir: str = "data", scenario_dir: str | None = None) -> str:
+    """
+    Resolves log source path relative to scenario_dir, data_dir, or parent directories.
+    """
+    # 1. Try resolving relative to scenario file's directory first
+    if scenario_dir:
+        candidate = os.path.abspath(os.path.join(scenario_dir, os.path.basename(log_source)))
+        if os.path.exists(candidate):
+            return candidate
+        # Also try direct/relative path from scenario_dir
+        candidate2 = os.path.abspath(os.path.join(scenario_dir, log_source))
+        if os.path.exists(candidate2):
+            return candidate2
+
+    # 2. Try resolving relative to data_dir
+    resolved_path = os.path.abspath(os.path.join(data_dir, os.path.basename(log_source)))
+    if not os.path.exists(resolved_path):
+        # Fallback to direct path or relative path
+        resolved_path = os.path.abspath(log_source)
+
+    if not os.path.exists(resolved_path):
+        # Check parent directories for workspace root "data" folder
+        cur = os.path.dirname(os.path.abspath(__file__))
+        for _ in range(5):
+            candidate = os.path.join(cur, "data", os.path.basename(log_source))
+            if os.path.exists(candidate):
+                resolved_path = os.path.abspath(candidate)
+                break
+            cur = os.path.dirname(cur)
+    return resolved_path
 
 
 class DagScenarioLoader:
@@ -22,8 +53,13 @@ class DagScenarioLoader:
     Loads and processes multi-stage DAG scenarios from YAML files.
     """
 
-    def __init__(self) -> None:
-        self.correlation_engine = CorrelationEngine()
+    def __init__(
+        self,
+        correlation_engine: CorrelationEngine | None = None,
+        loader_factory: Any = None,
+    ) -> None:
+        self.correlation_engine = correlation_engine or CorrelationEngine()
+        self.loader_factory = loader_factory or DatasetLoaderFactory
 
     def load_dag_scenario(self, file_path: str, data_dir: str = "data") -> dict[str, Any]:
         """
@@ -49,6 +85,7 @@ class DagScenarioLoader:
         processed_steps = {}
         total_events = 0
         all_mitre_ids = set()
+        scenario_dir = os.path.dirname(os.path.abspath(file_path))
 
         for step_key, step_info in steps.items():
             mitre_technique = step_info.get("mitre_technique")
@@ -63,33 +100,13 @@ class DagScenarioLoader:
 
             # If the step defines a log source, load and correlate it
             if log_source:
-                # Resolve log source relative to workspace root or data dir
-                resolved_log_path = os.path.abspath(os.path.join(data_dir, os.path.basename(log_source)))
-                if not os.path.exists(resolved_log_path):
-                    # Fallback to direct path or relative path
-                    resolved_log_path = os.path.abspath(log_source)
-
-                if not os.path.exists(resolved_log_path):
-                    # Check parent directories for workspace root "data" folder
-                    cur = os.path.dirname(os.path.abspath(__file__))
-                    for _ in range(5):
-                        candidate = os.path.join(cur, "data", os.path.basename(log_source))
-                        if os.path.exists(candidate):
-                            resolved_log_path = os.path.abspath(candidate)
-                            break
-                        cur = os.path.dirname(cur)
+                resolved_log_path = resolve_log_path(log_source, data_dir=data_dir, scenario_dir=scenario_dir)
 
                 if os.path.exists(resolved_log_path):
                     logger.info("dag_loader.processing_step_logs", step=step_key, log_source=resolved_log_path)
-                    
-                    is_zip = resolved_log_path.endswith((".zip", ".tar.gz"))
-                    if is_zip:
-                        loader = MordorLoader()
-                        raw_events_gen = loader.load(resolved_log_path)
-                    else:
-                        loader_custom = CustomLoader()
-                        metadata, raw_events_list = loader_custom.load_scenario_file(resolved_log_path)
-                        raw_events_gen = (e for e in raw_events_list)
+
+                    loader = self.loader_factory.get_loader_by_path(resolved_log_path)
+                    raw_events_gen = loader.load(resolved_log_path)
 
                     # Correlate events
                     correlated_events = correlate_and_fallback_events(

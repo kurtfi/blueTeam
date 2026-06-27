@@ -4,7 +4,7 @@ Tests for character length validations, scenario activation constraints, and dup
 
 import pytest
 
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 from attack_simulator import mcp_server
 
 

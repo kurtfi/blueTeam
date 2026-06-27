@@ -1,5 +1,5 @@
 """
-Unit tests for IngestionService and SimulationService.
+Unit tests for IngestionService and SimulationService using Dependency Injection.
 """
 
 import uuid
@@ -11,6 +11,7 @@ from attack_simulator.exceptions import ScenarioNotFoundError, SimulatorExceptio
 from attack_simulator.services.simulation import SimulationService
 from attack_simulator.sender.base import AlertSender
 from attack_simulator.evaluator.gateway import PlaybookRegistryGateway
+from attack_simulator.repository.base import SimulationRepository
 
 
 class MockAlertSender(AlertSender):
@@ -29,38 +30,58 @@ class MockPlaybookGateway(PlaybookRegistryGateway):
         return [mock_pb]
 
 
+class FakeSimulationRepository(SimulationRepository):
+    def __init__(self) -> None:
+        self.get_scenario_by_name = AsyncMock()
+        self.get_scenario_events = AsyncMock()
+        self.create_run = AsyncMock()
+        self.insert_simulation_result = AsyncMock()
+        self.update_run_stats = AsyncMock()
+        self.update_run_path = AsyncMock()
+        self.get_run = AsyncMock()
+        self.get_scenario_by_id = AsyncMock()
+        self.create_bulk_run = AsyncMock()
+        self.get_bulk_run_status = AsyncMock()
+        self.get_scenario_total_events = AsyncMock()
+        self.get_active_bulk_runs = AsyncMock()
+        self.get_runs_for_bulk = AsyncMock()
+        self.update_bulk_run_stats = AsyncMock()
+        self.cancel_bulk_run = AsyncMock()
+        self.update_simulation_result_actual = AsyncMock()
+
+
 @pytest.mark.asyncio
 async def test_simulation_scenario_not_found() -> None:
-    service = SimulationService()
+    mock_db = FakeSimulationRepository()
+    mock_db.get_scenario_by_name.return_value = None
+    service = SimulationService(db_repository=mock_db)
 
-    with patch("attack_simulator.models.db_repo.get_scenario_by_name", new_callable=AsyncMock) as mock_get_name:
-        mock_get_name.return_value = None
-
-        with pytest.raises(ScenarioNotFoundError):
-            await service.run_simulation(scenario_name="Non Existing Scenario")
+    with pytest.raises(ScenarioNotFoundError):
+        await service.run_simulation(scenario_name="Non Existing Scenario")
 
 
 @pytest.mark.asyncio
 async def test_simulation_scenario_no_events() -> None:
-    service = SimulationService()
+    mock_db = FakeSimulationRepository()
+    sc_id = str(uuid.uuid4())
+    mock_db.get_scenario_by_name.return_value = {"id": sc_id, "name": "Empty Scenario"}
+    mock_db.get_scenario_events.return_value = []
+    service = SimulationService(db_repository=mock_db)
 
-    with (
-        patch("attack_simulator.models.db_repo.get_scenario_by_name", new_callable=AsyncMock) as mock_get_name,
-        patch("attack_simulator.models.db_repo.get_scenario_events", new_callable=AsyncMock) as mock_get_events,
-    ):
-        sc_id = str(uuid.uuid4())
-        mock_get_name.return_value = {"id": sc_id, "name": "Empty Scenario"}
-        mock_get_events.return_value = []
-
-        with pytest.raises(SimulatorException):
-            await service.run_simulation(scenario_name="Empty Scenario")
+    with pytest.raises(SimulatorException):
+        await service.run_simulation(scenario_name="Empty Scenario")
 
 
 @pytest.mark.asyncio
 async def test_simulation_execution_flow() -> None:
     mock_sender = MockAlertSender()
     mock_gateway = MockPlaybookGateway()
-    service = SimulationService(alert_sender=mock_sender, playbook_gateway=mock_gateway)
+    mock_db = FakeSimulationRepository()
+    service = SimulationService(
+        alert_sender=mock_sender,
+        playbook_gateway=mock_gateway,
+        db_repository=mock_db,
+    )
 
     run_id = str(uuid.uuid4())
     scenario_id = str(uuid.uuid4())
@@ -79,11 +100,7 @@ async def test_simulation_execution_flow() -> None:
         }
     ]
 
-    with (
-        patch("attack_simulator.models.db_repo.insert_simulation_result", new_callable=AsyncMock) as mock_insert,
-        patch("attack_simulator.models.db_repo.update_run_stats", new_callable=AsyncMock) as mock_update,
-        patch("attack_simulator.services.simulation.evaluate_run", new_callable=AsyncMock) as mock_eval,
-    ):
+    with patch("attack_simulator.services.simulation.evaluate_run", new_callable=AsyncMock) as mock_eval:
         # Execute simulation synchronously for the test
         await service.execute_simulation(
             run_id=run_id, scenario_id=scenario_id, events=events, delay_between_events=0.0, strip_labels=True
@@ -100,6 +117,6 @@ async def test_simulation_execution_flow() -> None:
         assert sent_alert["rule"]["id"] == "999999"
 
         # Verify DB insertions and updates were called
-        mock_insert.assert_called_once()
-        assert mock_update.call_count == 1  # only RUNNING since evaluate_run is mocked
+        mock_db.insert_simulation_result.assert_called_once()
+        assert mock_db.update_run_stats.call_count == 1  # only RUNNING since evaluate_run is mocked
         mock_eval.assert_called_once_with(run_id)

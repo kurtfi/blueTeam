@@ -5,8 +5,8 @@ Computes and reports playbook coverage gaps for simulated MITRE techniques.
 from typing import Any
 
 import structlog
-from attack_simulator.mapper.mitre_catalog import MITRE_CATALOG, get_mitre_info
-from attack_simulator.models import db_repo
+from agentic_common.mapper.mitre_catalog import MITRE_CATALOG, get_mitre_info
+from attack_simulator.repository import db_repo
 
 logger = structlog.get_logger(__name__)
 

@@ -1,5 +1,5 @@
 """
-PostgreSQL models and repository interface for AttackSimulator.
+PostgreSQL repository implementation for AttackSimulator.
 """
 
 import json
@@ -11,11 +11,12 @@ import asyncpg  # type: ignore[import-untyped]
 import structlog
 
 from attack_simulator.config import DATABASE_URL
+from attack_simulator.repository.base import SimulationRepository
 
 logger = structlog.get_logger(__name__)
 
 
-class DatabaseRepository:
+class DatabaseRepository(SimulationRepository):
     """
     Data access layer for simulator scenarios, events, runs, and results.
     """
@@ -400,24 +401,6 @@ class DatabaseRepository:
                 results.append(d)
             return results
 
-    async def get_agentix_session(self, session_id: str) -> dict[str, Any] | None:
-        """
-        Reads from Agentix's core sessions table to check runtime playbook execution details.
-        """
-        pool = await self.get_pool()
-        sess_uuid = uuid.UUID(session_id)
-        async with pool.acquire() as conn:
-            # We query Agentix's sessions table (created in 001_create_sessions.sql)
-            row = await conn.fetchrow(
-                "SELECT * FROM sessions WHERE id = $1",
-                sess_uuid,
-            )
-            if row:
-                d = dict(row)
-                d["id"] = str(d["id"])
-                return d
-        return None
-
     async def create_bulk_run(
         self,
         name: str,
@@ -620,6 +603,23 @@ class DatabaseRepository:
             return await conn.fetchval(
                 "SELECT total_events FROM simulator.attack_scenarios WHERE id = $1",
                 scenario_id,
+            )
+
+    async def update_simulation_result_actual(
+        self, result_id: str, actual_playbook: str | None, match_result: str
+    ) -> None:
+        """Update the actual playbook matched and verdict status for a simulation result."""
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE simulator.simulation_results 
+                SET actual_playbook = $2, match_result = $3
+                WHERE id = $1
+                """,
+                uuid.UUID(result_id),
+                actual_playbook,
+                match_result,
             )
 
     async def close(self) -> None:

@@ -5,7 +5,7 @@ Generates structured Wazuh alert payloads from raw events.
 from datetime import UTC, datetime
 from typing import Any
 
-from attack_simulator.mapper.mitre_catalog import get_mitre_info
+from agentic_common.mapper.mitre_catalog import get_mitre_info
 
 # Static rule templates keyed by technique (internal use only – the technique key
 # itself is never exposed in the generated alert payload).

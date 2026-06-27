@@ -3,7 +3,7 @@ import pytest
 
 from agentic_common.memory import postgres_session_repo
 from attack_simulator.evaluator.playbook_match import check_actual_playbook
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 
 
 @pytest.fixture(autouse=True)
@@ -40,6 +40,50 @@ async def cleanup_db_pools():
         except Exception:
             pass
         db_repo._pool = None
+
+
+@pytest.fixture(autouse=True)
+async def mock_agentix_http_api():
+    import httpx
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    async def mock_get(url, *args, **kwargs):
+        parts = url.rstrip("/").split("/")
+        if len(parts) >= 2:
+            session_id = parts[-1]
+            is_events = False
+            if parts[-1] == "events":
+                session_id = parts[-2]
+                is_events = True
+
+            if is_events:
+                events = await postgres_session_repo.get_events(session_id)
+                resp = MagicMock(spec=httpx.Response)
+                resp.status_code = 200
+                resp.json.return_value = events
+                return resp
+            else:
+                session = await postgres_session_repo.get_session(session_id)
+                resp = MagicMock(spec=httpx.Response)
+                if session:
+                    resp.status_code = 200
+                    resp.json.return_value = session
+                else:
+                    resp.status_code = 404
+                    resp.json.return_value = {"detail": "Not found"}
+                return resp
+        resp = MagicMock(spec=httpx.Response)
+        resp.status_code = 404
+        return resp
+
+    mock_client.get.side_effect = mock_get
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        yield
 
 
 @pytest.mark.asyncio

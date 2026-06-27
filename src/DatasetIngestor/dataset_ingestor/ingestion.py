@@ -9,15 +9,11 @@ import os
 from collections.abc import Generator
 from typing import Any
 
-import httpx
 import structlog
-from attack_simulator.mapper.mitre_catalog import get_mitre_info
-from attack_simulator.mapper.wazuh_template import generate_wazuh_alert, strip_information_leakage
-from dataset_ingestor.mapper.mordor_filename import extract_technique_from_path, get_mordor_file_info
+from agentic_common.mapper.mitre_catalog import get_mitre_info
+from agentic_common.mapper.wazuh_template import generate_wazuh_alert, strip_information_leakage
 
 from dataset_ingestor.correlation.engine import CorrelationEngine
-from dataset_ingestor.loader.custom import CustomLoader
-from dataset_ingestor.loader.mordor import MordorLoader
 
 logger = structlog.get_logger(__name__)
 
@@ -142,41 +138,18 @@ class IngestionService:
         Downloads a dataset from a URL to the local data/ directory.
         Returns the absolute local path to the downloaded file.
         """
-        from urllib.parse import urlparse
+        from dataset_ingestor.downloader import DatasetDownloader
 
-        parsed_url = urlparse(url)
-        filename = os.path.basename(parsed_url.path)
-        if not filename or filename in (".", ".."):
-            raise ValueError(f"Could not extract a valid filename from URL: {url}")
-
-        dest_dir = "data"
-        abs_dest_dir = os.path.abspath(dest_dir)
-        local_path = os.path.abspath(os.path.join(abs_dest_dir, filename))
-
-        # Strict containment check to prevent path traversal
-        if not local_path.startswith(abs_dest_dir + os.sep) and local_path != abs_dest_dir:
-            raise ValueError(f"Path traversal detected in URL: {url}")
-
-        if os.path.exists(local_path) and os.path.getsize(local_path) > 100:
-            logger.info("ingestion.file_already_downloaded", filename=filename)
-            return local_path
-
-        try:
-            os.makedirs(dest_dir, exist_ok=True)
-            logger.info("ingestion.download_started", url=url, dest=local_path)
-            async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
-                response = await client.get(url)
-                if response.status_code != 200:
-                    raise Exception(f"HTTP Status {response.status_code}")
-                with open(local_path, "wb") as f:
-                    f.write(response.content)
-            logger.info("ingestion.download_completed", path=local_path, size_bytes=len(response.content))
-            return local_path
-        except Exception as e:
-            raise Exception(f"Failed to download file from {url}: {e}")
+        downloader = DatasetDownloader()
+        return await downloader.download_dataset(url)
 
     def prepare_scenario_payload(
-        self, path: str, source_type: str, scenario_name: str | None = None, description: str | None = None
+        self,
+        path: str,
+        source_type: str,
+        scenario_name: str | None = None,
+        description: str | None = None,
+        mitre_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Parses and correlates the scenario file/dataset and returns a dict matching the REST API schema.
@@ -198,31 +171,20 @@ class IngestionService:
             if not found:
                 raise FileNotFoundError(f"Source path does not exist: {local_path}")
 
-        if source_type == "mordor":
-            loader = MordorLoader()
-            resolved_name = (
-                scenario_name or os.path.splitext(os.path.basename(local_path))[0].replace("_", " ").title()
-            )
-            resolved_desc = description or f"Simulated attack using Mordor dataset: {os.path.basename(local_path)}"
+        from dataset_ingestor.loader.factory import DatasetLoaderFactory
+        from dataset_ingestor.loader.metadata import ScenarioMetadataReader
 
-            info = get_mordor_file_info(os.path.basename(local_path))
-            if info:
-                mitre_ids = info.get("techniques", [])
-            else:
-                mitre_ids = [extract_technique_from_path(local_path)]
+        metadata = ScenarioMetadataReader.read_metadata(local_path, source_type)
+        resolved_name = scenario_name or metadata["name"]
+        resolved_desc = description or metadata["description"]
+        resolved_mitre_ids = mitre_ids if mitre_ids is not None else metadata.get("mitre_ids", [])
 
-            raw_events_gen = loader.load(local_path)
-        else:  # custom
-            loader_custom = CustomLoader()
-            metadata, raw_events_list = loader_custom.load_scenario_file(local_path)
-            resolved_name = scenario_name or metadata["name"]
-            resolved_desc = description or metadata["description"]
-            mitre_ids = metadata.get("mitre_ids", [])
-            raw_events_gen = (e for e in raw_events_list)
+        loader = DatasetLoaderFactory.get_loader(source_type)
+        raw_events_gen = loader.load(local_path)
 
         # Correlate events
         engine = CorrelationEngine()
-        correlated_events = correlate_and_fallback_events(raw_events_gen, mitre_ids, engine)
+        correlated_events = correlate_and_fallback_events(raw_events_gen, resolved_mitre_ids, engine)
 
         if not correlated_events:
             raise Exception("Ingestion payload empty: 0 alerts generated from this raw data.")
@@ -232,7 +194,7 @@ class IngestionService:
             ev["wazuh_alert"] = strip_information_leakage(ev["wazuh_alert"], ev["mitre_technique"])
 
         event_techs = [ev["mitre_technique"] for ev in correlated_events]
-        combined_mitre_ids = list(set(mitre_ids + event_techs))
+        combined_mitre_ids = list(set(resolved_mitre_ids + event_techs))
 
         return {
             "name": resolved_name,
@@ -262,13 +224,13 @@ class IngestionService:
                 raise FileNotFoundError(f"Directory '{directory_path}' does not exist.")
 
         patterns = [
-            os.path.join(directory_path, "*.zip"),
-            os.path.join(directory_path, "*.tar.gz"),
-            os.path.join(directory_path, "*.json"),
+            os.path.join(directory_path, "**", "*.zip"),
+            os.path.join(directory_path, "**", "*.tar.gz"),
+            os.path.join(directory_path, "**", "*.json"),
         ]
         files = []
         for pat in patterns:
-            files.extend(glob.glob(pat))
+            files.extend(glob.glob(pat, recursive=True))
 
         files = list(set(os.path.abspath(f) for f in files))
         files.sort()

@@ -4,18 +4,224 @@ Service layer for simulation run lifecycle and telemetry replay.
 
 import asyncio
 import copy
+import re
 from typing import Any
+import uuid
 
 import structlog
 
 from attack_simulator.evaluator.gateway import PlaybookRegistryGateway
 from attack_simulator.evaluator.playbook_match import evaluate_run
 from attack_simulator.exceptions import ScenarioNotFoundError, SimulatorException
-from attack_simulator.models import db_repo
+from attack_simulator.repository import SimulationRepository, db_repo
 from attack_simulator.sender.base import AlertSender
 from attack_simulator.sender.webhook import WebhookAlertSender
 
 logger = structlog.get_logger(__name__)
+
+
+def strip_alert_labels(alert_payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Safeguard to strip MITRE, rule_id, and tactic labels from alert payloads.
+    """
+    sanitized = copy.deepcopy(alert_payload)
+    if "rule" in sanitized and isinstance(sanitized["rule"], dict):
+        sanitized["rule"].pop("mitre", None)
+        sanitized["rule"].pop("rule_id", None)
+        if "groups" in sanitized["rule"] and isinstance(sanitized["rule"]["groups"], list):
+            sanitized["rule"]["groups"] = [
+                g
+                for g in sanitized["rule"]["groups"]
+                if not (str(g).lower().startswith("mitre_") or re.match(r"^t\d{4}", str(g).lower()))
+            ]
+        sanitized["rule"]["id"] = "999999"
+    sanitized.pop("mitre_ids", None)
+    sanitized.pop("rule_id", None)
+    return sanitized
+
+
+
+class DagSimulationExecutor:
+    """
+    Orchestrates state-machine transitions and playbook matching evaluation
+    for a DAG-based attack simulation run.
+    """
+
+    def __init__(
+        self,
+        run_id: str,
+        scenario_id: str,
+        dag_structure: dict[str, Any],
+        db: SimulationRepository,
+        sender: AlertSender,
+        timing_strategy: Any,
+        strip_labels: bool = False,
+    ) -> None:
+        self.run_id = run_id
+        self.scenario_id = scenario_id
+        self.dag_structure = dag_structure
+        self.db = db
+        self.sender = sender
+        self.timing_strategy = timing_strategy
+        self.strip_labels = strip_labels
+
+    async def execute(self) -> None:
+        initial_step = self.dag_structure.get("initial_step")
+        steps = self.dag_structure.get("steps", {})
+
+        if not initial_step or not steps:
+            logger.error("simulation.dag_invalid_structure", run_id=self.run_id)
+            await self.db.update_run_stats(run_id=self.run_id, status="FAILED", sent_events=0)
+            return
+
+        current_step = initial_step
+        traversed_path = []
+        sent_events = 0
+        matched_playbooks = 0
+        mismatched_playbooks = 0
+        no_playbook = 0
+
+        try:
+            while current_step:
+                if current_step not in steps:
+                    logger.warning("simulation.dag_step_not_found", step=current_step)
+                    break
+
+                step_info = steps[current_step]
+                mitre_technique = step_info.get("mitre_technique")
+                wazuh_alerts = step_info.get("wazuh_alerts", [])
+                transitions = step_info.get("next", {})
+
+                # Record step traversal
+                traversed_path.append(current_step)
+                await self.db.update_run_path(self.run_id, list(traversed_path))
+
+                if not wazuh_alerts:
+                    # Empty/terminal node
+                    logger.info("simulation.dag_reached_terminal_step", step=current_step)
+                    if not transitions:
+                        break
+                    next_step = None
+                    if transitions and "COMPLETED" in transitions:
+                        next_step = transitions["COMPLETED"]
+                    elif transitions and isinstance(transitions, dict) and len(transitions) > 0:
+                        next_step = list(transitions.values())[0]
+                    current_step = next_step
+                    continue
+
+                logger.info("simulation.dag_executing_step", step=current_step, alerts_count=len(wazuh_alerts))
+
+                # Play all alerts for this step
+                last_session_id = None
+                for idx, alert in enumerate(wazuh_alerts):
+                    if self.strip_labels:
+                        alert_payload = strip_alert_labels(alert)
+                    else:
+                        alert_payload = copy.deepcopy(alert)
+
+                    alert_payload["simulation_run_id"] = str(self.run_id)
+                    last_session_id = await self.sender.send(alert_payload, mitre_technique)
+                    sent_events += 1
+                    await self.db.update_run_stats(run_id=self.run_id, status="RUNNING", sent_events=sent_events)
+
+                    if idx < len(wazuh_alerts) - 1:
+                        await self.timing_strategy.wait_before_next(alert, wazuh_alerts[idx + 1])
+
+                if not last_session_id:
+                    logger.warning("simulation.dag_step_no_session", step=current_step)
+                    mismatched_playbooks += 1
+                    current_step = transitions.get("TIMEOUT") or transitions.get("NO_PLAYBOOK")
+                    continue
+
+                from attack_simulator.evaluator.playbook_match import get_expected_playbooks
+                expected_list = await get_expected_playbooks([mitre_technique])
+                expected_pb = expected_list[0] if expected_list else None
+
+                result_id = await self.db.insert_simulation_result(
+                    run_id=self.run_id,
+                    event_id=None,
+                    session_id=last_session_id,
+                    expected_mitre=[mitre_technique],
+                    expected_playbook=expected_pb,
+                    match_result="PENDING",
+                )
+
+                # Poll and evaluate verdict
+                verdict, actual_pb = await self._poll_step_verdict(last_session_id, expected_list)
+
+                logger.info("simulation.dag_step_verdict", step=current_step, verdict=verdict, actual_playbook=actual_pb)
+
+                if verdict == "TRUE_POSITIVE":
+                    match_result = "CORRECT"
+                    matched_playbooks += 1
+                elif verdict == "FALSE_POSITIVE":
+                    match_result = "WRONG"
+                    mismatched_playbooks += 1
+                elif verdict == "NO_PLAYBOOK":
+                    match_result = "NO_PLAYBOOK"
+                    no_playbook += 1
+                else:
+                    match_result = "TIMEOUT"
+                    mismatched_playbooks += 1
+
+                # Update the result record
+                await self.db.update_simulation_result_actual(result_id, actual_pb, match_result)
+
+                next_step = transitions.get(verdict)
+                if not next_step:
+                    next_step = transitions.get("TIMEOUT") or transitions.get("NO_PLAYBOOK")
+
+                current_step = next_step
+
+            # Finalize run
+            logger.info("simulation.dag_run_completed", run_id=self.run_id, path=traversed_path)
+            await self.db.update_run_stats(
+                run_id=self.run_id,
+                status="COMPLETED",
+                sent_events=sent_events,
+                matched_playbooks=matched_playbooks,
+                mismatched_playbooks=mismatched_playbooks,
+                no_playbook=no_playbook,
+            )
+
+        except Exception as e:
+            logger.exception("simulation.dag_error", run_id=self.run_id, error=str(e))
+            await self.db.update_run_stats(run_id=self.run_id, status="FAILED", sent_events=sent_events)
+
+    async def _poll_step_verdict(
+        self, last_session_id: str, expected_list: list[str]
+    ) -> tuple[str, str | None]:
+        from attack_simulator.evaluator.agentix_gateway import AgentixSessionGateway
+        from attack_simulator.evaluator.playbook_match import check_actual_playbook
+        agentix_gateway = AgentixSessionGateway()
+
+        verdict = "TIMEOUT"
+        actual_pb = None
+        timeout_limit = 25.0
+        poll_interval = 2.0
+        elapsed = 0.0
+
+        while elapsed < timeout_limit:
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+
+            actual_pb = await check_actual_playbook(last_session_id)
+            sess_status = await agentix_gateway.get_session_status(last_session_id)
+
+            if not sess_status:
+                sess_status = "FAILED"
+
+            if actual_pb:
+                if actual_pb in expected_list:
+                    verdict = "TRUE_POSITIVE"
+                else:
+                    verdict = "FALSE_POSITIVE"
+                break
+            elif sess_status not in ("ACTIVE", "WAITING_APPROVAL"):
+                verdict = "NO_PLAYBOOK"
+                break
+
+        return verdict, actual_pb
 
 
 class SimulationService:
@@ -25,10 +231,14 @@ class SimulationService:
     """
 
     def __init__(
-        self, alert_sender: AlertSender | None = None, playbook_gateway: PlaybookRegistryGateway | None = None
+        self,
+        alert_sender: AlertSender | None = None,
+        playbook_gateway: PlaybookRegistryGateway | None = None,
+        db_repository: SimulationRepository | None = None,
     ) -> None:
         self.alert_sender = alert_sender or WebhookAlertSender()
         self.playbook_gateway = playbook_gateway or PlaybookRegistryGateway()
+        self.db = db_repository or db_repo
 
     async def run_simulation(
         self,
@@ -48,7 +258,7 @@ class SimulationService:
         if not scenario_name or len(scenario_name) > 255:
             raise ValueError("Scenario name exceeds 255 characters limit.")
 
-        sc = await db_repo.get_scenario_by_name(scenario_name)
+        sc = await self.db.get_scenario_by_name(scenario_name)
         if not sc:
             raise ScenarioNotFoundError(f"Scenario '{scenario_name}' not found.")
 
@@ -59,13 +269,13 @@ class SimulationService:
             total_events = sc.get("total_events") or 0
             events = []
         else:
-            events = await db_repo.get_scenario_events(scenario_id)
+            events = await self.db.get_scenario_events(scenario_id)
             if not events:
                 raise SimulatorException(f"Scenario '{scenario_name}' has no events in the database.")
             total_events = len(events)
 
         rate = 1.0 / delay_between_events if delay_between_events > 0 else 1.0
-        run_id = await db_repo.create_run(scenario_id, total_events, rate, bulk_run_id=bulk_run_id)
+        run_id = await self.db.create_run(scenario_id, total_events, rate, bulk_run_id=bulk_run_id)
 
         # Resolve sender and timing strategy
         from attack_simulator.sender.factory import get_sender
@@ -130,24 +340,10 @@ class SimulationService:
         sent_events = 0
         try:
             for idx, ev in enumerate(events):
-                alert_payload = copy.deepcopy(ev["wazuh_alert"])
-
-                # Perform label stripping if requested
                 if strip_labels:
-                    if "rule" in alert_payload and isinstance(alert_payload["rule"], dict):
-                        alert_payload["rule"].pop("mitre", None)
-                        alert_payload["rule"].pop("rule_id", None)
-                        if "groups" in alert_payload["rule"] and isinstance(alert_payload["rule"]["groups"], list):
-                            import re
-
-                            alert_payload["rule"]["groups"] = [
-                                g
-                                for g in alert_payload["rule"]["groups"]
-                                if not (str(g).lower().startswith("mitre_") or re.match(r"^t\d{4}", str(g).lower()))
-                            ]
-                        alert_payload["rule"]["id"] = "999999"
-                    alert_payload.pop("mitre_ids", None)
-                    alert_payload.pop("rule_id", None)
+                    alert_payload = strip_alert_labels(ev["wazuh_alert"])
+                else:
+                    alert_payload = copy.deepcopy(ev["wazuh_alert"])
 
                 alert_payload["simulation_run_id"] = str(run_id)
                 session_id = await sender.send(alert_payload, ev["mitre_technique"])
@@ -163,7 +359,7 @@ class SimulationService:
 
                 expected_pb = expected_list[0] if expected_list else None
 
-                await db_repo.insert_simulation_result(
+                await self.db.insert_simulation_result(
                     run_id=run_id,
                     event_id=ev["id"],
                     session_id=session_id,
@@ -173,7 +369,7 @@ class SimulationService:
                 )
 
                 sent_events += 1
-                await db_repo.update_run_stats(run_id=run_id, status="RUNNING", sent_events=sent_events)
+                await self.db.update_run_stats(run_id=run_id, status="RUNNING", sent_events=sent_events)
 
                 if idx < len(events) - 1:
                     next_ev = events[idx + 1]
@@ -189,7 +385,7 @@ class SimulationService:
 
         except Exception as e:
             logger.exception("simulation.worker_error", run_id=run_id, error=str(e))
-            await db_repo.update_run_stats(run_id=run_id, status="FAILED", sent_events=sent_events)
+            await self.db.update_run_stats(run_id=run_id, status="FAILED", sent_events=sent_events)
 
     async def execute_dag_simulation(
         self,
@@ -210,188 +406,25 @@ class SimulationService:
         if sender is None:
             sender = self.alert_sender
 
-        initial_step = dag_structure.get("initial_step")
-        steps = dag_structure.get("steps", {})
-
-        if not initial_step or not steps:
-            logger.error("simulation.dag_invalid_structure", run_id=run_id)
-            await db_repo.update_run_stats(run_id=run_id, status="FAILED", sent_events=0)
-            return
-
-        current_step = initial_step
-        traversed_path = []
-        sent_events = 0
-        matched_playbooks = 0
-        mismatched_playbooks = 0
-        no_playbook = 0
-
-        import uuid
-
-        from attack_simulator.evaluator.playbook_match import check_actual_playbook, get_expected_playbooks
-
-        try:
-            while current_step:
-                if current_step not in steps:
-                    logger.warning("simulation.dag_step_not_found", step=current_step)
-                    break
-
-                step_info = steps[current_step]
-                mitre_technique = step_info.get("mitre_technique")
-                wazuh_alerts = step_info.get("wazuh_alerts", [])
-                transitions = step_info.get("next", {})
-
-                # Record step traversal
-                traversed_path.append(current_step)
-                await db_repo.update_run_path(run_id, list(traversed_path))
-
-                if not wazuh_alerts:
-                    # Empty/terminal node
-                    logger.info("simulation.dag_reached_terminal_step", step=current_step)
-                    if not transitions:
-                        break
-                    next_step = None
-                    if transitions and "COMPLETED" in transitions:
-                        next_step = transitions["COMPLETED"]
-                    elif transitions and isinstance(transitions, dict) and len(transitions) > 0:
-                        next_step = list(transitions.values())[0]
-                    current_step = next_step
-                    continue
-
-                logger.info("simulation.dag_executing_step", step=current_step, alerts_count=len(wazuh_alerts))
-
-                # Play all alerts for this step
-                last_session_id = None
-                for idx, alert in enumerate(wazuh_alerts):
-                    alert_payload = copy.deepcopy(alert)
-                    if strip_labels:
-                        if "rule" in alert_payload and isinstance(alert_payload["rule"], dict):
-                            alert_payload["rule"].pop("mitre", None)
-                            alert_payload["rule"].pop("rule_id", None)
-                            if "groups" in alert_payload["rule"] and isinstance(alert_payload["rule"]["groups"], list):
-                                import re
-                                alert_payload["rule"]["groups"] = [
-                                    g for g in alert_payload["rule"]["groups"]
-                                    if not (str(g).lower().startswith("mitre_") or re.match(r"^t\d{4}", str(g).lower()))
-                                ]
-                            alert_payload["rule"]["id"] = "999999"
-                        alert_payload.pop("mitre_ids", None)
-                        alert_payload.pop("rule_id", None)
-
-                    alert_payload["simulation_run_id"] = str(run_id)
-                    last_session_id = await sender.send(alert_payload, mitre_technique)
-                    sent_events += 1
-                    await db_repo.update_run_stats(run_id=run_id, status="RUNNING", sent_events=sent_events)
-
-                    if idx < len(wazuh_alerts) - 1:
-                        await timing_strategy.wait_before_next(alert, wazuh_alerts[idx + 1])
-
-                if not last_session_id:
-                    logger.warning("simulation.dag_step_no_session", step=current_step)
-                    mismatched_playbooks += 1
-                    current_step = transitions.get("TIMEOUT") or transitions.get("NO_PLAYBOOK")
-                    continue
-
-                expected_list = await get_expected_playbooks([mitre_technique])
-                expected_pb = expected_list[0] if expected_list else None
-
-                result_id = await db_repo.insert_simulation_result(
-                    run_id=run_id,
-                    event_id=None,
-                    session_id=last_session_id,
-                    expected_mitre=[mitre_technique],
-                    expected_playbook=expected_pb,
-                    match_result="PENDING",
-                )
-
-                # Poll and evaluate verdict
-                verdict = "TIMEOUT"
-                actual_pb = None
-                timeout_limit = 25.0
-                poll_interval = 2.0
-                elapsed = 0.0
-
-                from attack_simulator.evaluator.agentix_gateway import AgentixSessionGateway
-                agentix_gateway = AgentixSessionGateway()
-
-                while elapsed < timeout_limit:
-                    await asyncio.sleep(poll_interval)
-                    elapsed += poll_interval
-
-                    actual_pb = await check_actual_playbook(last_session_id)
-                    sess_status = await agentix_gateway.get_session_status(last_session_id)
-
-                    if not sess_status:
-                        sess_status = "FAILED"
-
-                    if actual_pb:
-                        if actual_pb in expected_list:
-                            verdict = "TRUE_POSITIVE"
-                        else:
-                            verdict = "FALSE_POSITIVE"
-                        break
-                    elif sess_status not in ("ACTIVE", "WAITING_APPROVAL"):
-                        verdict = "NO_PLAYBOOK"
-                        break
-
-                logger.info("simulation.dag_step_verdict", step=current_step, verdict=verdict, actual_playbook=actual_pb)
-
-                if verdict == "TRUE_POSITIVE":
-                    match_result = "CORRECT"
-                    matched_playbooks += 1
-                elif verdict == "FALSE_POSITIVE":
-                    match_result = "WRONG"
-                    mismatched_playbooks += 1
-                elif verdict == "NO_PLAYBOOK":
-                    match_result = "NO_PLAYBOOK"
-                    no_playbook += 1
-                else:
-                    match_result = "TIMEOUT"
-                    mismatched_playbooks += 1
-
-                # Update the result record
-                pool = await db_repo.get_pool()
-                async with pool.acquire() as conn:
-                    await conn.execute(
-                        """
-                        UPDATE simulator.simulation_results 
-                        SET actual_playbook = $2, match_result = $3
-                        WHERE id = $1
-                        """,
-                        uuid.UUID(result_id),
-                        actual_pb,
-                        match_result,
-                    )
-
-                next_step = transitions.get(verdict)
-                if not next_step:
-                    next_step = transitions.get("TIMEOUT") or transitions.get("NO_PLAYBOOK")
-
-                current_step = next_step
-
-            # Finalize run
-            logger.info("simulation.dag_run_completed", run_id=run_id, path=traversed_path)
-            await db_repo.update_run_stats(
-                run_id=run_id,
-                status="COMPLETED",
-                sent_events=sent_events,
-                matched_playbooks=matched_playbooks,
-                mismatched_playbooks=mismatched_playbooks,
-                no_playbook=no_playbook,
-            )
-
-        except Exception as e:
-            logger.exception("simulation.dag_error", run_id=run_id, error=str(e))
-            await db_repo.update_run_stats(run_id=run_id, status="FAILED", sent_events=sent_events)
+        executor = DagSimulationExecutor(
+            run_id=run_id,
+            scenario_id=scenario_id,
+            dag_structure=dag_structure,
+            db=self.db,
+            sender=sender,
+            timing_strategy=timing_strategy,
+            strip_labels=strip_labels,
+        )
+        await executor.execute()
 
     async def evaluate_run_if_needed(self, run_id: str) -> None:
         """
         Evaluate run results against playbooks in real-time.
         """
         try:
-            import uuid
-            run = await db_repo.get_run(run_id)
+            run = await self.db.get_run(run_id)
             if run and run.get("scenario_id"):
-                sc = await db_repo.get_scenario_by_id(uuid.UUID(run["scenario_id"]))
+                sc = await self.db.get_scenario_by_id(uuid.UUID(run["scenario_id"]))
                 if sc and sc.get("type") == "dag":
                     return
             await evaluate_run(run_id)
@@ -414,7 +447,7 @@ class SimulationService:
         """
         Create the bulk run record and spawn background sequential execution task.
         """
-        bulk_run_id = await db_repo.create_bulk_run(
+        bulk_run_id = await self.db.create_bulk_run(
             name=name,
             llm_provider=llm_provider,
             llm_model=llm_model,
@@ -452,29 +485,27 @@ class SimulationService:
         """
         Background task running scenarios sequentially for a bulk simulation run.
         """
-        import uuid
-
         delay = 1.0 / send_rate_per_sec
         bulk_uuid = uuid.UUID(bulk_run_id)
 
         for sc_id in scenario_ids:
             try:
                 # Check bulk run status for cancellation
-                status = await db_repo.get_bulk_run_status(bulk_uuid)
+                status = await self.db.get_bulk_run_status(bulk_uuid)
                 if status in ("CANCELLED", "PARTIALLY_COMPLETED"):
                     logger.info("SimulationService.bulk_run_interrupted", bulk_run_id=bulk_run_id, status=status)
                     break
 
-                total_events = await db_repo.get_scenario_total_events(uuid.UUID(sc_id))
+                total_events = await self.db.get_scenario_total_events(uuid.UUID(sc_id))
                 if total_events is None:
                     logger.warning("SimulationService.bulk_run.scenario_not_found", scenario_id=sc_id)
                     continue
 
-                sc = await db_repo.get_scenario_by_id(uuid.UUID(sc_id))
+                sc = await self.db.get_scenario_by_id(uuid.UUID(sc_id))
                 if not sc:
                     continue
 
-                run_id = await db_repo.create_run(
+                run_id = await self.db.create_run(
                     scenario_id=sc_id,
                     total_events=total_events,
                     send_rate_per_sec=send_rate_per_sec,
@@ -511,7 +542,7 @@ class SimulationService:
                     )
                 else:
                     # Execute sequentially
-                    events = await db_repo.get_scenario_events(sc_id)
+                    events = await self.db.get_scenario_events(sc_id)
                     await self.execute_simulation(
                         run_id=run_id,
                         scenario_id=sc_id,
@@ -543,10 +574,10 @@ class SimulationService:
         """
         while True:
             try:
-                bulk_rows = await db_repo.get_active_bulk_runs()
+                bulk_rows = await self.db.get_active_bulk_runs()
                 for row in bulk_rows:
                     bulk_run_id = str(row["id"])
-                    runs = await db_repo.get_runs_for_bulk(bulk_run_id)
+                    runs = await self.db.get_runs_for_bulk(bulk_run_id)
 
                     completed_scenarios = 0
                     matched_count = 0
@@ -559,7 +590,7 @@ class SimulationService:
                         if r["status"] == "RUNNING":
                             try:
                                 await self.evaluate_run_if_needed(r_id)
-                                updated_r = await db_repo.get_run(r_id)
+                                updated_r = await self.db.get_run(r_id)
                                 if updated_r:
                                     r = updated_r
                             except Exception as eval_err:
@@ -578,7 +609,7 @@ class SimulationService:
                             all_done = False
 
                     bulk_status = "COMPLETED" if (all_done and len(runs) > 0) else "RUNNING"
-                    await db_repo.update_bulk_run_stats(
+                    await self.db.update_bulk_run_stats(
                         bulk_run_id=bulk_run_id,
                         status=bulk_status,
                         completed_scenarios=completed_scenarios,
@@ -597,5 +628,5 @@ class SimulationService:
         """
         Cancel bulk run status and compute stats up to the point of cancellation.
         """
-        await db_repo.cancel_bulk_run(bulk_run_id)
+        await self.db.cancel_bulk_run(bulk_run_id)
 

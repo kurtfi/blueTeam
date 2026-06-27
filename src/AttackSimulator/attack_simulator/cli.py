@@ -12,7 +12,7 @@ from tqdm import tqdm  # type: ignore[import-untyped]
 
 from attack_simulator.evaluator.gap_analyzer import generate_coverage_report, print_ascii_gap_report
 from attack_simulator.evaluator.playbook_match import evaluate_run
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 from attack_simulator.services.simulation import SimulationService
 
 logger = structlog.get_logger(__name__)

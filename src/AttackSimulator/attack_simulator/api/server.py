@@ -3,7 +3,7 @@ from pathlib import Path
 
 import structlog
 from attack_simulator.api.routes import router, simulation_service
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 

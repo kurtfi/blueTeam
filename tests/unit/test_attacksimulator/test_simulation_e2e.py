@@ -7,7 +7,7 @@ import pytest
 from typing import Any
 from unittest.mock import patch, AsyncMock
 
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 from attack_simulator.mcp_server import _run_simulation_task
 
 

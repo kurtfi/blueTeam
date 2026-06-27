@@ -10,7 +10,7 @@ from typing import Any
 import structlog
 from attack_simulator.evaluator.agentix_gateway import AgentixSessionGateway
 from attack_simulator.evaluator.gateway import PlaybookRegistryGateway
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 
 logger = structlog.get_logger(__name__)
 
@@ -124,10 +124,10 @@ def determine_session_verdict(actual: str | None, expected_list: list[str], sess
 
 async def check_actual_playbook(session_id: str, conn: Any | None = None) -> str | None:
     """
-    Queries the session audit logs in PostgreSQL to find if and which playbook the agent triggered,
+    Queries the session audit logs via HTTP gateway to find if and which playbook the agent triggered,
     detailed, or referenced in its final answer.
     """
-    rows = await agentix_gateway.get_session_events(session_id, conn)
+    rows = await agentix_gateway.get_session_events(session_id)
 
     triggered_pbs = []
     detailed_pbs = []
@@ -207,9 +207,8 @@ async def evaluate_run(run_id: str) -> dict[str, Any]:
         expected_str = ", ".join(expected_list) if expected_list else None
 
         # Check actual playbook and status for the session
-        async with pool.acquire() as conn:
-            actual = await check_actual_playbook(session_id, conn)
-            sess_status = await agentix_gateway.get_session_status(session_id, conn)
+        actual = await check_actual_playbook(session_id)
+        sess_status = await agentix_gateway.get_session_status(session_id)
 
         if not sess_status:
             sess_status = "FAILED"

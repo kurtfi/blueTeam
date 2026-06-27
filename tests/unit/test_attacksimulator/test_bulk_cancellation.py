@@ -3,7 +3,7 @@ Unit tests for Bulk Run Cancellation and Partial Completion states.
 """
 
 import pytest
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 from agentic_common.memory import postgres_session_repo
 
 

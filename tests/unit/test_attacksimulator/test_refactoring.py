@@ -130,25 +130,29 @@ async def test_original_delta_strategy() -> None:
 
 @pytest.mark.asyncio
 async def test_agentix_session_gateway() -> None:
-    """Verifies AgentixSessionGateway functions query the database correctly."""
+    """Verifies AgentixSessionGateway functions query the Agentix HTTP APIs correctly."""
+    import httpx
     gateway = AgentixSessionGateway()
     dummy_session_id = str(uuid.uuid4())
 
-    mock_conn = AsyncMock()
-    mock_conn.fetchrow.return_value = {"status": "ACTIVE"}
-    mock_conn.fetch.return_value = [
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    # Mock responses
+    mock_status_response = MagicMock(spec=httpx.Response)
+    mock_status_response.status_code = 200
+    mock_status_response.json.return_value = {"status": "ACTIVE"}
+
+    mock_events_response = MagicMock(spec=httpx.Response)
+    mock_events_response.status_code = 200
+    mock_events_response.json.return_value = [
         {"event_type": "think", "actor": "agent", "content": "thought", "metadata": None}
     ]
 
-    mock_acq = MagicMock()
-    mock_acq.__aenter__ = AsyncMock(return_value=mock_conn)
-    mock_acq.__aexit__ = AsyncMock()
-
-    mock_pool = MagicMock()
-    mock_pool.acquire.return_value = mock_acq
-
-    with patch("attack_simulator.models.db_repo.get_pool", new_callable=AsyncMock) as mock_get_pool:
-        mock_get_pool.return_value = mock_pool
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        # Configure mock get requests
+        mock_client.get.side_effect = [mock_status_response, mock_events_response]
 
         status = await gateway.get_session_status(dummy_session_id)
         assert status == "ACTIVE"

@@ -1,6 +1,6 @@
 import uuid
 
-from attack_simulator.models import db_repo
+from attack_simulator.repository import db_repo
 from attack_simulator.services.simulation import SimulationService
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field

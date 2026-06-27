@@ -2,7 +2,7 @@
 Unit tests for alert transformer and wazuh alert payload generator.
 """
 
-from attack_simulator.mapper.wazuh_template import generate_wazuh_alert
+from agentic_common.mapper.wazuh_template import generate_wazuh_alert
 
 
 def test_alert_generation_default() -> None:
