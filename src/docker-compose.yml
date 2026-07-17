@@ -83,7 +83,7 @@ services:
       - ..:/app
       - /app/.venv
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/sse')"]
+      test: [ "CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/sse')" ]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -99,7 +99,7 @@ services:
     restart: always
     environment:
       - AGENTIX_LOG_LEVEL=DEBUG
-      - AGENTIX_TRIAGE_CORE_URL=http://triage-core:8081/sse
+      - AGENTIX_TRIAGE_CORE_URL=http://host.docker.internal:8084/sse
       - AGENTIX_ATTACK_SIMULATOR_URL=http://attack-simulator:8082/sse
       - AGENTIX_ATTACK_SIMULATOR_API_URL=http://attack-simulator:8083
       - REDIS_URL=redis://redis:6379
@@ -149,7 +149,7 @@ services:
       - ..:/app
       - /app/.venv
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/sse')"]
+      test: [ "CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/sse')" ]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -177,7 +177,6 @@ services:
     command: [ "uv", "run", "uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8001" ]
     depends_on:
       - agentix-api
-
 
 networks:
   agentix_net:
